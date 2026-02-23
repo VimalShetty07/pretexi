@@ -202,7 +202,7 @@ export default function PortalBgVerifyPage() {
               { key: "relation_to_employee", label: "Relationship to You" },
               { key: "employment_start", label: "Your Employment Start Date", type: "date" },
               { key: "employment_end", label: "Your Employment End Date", type: "date" },
-            ] as const).map((f) => (
+            ] as { key: string; label: string; required?: boolean; type?: string }[]).map((f) => (
               <div key={f.key}>
                 <label className="block text-xs font-medium text-gray-700" style={{ marginBottom: 4 }}>{f.label}</label>
                 <input
