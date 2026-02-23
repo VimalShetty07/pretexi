@@ -1,0 +1,161 @@
+# Protexi — Cursor AI Context
+
+## Project Overview
+
+Protexi is a UK Sponsor Licence Compliance Management Platform. It has a Next.js frontend and a Python FastAPI backend.
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router), React 19, TypeScript 5
+- **Styling:** Tailwind CSS 4 (via @tailwindcss/postcss)
+- **UI Primitives:** Radix UI (Avatar, Dialog, Dropdown, Label, Progress, ScrollArea, Select, Separator, Slot, Tabs, Tooltip)
+- **Icons:** lucide-react
+- **Utils:** clsx + tailwind-merge (via `cn()` in `src/lib/utils.ts`), class-variance-authority
+- **Backend:** Python FastAPI (lives in `/backend`, separate process)
+- **Auth:** JWT tokens via `src/components/auth-provider.tsx`, mock auth supported via `NEXT_PUBLIC_MOCK_AUTH=true`
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── page.tsx               # Login page (liquid glass design)
+│   ├── layout.tsx             # Root layout (wraps AuthProvider)
+│   ├── globals.css            # Tailwind config, brand tokens, glass CSS
+│   └── (admin)/               # Protected admin route group
+│       ├── layout.tsx         # Sidebar + Topbar shell
+│       ├── dashboard/page.tsx
+│       ├── workers/page.tsx
+│       ├── organisation/page.tsx
+│       ├── documents/page.tsx
+│       ├── reports/page.tsx
+│       ├── risk/page.tsx
+│       ├── settings/page.tsx
+│       └── portal/           # Employee-only routes
+│           ├── page.tsx
+│           ├── documents/page.tsx
+│           └── details/page.tsx
+├── components/
+│   ├── auth-provider.tsx      # Auth context, login/logout, role guards
+│   ├── sidebar.tsx            # Collapsible sidebar (72px / 240px)
+│   └── topbar.tsx             # Sticky top bar with search, user info
+├── lib/
+│   ├── api.ts                 # Fetch wrapper, mock-auth headers
+│   ├── auth.ts                # Types (UserRole, AuthUser), ROUTE_PERMISSIONS, ROLE_HOME
+│   ├── mock-users.ts          # 3 dev users: admin, hr, employee
+│   └── utils.ts               # cn() helper
+public/
+└── logo.png                   # Brand logo (blue bg, white text)
+```
+
+## Brand Color Palette
+
+All brand colors are defined in `globals.css` under `@theme inline`. Use Tailwind classes like `text-brand-500`, `bg-brand-100`, etc.
+
+| Token        | Hex       | Usage                        |
+|-------------|-----------|------------------------------|
+| brand-50    | #EBF1FA   | Lightest tint, subtle bg     |
+| brand-100   | #D1DFF3   | Light bg, icon bg            |
+| brand-200   | #A8C2E8   | Borders, hover states        |
+| brand-300   | #7AA1DA   | Secondary accents            |
+| brand-400   | #4E82CC   | Links, interactive elements  |
+| brand-500   | #2B5DA8   | Primary (buttons, CTA)       |
+| brand-600   | #234D8C   | Primary hover                |
+| brand-700   | #1B3D6F   | Dark accents, headings       |
+| brand-800   | #132C52   | Sidebar, dark surfaces       |
+| brand-900   | #0C1C36   | Darkest (foreground)         |
+
+CSS variables are also defined: `--primary: #2B5DA8`, `--background: #F4F7FB`, `--sidebar: #0C1C36`, etc.
+
+## Design System
+
+### Login Page (src/app/page.tsx)
+
+The login page uses a **liquid glass** aesthetic on a dark animated background.
+
+**Background layers (bottom to top):**
+1. `.login-bg` — Animated gradient using brand-800 → brand-500 (300% canvas, 18s shift)
+2. `.login-orb` — Four radial-gradient orbs (brand blues) with drift animations (16–28s loops)
+3. `.logo-watermark` — Large "Protexi" text, opacity 0.06, centered
+
+**Glass card (`.glass-card`):**
+- Semi-transparent white gradient bg (8–22% opacity)
+- `backdrop-filter: blur(32px) saturate(1.4)`
+- 1px white/25% border, 24px border-radius
+- Deep shadow + inner highlight
+- `::before` pseudo-element with animated shine sweep (6s loop)
+
+**Glass sub-components:**
+- `.glass-field` — Translucent inputs (10% white, blur, 14px radius)
+- `.glass-role-btn` — Role selection buttons (8% white, blur, 16px radius, shine animation)
+- `.glass-cta` — Primary submit button (brand gradient, glow shadow)
+
+**Spacing (explicit px values via inline styles for precision):**
+- Card padding: `40px 36px 36px`
+- Logo margin-bottom: `32px`
+- Subtitle margin-bottom: `28px`
+- Role button gap: `12px`
+- Role button padding: `16px 20px`
+- Icon-to-text gap: `16px`
+- Icon box: `44×44px`, rounded-2xl
+- Footer margin-top: `28px`, padding-top: `24px`
+
+**Text styling on glass:**
+- All text is white with varying opacity (labels: /60, descriptions: /40, headings: white)
+- Uppercase tracking-widest for subtitles
+- Font sizes: labels 12–13px, body 14–15px, descriptions 11–12px
+
+**Logo rendering:**
+- Uses `/public/logo.png` (has blue background)
+- `mixBlendMode: "screen"` strips the blue box so it blends into the glass card
+- Size: 150×48px, `object-contain`
+
+### Admin Shell (src/app/(admin)/layout.tsx)
+
+**Layout:** Fixed sidebar left, sticky topbar top, scrollable content area.
+
+**Sidebar (`src/components/sidebar.tsx`):**
+- Collapsed: 72px, Expanded: 240px, 300ms transition
+- Background: dark gradient (#0E2240 → #0A1929)
+- Navigation is role-based (admin nav vs employee nav)
+- Shows logo, nav items, user badge, settings (super_admin), sign out
+
+**Topbar (`src/components/topbar.tsx`):**
+- Sticky, backdrop-blur
+- Search input, notification bell, user avatar + name
+
+**Content area:** `bg-background` (#F4F7FB), `p-6 lg:p-8`, margin-left adjusts to sidebar width.
+
+### General Component Patterns
+
+- Dark surfaces: brand-800/900 backgrounds, brand-100/200 text
+- Light surfaces: white cards, brand-900 text, brand-50 subtle bg
+- Borders: `border-border` (#DDE5EF) on light, `border-white/10–25` on dark/glass
+- Radius: 14–16px for inputs/buttons, 24px for cards
+- Transitions: 0.25s ease for interactions, cubic-bezier for entrance animations
+
+## Auth & Roles
+
+Six roles: `super_admin`, `compliance_manager`, `hr_officer`, `payroll_officer`, `inspector`, `employee`.
+
+Route permissions are in `src/lib/auth.ts` → `ROUTE_PERMISSIONS`. The `canAccess(role, path)` function checks access. `getHomeForRole(role)` returns the default landing page.
+
+Mock auth mode (`NEXT_PUBLIC_MOCK_AUTH=true`) shows 3 role buttons on login instead of email/password. Mock users are defined in `src/lib/mock-users.ts`.
+
+## Coding Conventions
+
+- Use `"use client"` directive for interactive components
+- Use `cn()` from `@/lib/utils` for conditional class merging
+- Prefer Tailwind classes; use inline `style={{}}` only for precise pixel spacing
+- Icons from `lucide-react`, sized with `h-N w-N` classes or inline style
+- All pages are React client components using hooks (`useState`, `useCallback`, etc.)
+- API calls go through `src/lib/api.ts` (handles tokens + mock headers)
+- File aliases: `@/` maps to `src/`
+
+## Important Notes
+
+- The logo at `/public/logo.png` has a blue background — always use `mixBlendMode: "screen"` when rendering on dark/glass surfaces to eliminate the blue box
+- Login page spacing uses inline `style={{}}` with pixel values to avoid Tailwind spacing inconsistencies — keep this pattern when modifying the login page
+- Glass CSS classes are in `globals.css` after line 136 — edit there, not inline
+- The admin pages are currently stubs waiting for backend API integration
+- Backend runs separately at `http://localhost:8000`, frontend at `http://localhost:3000`
