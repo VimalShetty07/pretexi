@@ -11,9 +11,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center admin-bg">
-        <div className="glass-card" style={{ padding: "20px 40px" }}>
-          <p className="text-white/60 text-sm tracking-wide">Loading&hellip;</p>
+      <div className="flex min-h-screen items-center justify-center" style={{ background: "#1657ad" }}>
+        <div className="rounded-2xl bg-white/10 backdrop-blur-md" style={{ padding: "20px 40px" }}>
+          <p className="text-white/70 text-sm tracking-wide">Loading&hellip;</p>
         </div>
       </div>
     );
@@ -28,10 +28,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         className="flex-1 flex flex-col min-h-screen transition-all duration-300"
         style={{ marginLeft: collapsed ? 72 : 240 }}
       >
-        <Topbar />
+        <Topbar userRole={user.role} />
         <main
-          className="bg-[var(--background)]"
-          style={{ padding: "24px 28px", flex: 1, borderTopLeftRadius: 16 }}
+          style={{ padding: "24px 28px", flex: 1, borderTopLeftRadius: 16, background: "#f1f5fb" }}
         >
           {children}
         </main>

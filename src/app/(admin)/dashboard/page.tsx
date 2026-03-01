@@ -1,409 +1,290 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "@/components/auth-provider";
-import { api } from "@/lib/api";
+import { useEffect, useMemo, useState, type ComponentType, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Users,
-  Shield,
-  UserCheck,
-  AlertTriangle,
-  Clock,
-  CalendarDays,
-  Loader2,
-  ChevronRight,
-  Eye,
+  Users, UserCheck, CalendarClock, FileWarning,
+  Briefcase, AlertTriangle, ArrowRight, TrendingUp,
 } from "lucide-react";
+import { useAuth } from "@/components/auth-provider";
+import { api } from "@/lib/api";
 
-interface DashboardData {
-  total_employees: number;
-  active_employees: number;
-  sponsored: number;
-  non_sponsored: number;
-  pending_leaves: number;
-  visa_breakdown: {
-    expired: number;
-    expiring_30: number;
-    expiring_60: number;
-    expiring_90: number;
-    valid: number;
-    no_visa: number;
-  };
-  expiring_workers: {
-    id: string;
-    name: string;
-    visa_expiry: string;
-    days_left: number;
-    category: string;
-    department: string | null;
-    job_title: string;
-  }[];
+interface DashboardOverview {
+  total_employees: number; active_employees: number;
+  sponsored: number; non_sponsored: number; pending_leaves: number;
+  cos_allocated: number; cos_used: number; cos_available: number;
+  cos_forecasted_required: number; cos_projected_required: number;
+  cos_forecasted_demand: number; cos_projected_demand: number;
+  visa_breakdown: { expired: number; expiring_30: number; expiring_60: number; expiring_90: number; valid: number; no_visa: number; };
+  expiring_workers: Array<{ id: string; name: string; visa_expiry: string; days_left: number; category: string; department?: string | null; job_title?: string | null; }>;
 }
 
-function fmt(iso: string): string {
+function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-// SVG donut chart
-function DonutChart({
-  segments,
-  size = 200,
-  strokeWidth = 32,
-}: {
-  segments: { value: number; color: string; label: string }[];
-  size?: number;
-  strokeWidth?: number;
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const total = segments.reduce((s, seg) => s + seg.value, 0);
-  if (total === 0) {
-    return (
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle
-          cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke="#e5e7eb" strokeWidth={strokeWidth}
-        />
-        <text x={size / 2} y={size / 2} textAnchor="middle" dy="0.35em" className="fill-gray-400" style={{ fontSize: 14 }}>
-          No data
-        </text>
-      </svg>
-    );
-  }
-
-  let offset = 0;
-  const arcs = segments.filter((s) => s.value > 0).map((seg) => {
-    const pct = seg.value / total;
-    const dashArray = `${pct * circumference} ${circumference}`;
-    const rotation = (offset / total) * 360 - 90;
-    offset += seg.value;
-    return (
-      <circle
-        key={seg.label}
-        cx={size / 2} cy={size / 2} r={radius}
-        fill="none" stroke={seg.color} strokeWidth={strokeWidth}
-        strokeDasharray={dashArray}
-        strokeLinecap="butt"
-        transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
-      />
-    );
-  });
-
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {arcs}
-      <text x={size / 2} y={size / 2 - 8} textAnchor="middle" className="fill-brand-900 font-bold" style={{ fontSize: 28 }}>
-        {total}
-      </text>
-      <text x={size / 2} y={size / 2 + 14} textAnchor="middle" className="fill-gray-500" style={{ fontSize: 12 }}>
-        Total
-      </text>
-    </svg>
-  );
-}
-
 export default function DashboardPage() {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const router = useRouter();
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const fetchDashboard = useCallback(async () => {
-    try {
-      const d = await api.get<DashboardData>("/dashboard/overview", token ?? undefined);
-      setData(d);
-    } catch {
-      /* ignore */
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+    const load = async () => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const overview = await api.get<DashboardOverview>("/dashboard/overview", token);
+        setData(overview);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to load dashboard");
+      } finally { setLoading(false); }
+    };
+    load();
+  }, [token]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center" style={{ padding: 80 }}>
-        <Loader2 className="animate-spin text-brand-500" style={{ width: 24, height: 24 }} />
-      </div>
-    );
-  }
+  const topAlerts = useMemo(() => data?.expiring_workers.slice(0, 6) ?? [], [data]);
 
-  if (!data) {
-    return (
-      <div style={{ padding: 40 }}>
-        <h1 className="text-2xl font-bold text-brand-900 tracking-tight">Dashboard</h1>
-        <p className="text-sm text-[var(--muted-foreground)]" style={{ marginTop: 8 }}>
-          Unable to load dashboard data.
-        </p>
-      </div>
-    );
-  }
+  if (loading) return <p className="text-sm text-gray-400">Loading dashboard...</p>;
+  if (error || !data) return <p className="text-sm text-red-500">{error || "Dashboard unavailable"}</p>;
 
-  const v = data.visa_breakdown;
-  const totalAlerts = v.expired + v.expiring_30 + v.expiring_60 + v.expiring_90;
-
-  const sponsorSegments = [
-    { value: data.sponsored, color: "#2563eb", label: "Sponsored" },
-    { value: data.non_sponsored, color: "#8b5cf6", label: "Non-Sponsored" },
-  ];
-
-  const visaSegments = [
-    { value: v.expired, color: "#dc2626", label: "Expired" },
-    { value: v.expiring_30, color: "#f97316", label: "Within 30 days" },
-    { value: v.expiring_60, color: "#eab308", label: "Within 60 days" },
-    { value: v.expiring_90, color: "#3b82f6", label: "Within 90 days" },
-    { value: v.valid, color: "#10b981", label: "Valid (>90 days)" },
-  ];
+  const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const expired = data.visa_breakdown.expired;
+  const expiring90 = expired + data.visa_breakdown.expiring_30 + data.visa_breakdown.expiring_60 + data.visa_breakdown.expiring_90;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-brand-900 tracking-tight">Dashboard</h1>
-      <p className="text-sm text-[var(--muted-foreground)]" style={{ marginTop: 4, marginBottom: 24 }}>
-        Sponsor licence compliance overview
-      </p>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: 16, marginBottom: 24 }}>
-        <StatCard
-          icon={Users} iconBg="#dbeafe" iconColor="#2563eb"
-          label="Total Employees" value={data.total_employees}
-          sub={`${data.active_employees} active`}
-        />
-        <StatCard
-          icon={Shield} iconBg="#ede9fe" iconColor="#7c3aed"
-          label="Sponsored" value={data.sponsored}
-          sub={`${data.non_sponsored} non-sponsored`}
-        />
-        <StatCard
-          icon={AlertTriangle} iconBg={totalAlerts > 0 ? "#fef3c7" : "#d1fae5"} iconColor={totalAlerts > 0 ? "#d97706" : "#059669"}
-          label="Visa Alerts" value={totalAlerts}
-          sub={v.expired > 0 ? `${v.expired} expired!` : "All good"}
-          alert={v.expired > 0}
-        />
-        <StatCard
-          icon={CalendarDays} iconBg="#fce7f3" iconColor="#db2777"
-          label="Pending Leaves" value={data.pending_leaves}
-          sub="Awaiting approval"
-          onClick={() => router.push("/leave")}
-        />
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between flex-wrap" style={{ gap: 12 }}>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#1a5296", marginBottom: 4 }}>
+            Sponsor Compliance
+          </p>
+          <h1 className="font-black tracking-tight text-gray-900" style={{ fontSize: 30, lineHeight: 1 }}>
+            Dashboard
+          </h1>
+          <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 5 }}>{today}</p>
+        </div>
+        {expired > 0 && (
+          <div className="flex items-center gap-2 rounded-2xl" style={{ padding: "8px 14px", background: "#fef2f2", border: "1px solid #fecaca" }}>
+            <AlertTriangle style={{ width: 14, height: 14, color: "#ef4444" }} />
+            <span style={{ color: "#dc2626", fontSize: 12, fontWeight: 600 }}>{expired} visa{expired > 1 ? "s" : ""} expired — action required</span>
+          </div>
+        )}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 20, marginBottom: 24 }}>
-        {/* Sponsored vs Non-Sponsored */}
-        <div className="bg-white rounded-2xl border border-[var(--border)]" style={{ padding: "24px 28px" }}>
-          <h3 className="text-sm font-semibold text-brand-900 uppercase tracking-wide" style={{ marginBottom: 20 }}>
-            Employee Sponsorship
-          </h3>
-          <div className="flex items-center justify-center" style={{ gap: 40 }}>
-            <DonutChart segments={sponsorSegments} size={180} strokeWidth={28} />
-            <div style={{ minWidth: 140 }}>
-              {sponsorSegments.map((s) => (
-                <div key={s.label} className="flex items-center" style={{ gap: 10, marginBottom: 14 }}>
-                  <div className="rounded-full shrink-0" style={{ width: 12, height: 12, background: s.color }} />
-                  <div>
-                    <div className="text-sm font-bold text-brand-900">{s.value}</div>
-                    <div className="text-xs text-[var(--muted-foreground)]">{s.label}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Visa Expiry Breakdown */}
-        <div className="bg-white rounded-2xl border border-[var(--border)]" style={{ padding: "24px 28px" }}>
-          <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
-            <h3 className="text-sm font-semibold text-brand-900 uppercase tracking-wide">
-              Visa Expiry Status
-            </h3>
-            {totalAlerts > 0 && (
-              <span className="inline-flex items-center rounded-full bg-amber-50 text-amber-700 text-xs font-medium" style={{ padding: "3px 10px", gap: 4 }}>
-                <AlertTriangle style={{ width: 12, height: 12 }} />
-                {totalAlerts} alert{totalAlerts !== 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center justify-center" style={{ gap: 40 }}>
-            <DonutChart segments={visaSegments} size={180} strokeWidth={28} />
-            <div style={{ minWidth: 150 }}>
-              {visaSegments.map((s) => (
-                <div key={s.label} className="flex items-center" style={{ gap: 10, marginBottom: 10 }}>
-                  <div className="rounded-full shrink-0" style={{ width: 10, height: 10, background: s.color }} />
-                  <div className="flex items-center" style={{ gap: 6 }}>
-                    <span className="text-sm font-bold text-brand-900" style={{ minWidth: 20 }}>{s.value}</span>
-                    <span className="text-xs text-[var(--muted-foreground)]">{s.label}</span>
-                  </div>
-                </div>
-              ))}
-              {v.no_visa > 0 && (
-                <div className="flex items-center" style={{ gap: 10, marginTop: 4 }}>
-                  <div className="rounded-full shrink-0" style={{ width: 10, height: 10, background: "#d1d5db" }} />
-                  <div className="flex items-center" style={{ gap: 6 }}>
-                    <span className="text-sm font-bold text-brand-900" style={{ minWidth: 20 }}>{v.no_visa}</span>
-                    <span className="text-xs text-[var(--muted-foreground)]">No visa set</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      {/* ── KPI 3D Cards ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 16 }}>
+        <KpiCard3D icon={Users}         label="Total Employees"   value={data.total_employees} sub={`${data.active_employees} active`}       colors={BLUE}   delay={0}   onClick={() => router.push("/workers")} />
+        <KpiCard3D icon={UserCheck}     label="Sponsored Workers" value={data.sponsored}       sub={`${data.non_sponsored} not sponsored`}   colors={PURPLE} delay={70}  />
+        <KpiCard3D icon={CalendarClock} label="Pending Leaves"    value={data.pending_leaves}  sub="Awaiting review"                         colors={AMBER}  delay={140} onClick={() => router.push("/leave")} />
+        <KpiCard3D icon={FileWarning}   label="Visa Expiring 90d" value={expiring90}           sub={`${expired} already expired`}            colors={PINK}   delay={210} onClick={() => router.push("/workers/visa-expiry")} />
       </div>
 
-      {/* Expiring Workers Table */}
-      {data.expiring_workers.length > 0 && (
-        <div className="bg-white rounded-2xl border border-[var(--border)] overflow-hidden">
-          <div className="flex items-center justify-between" style={{ padding: "16px 24px" }}>
-            <div className="flex items-center" style={{ gap: 10 }}>
-              <AlertTriangle style={{ width: 18, height: 18 }} className="text-amber-500" />
-              <h3 className="text-sm font-semibold text-brand-900">
-                Visa Expiry Alerts ({data.expiring_workers.length})
-              </h3>
-            </div>
-            <button
-              type="button"
-              onClick={() => router.push("/workers")}
-              className="text-xs font-medium text-brand-600 hover:text-brand-800 transition-colors cursor-pointer flex items-center"
-              style={{ gap: 4 }}
-            >
-              View All Employees <ChevronRight style={{ width: 14, height: 14 }} />
-            </button>
+      {/* ── CoS Glass Cards ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 16 }}>
+        <CoSCard icon={Briefcase}    label="CoS Available"      value={data.cos_available}          sub={`Allocated ${data.cos_allocated}  ·  Used ${data.cos_used}`} accent="#4e82ff" />
+        <CoSCard icon={CalendarClock} label="Forecasted CoS 90d" value={data.cos_forecasted_required} sub={`Demand: ${data.cos_forecasted_demand}`}                     accent="#f59e0b" />
+        <CoSCard icon={TrendingUp}   label="Projected CoS 12m"  value={data.cos_projected_required} sub={`Demand: ${data.cos_projected_demand}`}                       accent="#f43f5e" />
+      </div>
+
+      {/* ── Visa Expiry Table ── */}
+      <div style={{ borderRadius: 20, overflow: "hidden", background: "#fff", border: "1px solid #e5eaf4", boxShadow: "0 2px 16px -6px rgba(26,82,150,0.10), 0 1px 4px rgba(0,0,0,0.05)" }}>
+        <div className="flex items-center justify-between" style={{ padding: "15px 20px", borderBottom: "1px solid #EEF3FB", background: "#FAFCFF" }}>
+          <div className="flex items-center gap-2">
+            <AlertTriangle style={{ width: 15, height: 15, color: "#f59e0b" }} />
+            <span className="font-bold text-gray-900" style={{ fontSize: 13 }}>Visa Expiry Alerts</span>
+            <span className="rounded-full font-bold" style={{ fontSize: 11, padding: "2px 8px", background: "#EEF3FB", color: "#1a5296", border: "1px solid #d0dff5" }}>
+              {data.expiring_workers.length}
+            </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full" style={{ fontSize: 13 }}>
-              <thead>
-                <tr className="border-t border-b border-[var(--border)] bg-[var(--muted)]">
-                  {["Employee", "Department", "Visa Expiry", "Days Left", "Urgency", ""].map((h) => (
-                    <th
-                      key={h || "_a"}
-                      className="text-left font-semibold text-[var(--muted-foreground)] uppercase"
-                      style={{ padding: "10px 16px", fontSize: 11, letterSpacing: "0.05em" }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.expiring_workers.map((w) => {
-                  const urgency = getUrgency(w.category);
-                  return (
-                    <tr key={w.id} className="border-b border-[var(--border)] last:border-b-0 hover:bg-brand-50/50 transition-colors">
-                      <td style={{ padding: "12px 16px" }}>
-                        <div className="flex items-center" style={{ gap: 10 }}>
-                          <div
-                            className="flex items-center justify-center rounded-full bg-brand-100 text-brand-600 font-bold shrink-0"
-                            style={{ width: 32, height: 32, fontSize: 11 }}
-                          >
-                            {w.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-brand-900 truncate">{w.name}</p>
-                            <p className="text-[var(--muted-foreground)] truncate" style={{ fontSize: 11 }}>{w.job_title}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="text-brand-800" style={{ padding: "12px 16px" }}>{w.department ?? "—"}</td>
-                      <td className="text-brand-800" style={{ padding: "12px 16px" }}>{fmt(w.visa_expiry)}</td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <span className={`font-bold ${w.days_left <= 0 ? "text-red-600" : w.days_left <= 30 ? "text-orange-600" : "text-amber-600"}`}>
-                          {w.days_left <= 0 ? `${Math.abs(w.days_left)}d overdue` : `${w.days_left}d`}
-                        </span>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <span
-                          className={`inline-flex items-center rounded-full text-xs font-medium ${urgency.color} ${urgency.bg}`}
-                          style={{ padding: "3px 10px", gap: 4 }}
-                        >
-                          <urgency.icon style={{ width: 12, height: 12 }} />
-                          {urgency.label}
-                        </span>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/workers/${w.id}`)}
-                          className="inline-flex items-center rounded-lg bg-brand-50 text-xs font-medium text-brand-700 hover:bg-brand-100 transition-colors cursor-pointer"
-                          style={{ height: 28, padding: "0 10px", gap: 4 }}
-                        >
-                          <Eye style={{ width: 12, height: 12 }} />
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <button
+            onClick={() => router.push("/workers/visa-expiry")}
+            className="flex items-center gap-1.5 rounded-xl font-semibold transition-all hover:opacity-90 active:scale-95"
+            style={{ height: 30, padding: "0 13px", fontSize: 12, color: "#fff", background: "linear-gradient(135deg, #1a5296, #2b6cd4)", boxShadow: "0 2px 12px rgba(26,82,150,0.5)" }}
+          >
+            View all <ArrowRight style={{ width: 11, height: 11 }} />
+          </button>
         </div>
-      )}
+
+        {topAlerts.length === 0 ? (
+          <p style={{ textAlign: "center", padding: "32px 20px", color: "#9ca3af", fontSize: 13 }}>No upcoming visa expiry alerts.</p>
+        ) : (
+          <div>
+            {topAlerts.map((w, i) => {
+              const urgent = w.days_left <= 0;
+              const soon   = w.days_left > 0 && w.days_left <= 30;
+              const bar    = urgent ? "#ef4444" : soon ? "#f59e0b" : w.days_left <= 60 ? "#f97316" : "#3b82f6";
+              const badge  = urgent
+                ? { bg: "#fee2e2", border: "#fecaca", text: "#dc2626" }
+                : soon
+                ? { bg: "#fef3c7", border: "#fde68a", text: "#b45309" }
+                : w.days_left <= 60
+                ? { bg: "#fff7ed", border: "#fed7aa", text: "#ea580c" }
+                : { bg: "#dbeafe", border: "#bfdbfe", text: "#1d4ed8" };
+              return (
+                <div
+                  key={w.id}
+                  className="flex items-center justify-between"
+                  style={{ padding: "12px 20px", borderBottom: i < topAlerts.length - 1 ? "1px solid #F0F4FA" : "none", position: "relative", transition: "background 0.15s ease" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "#f8faff")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  <div style={{ position: "absolute", left: 0, top: "20%", bottom: "20%", width: 3, borderRadius: "0 3px 3px 0", background: bar }} />
+                  <div className="flex items-center gap-3" style={{ paddingLeft: 8 }}>
+                    <div className="flex items-center justify-center rounded-full font-bold text-white shrink-0" style={{ width: 34, height: 34, fontSize: 13, background: `linear-gradient(135deg, ${bar}, ${bar}99)` }}>
+                      {w.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900" style={{ fontSize: 13 }}>{w.name}</p>
+                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                        {w.department || "—"} · {w.job_title || "—"} · {fmtDate(w.visa_expiry)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-lg font-bold shrink-0" style={{ fontSize: 11, padding: "4px 10px", background: badge.bg, border: `1px solid ${badge.border}`, color: badge.text }}>
+                    {urgent ? "Expired" : `${w.days_left}d left`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function StatCard({
-  icon: Icon,
-  iconBg,
-  iconColor,
-  label,
-  value,
-  sub,
-  alert,
-  onClick,
-}: {
-  icon: typeof Users;
-  iconBg: string;
-  iconColor: string;
-  label: string;
-  value: number;
-  sub: string;
-  alert?: boolean;
-  onClick?: () => void;
+/* ── Color palettes ── */
+const BLUE   = { from: "#1d6ae5", via: "#2563eb", to: "#0ea5e9", edge: "#1040a8", glow: "rgba(37,99,235,0.55)",  dot: "rgba(255,255,255,0.12)" };
+const PURPLE = { from: "#7c3aed", via: "#9333ea", to: "#c026d3", edge: "#4c1d95", glow: "rgba(147,51,234,0.55)", dot: "rgba(255,255,255,0.12)" };
+const AMBER  = { from: "#f97316", via: "#f59e0b", to: "#eab308", edge: "#92400e", glow: "rgba(249,115,22,0.55)", dot: "rgba(255,255,255,0.14)" };
+const PINK   = { from: "#db2777", via: "#e11d48", to: "#f43f5e", edge: "#881337", glow: "rgba(225,29,72,0.55)",  dot: "rgba(255,255,255,0.12)" };
+type Palette = typeof BLUE;
+
+/* ── 3D KPI Card ── */
+function KpiCard3D({ icon: Icon, label, value, sub, colors, delay = 0, onClick }: {
+  icon: ComponentType<{ style?: CSSProperties }>;
+  label: string; value: number | string; sub: string;
+  colors: Palette; delay?: number; onClick?: () => void;
 }) {
-  const Tag = onClick ? "button" : "div";
+  const [hovered, setHovered] = useState(false);
   return (
-    <Tag
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
-      className={`bg-white rounded-2xl border border-[var(--border)] text-left transition-colors ${onClick ? "hover:bg-brand-50 cursor-pointer" : ""} ${alert ? "border-amber-300" : ""}`}
-      style={{ padding: "20px 22px" }}
-      type={onClick ? "button" : undefined}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: "relative",
+        borderRadius: 24,
+        /* 3-stop richer gradient */
+        background: `linear-gradient(135deg, ${colors.from} 0%, ${colors.via} 50%, ${colors.to} 100%)`,
+        border: "1px solid rgba(255,255,255,0.30)",
+        padding: "22px 22px 20px",
+        cursor: onClick ? "pointer" : "default",
+        minHeight: 168,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        overflow: "hidden",
+        transform: hovered ? "translateY(-10px) scale(1.025)" : "translateY(0) scale(1)",
+        transition: "transform 0.30s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.30s ease",
+        /* real 3-D block: bottom edge + deep glow */
+        boxShadow: hovered
+          ? `inset 0 1.5px 0 rgba(255,255,255,0.40),
+             0 12px 0 ${colors.edge},
+             0 40px 70px -14px ${colors.glow},
+             0 10px 28px rgba(0,0,0,0.28)`
+          : `inset 0 1.5px 0 rgba(255,255,255,0.28),
+             0 7px 0 ${colors.edge},
+             0 22px 50px -14px ${colors.glow},
+             0 4px 16px rgba(0,0,0,0.22)`,
+        animationDelay: `${delay}ms`,
+      }}
     >
-      <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
-        <div
-          className="flex items-center justify-center rounded-xl"
-          style={{ width: 40, height: 40, background: iconBg }}
-        >
-          <Icon style={{ width: 20, height: 20, color: iconColor }} />
+      {/* ── top-half glass shine ── */}
+      <div style={{ position: "absolute", inset: 0, borderRadius: 24, background: "linear-gradient(165deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.04) 48%, rgba(255,255,255,0) 100%)", pointerEvents: "none", zIndex: 1 }} />
+
+      {/* ── dot-grid pattern ── */}
+      <div style={{ position: "absolute", inset: 0, borderRadius: 24,
+        backgroundImage: `radial-gradient(circle, ${colors.dot} 1px, transparent 1px)`,
+        backgroundSize: "18px 18px", pointerEvents: "none", zIndex: 1 }} />
+
+      {/* ── shimmer sweep ── */}
+      <div className="kpi-shimmer" style={{ position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none" }} />
+
+      {/* ── large soft glow orb bottom-right ── */}
+      <div style={{ position: "absolute", bottom: "-35%", right: "-12%", width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,0.14)", filter: "blur(36px)", pointerEvents: "none", zIndex: 1 }} />
+
+      {/* ── Icon row ── */}
+      <div className="flex items-start justify-between" style={{ position: "relative", zIndex: 3 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 48, height: 48, borderRadius: 16, background: "rgba(255,255,255,0.20)", border: "1px solid rgba(255,255,255,0.28)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 4px 12px rgba(0,0,0,0.22)" }}>
+          <Icon style={{ width: 22, height: 22, color: "#fff" }} />
         </div>
-        {alert && (
-          <span className="inline-flex items-center rounded-full bg-red-100 text-red-700" style={{ padding: "2px 8px", fontSize: 10, fontWeight: 600 }}>
-            ACTION
-          </span>
+        {onClick && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 10, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)" }}>
+            <ArrowRight style={{ width: 13, height: 13, color: "rgba(255,255,255,0.8)" }} />
+          </div>
         )}
       </div>
-      <div className="text-2xl font-bold text-brand-900" style={{ marginBottom: 2 }}>{value}</div>
-      <div className="text-xs text-[var(--muted-foreground)]">{label}</div>
-      <div className="text-xs text-[var(--muted-foreground)]" style={{ marginTop: 2 }}>{sub}</div>
-    </Tag>
+
+      {/* ── Value + labels ── */}
+      <div style={{ position: "relative", zIndex: 3 }}>
+        <p style={{ fontSize: 52, fontWeight: 900, color: "#fff", lineHeight: 1, letterSpacing: "-2px" }}>{value}</p>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginTop: 6 }}>{label}</p>
+        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.62)", marginTop: 3 }}>{sub}</p>
+      </div>
+    </div>
   );
 }
 
-function getUrgency(category: string) {
-  switch (category) {
-    case "expired":
-      return { label: "Expired", color: "text-red-700", bg: "bg-red-50", icon: AlertTriangle };
-    case "30_days":
-      return { label: "Critical", color: "text-orange-700", bg: "bg-orange-50", icon: AlertTriangle };
-    case "60_days":
-      return { label: "Warning", color: "text-amber-700", bg: "bg-amber-50", icon: Clock };
-    case "90_days":
-      return { label: "Monitor", color: "text-blue-700", bg: "bg-blue-50", icon: Clock };
-    default:
-      return { label: "OK", color: "text-emerald-700", bg: "bg-emerald-50", icon: UserCheck };
-  }
+/* ── CoS Card: deep navy with glow accent ── */
+function CoSCard({ icon: Icon, label, value, sub, accent }: {
+  icon: ComponentType<{ style?: CSSProperties }>;
+  label: string; value: number | string; sub: string; accent: string;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        borderRadius: 24,
+        background: "linear-gradient(145deg, #0f1f3d 0%, #152a4e 55%, #1a3360 100%)",
+        border: `1px solid ${hovered ? accent + "60" : "rgba(255,255,255,0.10)"}`,
+        padding: "22px 22px 20px",
+        position: "relative",
+        overflow: "hidden",
+        transition: "transform 0.30s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.30s ease, border 0.2s ease",
+        transform: hovered ? "translateY(-8px) scale(1.015)" : "translateY(0) scale(1)",
+        boxShadow: hovered
+          ? `inset 0 1px 0 rgba(255,255,255,0.14), 0 8px 0 #050e1f, 0 28px 60px -16px ${accent}55, 0 8px 24px rgba(0,0,0,0.45)`
+          : `inset 0 1px 0 rgba(255,255,255,0.08), 0 5px 0 #050e1f, 0 16px 40px -14px rgba(0,0,0,0.5), 0 4px 14px rgba(0,0,0,0.3)`,
+      }}
+    >
+      {/* top shine */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "42%", borderRadius: "24px 24px 0 0", background: "linear-gradient(180deg, rgba(255,255,255,0.09) 0%, transparent 100%)", pointerEvents: "none" }} />
+      {/* dot grid */}
+      <div style={{ position: "absolute", inset: 0, borderRadius: 24, backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)", backgroundSize: "18px 18px", pointerEvents: "none" }} />
+      {/* accent glow orb */}
+      <div style={{ position: "absolute", bottom: -30, right: -20, width: 120, height: 120, borderRadius: "50%", background: accent, opacity: hovered ? 0.25 : 0.12, filter: "blur(28px)", transition: "opacity 0.3s", pointerEvents: "none" }} />
+      {/* accent left bar */}
+      <div style={{ position: "absolute", left: 0, top: "15%", bottom: "15%", width: 3, borderRadius: "0 3px 3px 0", background: accent, boxShadow: `0 0 12px ${accent}`, opacity: hovered ? 1 : 0.6, transition: "opacity 0.2s" }} />
+
+      <div style={{ position: "relative", zIndex: 2 }}>
+        <div className="flex items-center gap-2.5" style={{ marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 14, background: `${accent}22`, border: `1px solid ${accent}45`, boxShadow: `0 0 16px ${accent}22` }}>
+            <Icon style={{ width: 17, height: 17, color: accent }} />
+          </div>
+          <p style={{ fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,0.65)" }}>{label}</p>
+        </div>
+        <p style={{ fontSize: 50, fontWeight: 900, color: "#fff", lineHeight: 1, letterSpacing: "-2px" }}>{value}</p>
+        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.38)", marginTop: 8 }}>{sub}</p>
+      </div>
+    </div>
+  );
 }

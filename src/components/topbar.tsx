@@ -1,78 +1,123 @@
 "use client";
 
-import { Bell, Search, LogOut } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Bell, LogOut, ChevronRight } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
+import { type UserRole } from "@/lib/auth";
 
-export function Topbar() {
+interface NavItem { label: string; href: string; }
+
+const adminNav: NavItem[] = [
+  { label: "Dashboard",    href: "/dashboard" },
+  { label: "Employees",    href: "/workers" },
+  { label: "Visa Expiry",  href: "/workers/visa-expiry" },
+  { label: "Leave",        href: "/leave" },
+  { label: "Calendar",     href: "/calendar" },
+  { label: "Organisation", href: "/organisation" },
+  { label: "Documents",    href: "/documents" },
+  { label: "Reports",      href: "/reports" },
+  { label: "Risk",         href: "/risk" },
+];
+
+const employeeNav: NavItem[] = [
+  { label: "Dashboard",  href: "/portal" },
+  { label: "BG Verify",  href: "/portal/bgverify" },
+  { label: "Documents",  href: "/portal/documents" },
+  { label: "Leave",      href: "/portal/leave" },
+  { label: "Calendar",   href: "/portal/calendar" },
+  { label: "My Details", href: "/portal/details" },
+];
+
+export function Topbar({ userRole }: { userRole: UserRole }) {
   const { user, logout } = useAuth();
+  const pathname = usePathname();
+  const navItems = userRole === "employee" ? employeeNav : adminNav;
+
+  const isTabActive = (href: string) => {
+    if (href === "/dashboard" || href === "/portal") return pathname === href;
+    if (href === "/workers") return (pathname === "/workers" || pathname?.startsWith("/workers/")) && pathname !== "/workers/visa-expiry";
+    if (href === "/workers/visa-expiry") return pathname === "/workers/visa-expiry";
+    return pathname === href || pathname?.startsWith(href + "/");
+  };
+
+  const activeTab = navItems.find((item) => isTabActive(item.href));
 
   const initials = user?.full_name
-    ?.split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "U";
+    ?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "U";
 
   const roleLabel = user?.role?.replace(/_/g, " ") || "User";
 
   return (
-    <header
-      className="topbar-glass sticky top-0 z-30 flex items-center justify-between shrink-0"
-      style={{ height: 64, paddingLeft: 24, paddingRight: 24 }}
-    >
-      {/* Search */}
-      <div className="flex-1" style={{ maxWidth: 420 }}>
-        <div className="relative">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none"
-            style={{ width: 16, height: 16 }}
-          />
-          <input
-            type="text"
-            placeholder="Search workers, documents..."
-            className="topbar-search w-full"
-            style={{ height: 38, paddingLeft: 38, paddingRight: 16, fontSize: 13 }}
-          />
+    <header className="topbar-glass sticky top-0 z-30 shrink-0">
+      {/* Main row */}
+      <div className="flex items-center justify-between" style={{ height: 64, paddingLeft: 24, paddingRight: 20 }}>
+
+        {/* Left — breadcrumb/page context */}
+        <div className="flex items-center gap-2">
+          <span className="text-white/35 text-xs font-medium">Protexi</span>
+          <ChevronRight style={{ width: 12, height: 12 }} className="text-white/25" />
+          <span className="text-white/90 text-sm font-semibold">
+            {activeTab?.label ?? "Dashboard"}
+          </span>
+        </div>
+
+        {/* Right — actions + user */}
+        <div className="flex items-center" style={{ gap: 6 }}>
+          {/* Bell */}
+          <button
+            className="topbar-icon-btn"
+            aria-label="Notifications"
+          >
+            <Bell style={{ width: 17, height: 17 }} />
+          </button>
+
+          {/* Divider */}
+          <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.12)", margin: "0 6px" }} />
+
+          {/* User chip */}
+          <div className="flex items-center gap-2 rounded-2xl" style={{ padding: "5px 10px 5px 5px", background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.13)" }}>
+            <div
+              className="flex items-center justify-center rounded-full text-white font-bold shrink-0"
+              style={{ width: 30, height: 30, fontSize: 11, background: "linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.12))", border: "1px solid rgba(255,255,255,0.22)" }}
+            >
+              {initials}
+            </div>
+            <div className="text-left hidden md:block">
+              <p className="font-semibold text-white leading-tight" style={{ fontSize: 12 }}>
+                {user?.full_name || "User"}
+              </p>
+              <p className="text-white/45 leading-tight capitalize" style={{ fontSize: 10, marginTop: 1 }}>
+                {roleLabel}
+              </p>
+            </div>
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="topbar-icon-btn"
+              style={{ width: 28, height: 28, marginLeft: 2 }}
+            >
+              <LogOut style={{ width: 13, height: 13 }} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Right side */}
-      <div className="flex items-center" style={{ gap: 8, marginLeft: 24 }}>
-        <button
-          className="flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/[0.08] transition-colors"
-          style={{ width: 38, height: 38 }}
-        >
-          <Bell style={{ width: 18, height: 18 }} />
-        </button>
-
-        <div className="bg-white/[0.08]" style={{ width: 1, height: 24, marginLeft: 8, marginRight: 8 }} />
-
-        <div className="flex items-center" style={{ gap: 10 }}>
-          <div
-            className="flex items-center justify-center rounded-full text-white font-bold shrink-0"
-            style={{
-              width: 34, height: 34, fontSize: 11,
-              background: "linear-gradient(135deg, #2B5DA8, #4E82CC)",
-            }}
-          >
-            {initials}
-          </div>
-          <div className="text-left hidden md:block">
-            <p className="font-semibold text-white leading-tight" style={{ fontSize: 13 }}>
-              {user?.full_name || "User"}
-            </p>
-            <p className="text-white/40 leading-tight capitalize" style={{ fontSize: 11, marginTop: 1 }}>
-              {roleLabel}
-            </p>
-          </div>
-          <button
-            onClick={logout}
-            title="Sign out"
-            className="hidden md:flex items-center justify-center rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-            style={{ width: 30, height: 30, marginLeft: 4 }}
-          >
-            <LogOut style={{ width: 14, height: 14 }} />
-          </button>
+      {/* Tab nav row */}
+      <div className="topbar-tabs-row" style={{ paddingLeft: 24, paddingRight: 24 }}>
+        <div className="topbar-tabs-wrap">
+          {navItems.map((item) => {
+            const active = isTabActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`topbar-tab${active ? " topbar-tab-active" : ""}`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </header>
