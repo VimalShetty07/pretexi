@@ -54,7 +54,7 @@ function typeLabel(val: string): string {
   return LEAVE_TYPES.find((t) => t.value === val)?.label ?? val;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://pretexi-backend.onrender.com/api";
 
 export default function PortalLeavePage() {
   const { token } = useAuth();

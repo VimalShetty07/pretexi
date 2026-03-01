@@ -46,7 +46,7 @@ const STATUS_BADGES: Record<string, { label: string; color: string; bg: string }
   not_applicable: { label: "N/A", color: "text-gray-500", bg: "bg-gray-50" },
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://pretexi-backend.onrender.com/api";
 
 export default function PortalDocumentsPage() {
   const { token } = useAuth();

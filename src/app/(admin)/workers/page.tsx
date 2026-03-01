@@ -70,7 +70,7 @@ function daysUntil(iso: string | null): number | null {
 
 const STAFF_ROLES = ["super_admin", "compliance_manager", "hr_officer"];
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://pretexi-backend.onrender.com/api";
 
 export default function WorkersPage() {
   const router = useRouter();
