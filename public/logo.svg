@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 90" fill="none">
+  <!-- Import a script font that closely matches the original -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pacifico&amp;display=swap');
+  </style>
+
+  <!-- "Protexi" in bold italic script -->
+  <text
+    x="150" y="52"
+    text-anchor="middle"
+    font-family="Pacifico, 'Brush Script MT', 'Segoe Script', 'Apple Chancery', cursive"
+    font-size="48"
+    fill="white"
+    letter-spacing="0.5"
+  >Protexi</text>
+
+  <!-- Star replacing the dot on "i" — positioned above the i -->
+  <g transform="translate(222, 10)" fill="white">
+    <polygon points="0,-8 2.2,-2.5 8,-2.5 3.5,1.5 5,7.5 0,3.5 -5,7.5 -3.5,1.5 -8,-2.5 -2.2,-2.5"/>
+  </g>
+
+  <!-- Swoosh underline — smooth S-curve from left to right -->
+  <path
+    d="M 48 62 C 75 68, 105 70, 145 62 C 185 54, 220 56, 260 62"
+    stroke="white"
+    stroke-width="2.2"
+    fill="none"
+    stroke-linecap="round"
+  />
+
+  <!-- "SPONSOR COMPLIANCE" subtitle -->
+  <text
+    x="150" y="82"
+    text-anchor="middle"
+    font-family="Inter, 'Helvetica Neue', Arial, system-ui, sans-serif"
+    font-size="11.5"
+    font-weight="400"
+    fill="white"
+    letter-spacing="4"
+  >SPONSOR COMPLIANCE</text>
+</svg>
