@@ -24,6 +24,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const TOKEN_KEY = "protexi_token";
+const PUBLIC_ROUTES = new Set(["/", "/pricing", "/checkout/success", "/checkout/cancel"]);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -63,7 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (loading) return;
 
     const isLoginPage = pathname === "/";
-    const isAdminRoute = pathname !== "/" && !pathname.startsWith("/_");
+    const isPublicRoute = PUBLIC_ROUTES.has(pathname || "");
+    const isAdminRoute = !isPublicRoute && pathname !== "/" && !pathname.startsWith("/_");
 
     if (!user && isAdminRoute) {
       router.replace("/");

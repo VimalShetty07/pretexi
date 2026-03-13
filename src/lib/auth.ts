@@ -1,4 +1,8 @@
 export type UserRole =
+  | "platform_owner"
+  | "tenant_admin"
+  | "tenant_staff"
+  | "tenant_employee"
   | "super_admin"
   | "compliance_manager"
   | "hr_officer"
@@ -22,6 +26,7 @@ export interface AuthUser {
  * If a route is not listed here, it's accessible to all authenticated users.
  */
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
+  "/super-admin":   ["platform_owner"],
   "/dashboard":     ["super_admin", "compliance_manager", "hr_officer", "payroll_officer", "inspector"],
   "/workers":       ["super_admin", "compliance_manager", "hr_officer", "payroll_officer", "inspector"],
   "/leave":         ["super_admin", "compliance_manager", "hr_officer"],
@@ -38,6 +43,10 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
  * Where to redirect each role after login.
  */
 export const ROLE_HOME: Record<UserRole, string> = {
+  platform_owner: "/super-admin/dashboard",
+  tenant_admin: "/dashboard",
+  tenant_staff: "/workers",
+  tenant_employee: "/portal",
   super_admin: "/dashboard",
   compliance_manager: "/dashboard",
   hr_officer: "/workers",

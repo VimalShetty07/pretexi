@@ -29,10 +29,22 @@ const employeeNav: NavItem[] = [
   { label: "My Details", href: "/portal/details" },
 ];
 
+const platformNav: NavItem[] = [
+  { label: "Overview", href: "/super-admin/dashboard" },
+  { label: "Clients", href: "/super-admin/clients" },
+  { label: "Subscriptions", href: "/super-admin/subscriptions" },
+];
+
 export function Topbar({ userRole }: { userRole: UserRole }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
-  const navItems = (userRole === "employee" ? employeeNav : adminNav).filter((item) => {
+  const roleNav =
+    userRole === "employee"
+      ? employeeNav
+      : userRole === "platform_owner"
+      ? platformNav
+      : adminNav;
+  const navItems = roleNav.filter((item) => {
     const allowed = ROUTE_PERMISSIONS[item.href];
     return !allowed || allowed.includes(userRole);
   });

@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+/confedential/
+/confedential/pretexi-key.pem
 
 # debug
 npm-debug.log*
