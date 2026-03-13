@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://pretexi-backend.onrender.com/api";
+const API_URL = "/api";
 
 type FetchOptions = RequestInit & {
   token?: string;
