@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const API_PROXY_TARGET = process.env.API_PROXY_TARGET || "http://127.0.0.1:8000/api";
+const API_PROXY_TARGET = process.env.API_PROXY_TARGET || "http://100.48.82.246/api";
 
 const nextConfig: NextConfig = {
   turbopack: {
