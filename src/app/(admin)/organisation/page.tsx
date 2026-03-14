@@ -9,6 +9,9 @@ interface Me {
   email: string;
   full_name: string;
   organisation_id: string;
+  organisation_name?: string | null;
+  organisation_slug?: string | null;
+  organisation_licence_number?: string | null;
 }
 
 interface Overview {
@@ -66,7 +69,9 @@ export default function OrganisationPage() {
   const expiring90 = ov.visa_breakdown
     ? ov.visa_breakdown.expired + ov.visa_breakdown.expiring_30 + ov.visa_breakdown.expiring_60 + ov.visa_breakdown.expiring_90
     : 0;
-  const orgCode = me.organisation_id.slice(0, 8).toUpperCase();
+  const orgCode = (me.organisation_slug || me.organisation_id.slice(0, 8)).toUpperCase();
+  const orgDisplay = me.organisation_name || `Protexi Tenant ${orgCode}`;
+  const orgRef = me.organisation_slug || me.organisation_licence_number || orgCode;
   const canViewCos = user?.role !== "hr_officer";
 
   return (
@@ -82,7 +87,7 @@ export default function OrganisationPage() {
         <div className="flex items-center justify-between flex-wrap" style={{ gap: 10 }}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Organisation Profile</p>
-            <h2 className="text-lg font-semibold text-gray-900" style={{ marginTop: 2 }}>Protexi Tenant {orgCode}</h2>
+            <h2 className="text-lg font-semibold text-gray-900" style={{ marginTop: 2 }}>{orgDisplay}</h2>
           </div>
           <span
             className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
@@ -93,7 +98,7 @@ export default function OrganisationPage() {
           </span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10, marginTop: 12 }}>
-          <Info icon={Building2} label="Organisation ID" value={me.organisation_id} />
+          <Info icon={Building2} label="Organisation Ref" value={orgRef} />
           <Info icon={Mail} label="Admin Email" value={me.email} />
         </div>
       </div>
@@ -139,7 +144,7 @@ export default function OrganisationPage() {
         <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10, marginTop: 10 }}>
           <Info icon={Building2} label="Admin Name" value={me.full_name} />
           <Info icon={Mail} label="Email" value={me.email} />
-          <Info icon={Building2} label="Organisation ID" value={me.organisation_id} />
+          <Info icon={Building2} label="Organisation Ref" value={orgRef} />
           {canViewCos ? (
             <Info icon={BriefcaseBusiness} label="Current CoS Used" value={String(ov.cos_used)} />
           ) : (

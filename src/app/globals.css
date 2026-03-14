@@ -58,6 +58,9 @@
   --ring: #2B5DA8;
   --sidebar: #0C1C36;
   --sidebar-foreground: #D1DFF3;
+  --logo-blue-700: #1657ad;
+  --logo-blue-600: #1a5296;
+  --logo-blue-500: #2b6cd4;
 }
 
 * {
@@ -361,7 +364,7 @@ body {
 .sidebar-shell {
   background:
     radial-gradient(130% 50% at 100% 0%, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 55%),
-    linear-gradient(180deg, #174e92 0%, #1b5398 65%, #1f5fae 100%);
+    linear-gradient(180deg, var(--logo-blue-700) 0%, var(--logo-blue-600) 58%, var(--logo-blue-500) 100%);
   border-right: 1px solid rgba(255,255,255,0.12);
   box-shadow: 6px 0 18px -14px rgba(15, 50, 110, 0.45);
 }
@@ -398,7 +401,7 @@ body {
 .topbar-glass {
   background:
     radial-gradient(110% 170% at -5% -20%, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 55%),
-    linear-gradient(180deg, #164f95 0%, #1a5399 62%, #205eaa 100%);
+    linear-gradient(180deg, var(--logo-blue-700) 0%, var(--logo-blue-600) 62%, var(--logo-blue-500) 100%);
   border-bottom: 1px solid rgba(255,255,255,0.14);
   box-shadow: 0 10px 24px -20px rgba(12, 40, 90, 0.45);
   backdrop-filter: blur(8px) saturate(1.05);
@@ -424,8 +427,8 @@ body {
 }
 
 .admin-bg {
-  background: #0C1C36;
-  background-image: linear-gradient(160deg, #050d1a 0%, #0C1C36 30%, #132C52 60%, #1B3D6F 100%);
+  background: var(--logo-blue-700);
+  background-image: linear-gradient(160deg, var(--logo-blue-700) 0%, var(--logo-blue-600) 48%, var(--logo-blue-500) 100%);
   background-size: 200% 200%;
   background-attachment: fixed;
   animation: gradient-shift 24s ease infinite;

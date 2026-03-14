@@ -52,7 +52,7 @@ export function Sidebar({ collapsed, onToggle, userRole, hideMainNav = false }: 
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const navItems = getVisibleNav(userRole);
-  const showSettings = userRole === "super_admin";
+  const showSettings = userRole === "super_admin" || userRole === "tenant_admin";
   const isNavActive = (href: string) => {
     // Root dashboard tabs should only be active on exact match.
     if (href === "/dashboard" || href === "/portal") {

@@ -69,9 +69,9 @@ function daysUntil(iso: string | null): number | null {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-const STAFF_ROLES = ["super_admin", "compliance_manager", "hr_officer"];
+const STAFF_ROLES = ["super_admin", "tenant_admin", "compliance_manager", "hr_officer"];
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://pretexi-backend.onrender.com/api";
+const API_URL = "/api";
 
 export default function WorkersPage() {
   const router = useRouter();

@@ -52,12 +52,14 @@ function fmt(iso: string | null): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://pretexi-backend.onrender.com/api";
+const API_URL = "/api";
 
 export default function LeaveManagementPage() {
   const { token } = useAuth();
   const [leaves, setLeaves] = useState<LeaveItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
@@ -69,8 +71,9 @@ export default function LeaveManagementPage() {
       const qs = statusFilter ? `?status_filter=${statusFilter}` : "";
       const data = await api.get<LeaveItem[]>(`/leave/all${qs}`, token ?? undefined);
       setLeaves(data);
-    } catch {
-      /* ignore */
+      setError("");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load leave requests");
     } finally {
       setLoading(false);
     }
@@ -88,14 +91,21 @@ export default function LeaveManagementPage() {
 
   const handleApprove = async (id: string) => {
     setActionLoading(id);
+    setError("");
+    setSuccess("");
     try {
-      await fetch(`${API_URL}/leave/${id}/approve`, {
+      const res = await fetch(`${API_URL}/leave/${id}/approve`, {
         method: "POST",
         headers: authHeaders(),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Approve failed (${res.status})`);
+      }
       await fetchLeaves();
-    } catch {
-      /* ignore */
+      setSuccess("Leave request approved.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Approve failed");
     } finally {
       setActionLoading(null);
     }
@@ -103,17 +113,24 @@ export default function LeaveManagementPage() {
 
   const handleReject = async (id: string) => {
     setActionLoading(id);
+    setError("");
+    setSuccess("");
     try {
-      await fetch(`${API_URL}/leave/${id}/reject`, {
+      const res = await fetch(`${API_URL}/leave/${id}/reject`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ rejection_reason: rejectReason || null }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Reject failed (${res.status})`);
+      }
       setRejectId(null);
       setRejectReason("");
       await fetchLeaves();
-    } catch {
-      /* ignore */
+      setSuccess("Leave request rejected.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Reject failed");
     } finally {
       setActionLoading(null);
     }
@@ -123,6 +140,16 @@ export default function LeaveManagementPage() {
 
   return (
     <div>
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 text-red-700" style={{ padding: "10px 12px", fontSize: 13, marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700" style={{ padding: "10px 12px", fontSize: 13, marginBottom: 12 }}>
+          {success}
+        </div>
+      )}
       <div className="flex items-center justify-between flex-wrap" style={{ gap: 12, marginBottom: 24 }}>
         <div>
           <h1 className="admin-page-title">Leave Management</h1>

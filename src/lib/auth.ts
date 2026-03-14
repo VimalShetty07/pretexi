@@ -27,15 +27,15 @@ export interface AuthUser {
  */
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/super-admin":   ["platform_owner"],
-  "/dashboard":     ["super_admin", "compliance_manager", "hr_officer", "payroll_officer", "inspector"],
-  "/workers":       ["super_admin", "compliance_manager", "hr_officer", "payroll_officer", "inspector"],
-  "/leave":         ["super_admin", "compliance_manager", "hr_officer"],
-  "/calendar":      ["super_admin", "compliance_manager", "hr_officer", "payroll_officer"],
-  "/organisation":  ["super_admin", "compliance_manager"],
-  "/documents":     ["super_admin", "compliance_manager", "hr_officer"],
-  "/reports":       ["super_admin", "compliance_manager"],
-  "/risk":          ["super_admin", "compliance_manager"],
-  "/settings":      ["super_admin"],
+  "/dashboard":     ["super_admin", "tenant_admin", "compliance_manager", "hr_officer", "payroll_officer", "inspector"],
+  "/workers":       ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer", "payroll_officer", "inspector"],
+  "/leave":         ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer"],
+  "/calendar":      ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer", "payroll_officer"],
+  "/organisation":  ["super_admin", "tenant_admin", "compliance_manager"],
+  "/documents":     ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer"],
+  "/reports":       ["super_admin", "tenant_admin", "compliance_manager"],
+  "/risk":          ["super_admin", "tenant_admin", "compliance_manager"],
+  "/settings":      ["super_admin", "tenant_admin"],
   "/portal":        ["employee"],
 };
 

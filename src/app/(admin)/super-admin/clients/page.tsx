@@ -26,6 +26,7 @@ type OrgCreatePayload = {
   admin_name: string;
   admin_password: string;
   plan_code: string;
+  portal_expires_at?: string | null;
 };
 
 export default function SuperAdminClientsPage() {
@@ -41,6 +42,7 @@ export default function SuperAdminClientsPage() {
     admin_name: "",
     admin_password: "demo123",
     plan_code: "starter_monthly",
+    portal_expires_at: null,
   });
 
   const load = async () => {
@@ -88,6 +90,7 @@ export default function SuperAdminClientsPage() {
         admin_name: "",
         admin_password: "demo123",
         plan_code: "starter_monthly",
+        portal_expires_at: null,
       });
       await load();
     } catch (err: unknown) {
@@ -117,6 +120,49 @@ export default function SuperAdminClientsPage() {
     }
   };
 
+  const renderExpiry = (item: OrgSummary) => {
+    const rawExpiry = item.portal_expires_at || item.subscription_current_period_end;
+    if (!rawExpiry) {
+      return <span className="text-[12px] text-[var(--muted-foreground)]">-</span>;
+    }
+
+    const expiryDate = new Date(rawExpiry);
+    if (Number.isNaN(expiryDate.getTime())) {
+      return <span className="text-[12px] text-[var(--muted-foreground)]">-</span>;
+    }
+
+    const today = new Date();
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    const expiryMidnight = new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate()).getTime();
+    const daysLeft = Math.floor((expiryMidnight - todayMidnight) / (1000 * 60 * 60 * 24));
+
+    let chipBg = "#dbeafe";
+    let chipText = "#1d4ed8";
+    let chipLabel = `${daysLeft}d left`;
+    if (daysLeft < 0) {
+      chipBg = "#fee2e2";
+      chipText = "#b91c1c";
+      chipLabel = `${Math.abs(daysLeft)}d overdue`;
+    } else if (daysLeft <= 30) {
+      chipBg = "#fef3c7";
+      chipText = "#b45309";
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-[12px] text-[var(--muted-foreground)]">
+          {expiryDate.toLocaleDateString("en-GB")}
+        </span>
+        <span
+          className="rounded-full"
+          style={{ padding: "2px 7px", fontSize: 10, fontWeight: 700, background: chipBg, color: chipText }}
+        >
+          {chipLabel}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
@@ -143,11 +189,34 @@ export default function SuperAdminClientsPage() {
           <Plus size={15} className="text-[#1a5296]" />
           <p className="font-semibold text-[#0f1f3a]" style={{ fontSize: 14 }}>Add Client</p>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0,1fr))", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 10 }}>
           <input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Company name" className="rounded-xl border border-[var(--border)] bg-white" style={{ height: 38, padding: "0 12px", fontSize: 13 }} />
           <input value={form.slug} onChange={(e) => setField("slug", e.target.value)} placeholder="Slug" className="rounded-xl border border-[var(--border)] bg-white" style={{ height: 38, padding: "0 12px", fontSize: 13 }} />
           <input value={form.admin_name} onChange={(e) => setField("admin_name", e.target.value)} placeholder="Admin name" className="rounded-xl border border-[var(--border)] bg-white" style={{ height: 38, padding: "0 12px", fontSize: 13 }} />
           <input value={form.admin_email} onChange={(e) => setField("admin_email", e.target.value)} placeholder="Admin email" className="rounded-xl border border-[var(--border)] bg-white" style={{ height: 38, padding: "0 12px", fontSize: 13 }} />
+          <select
+            value={form.plan_code}
+            onChange={(e) => setField("plan_code", e.target.value)}
+            className="rounded-xl border border-[var(--border)] bg-white"
+            style={{ height: 38, padding: "0 12px", fontSize: 13 }}
+          >
+            <option value="free">Free</option>
+            <option value="starter_monthly">Starter Monthly</option>
+            <option value="growth_monthly">Growth Monthly</option>
+            <option value="enterprise_monthly">Enterprise Monthly</option>
+          </select>
+          <input
+            type="date"
+            value={form.portal_expires_at ? form.portal_expires_at.slice(0, 10) : ""}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                portal_expires_at: e.target.value ? `${e.target.value}T00:00:00Z` : null,
+              }))
+            }
+            className="rounded-xl border border-[var(--border)] bg-white"
+            style={{ height: 38, padding: "0 12px", fontSize: 13 }}
+          />
           <input value={form.admin_password} onChange={(e) => setField("admin_password", e.target.value)} placeholder="Temp password" className="rounded-xl border border-[var(--border)] bg-white" style={{ height: 38, padding: "0 12px", fontSize: 13 }} />
           <button onClick={createOrg} disabled={saving} className="rounded-xl text-white font-semibold disabled:opacity-60" style={{ height: 38, fontSize: 13, background: "linear-gradient(135deg,#1a5296,#2b6cd4)" }}>
             {saving ? "Creating..." : "Create"}
@@ -178,7 +247,7 @@ export default function SuperAdminClientsPage() {
                 {item.is_active ? "Active" : "Suspended"}
               </span>
             </td>
-            <td className="text-[12px] text-[var(--muted-foreground)]">{item.portal_expires_at ? new Date(item.portal_expires_at).toLocaleDateString("en-GB") : "-"}</td>
+            <td>{renderExpiry(item)}</td>
             <td>
               <div className="flex items-center gap-2">
                 <Link href={`/super-admin/clients/${item.id}`} className="rounded-lg border border-[var(--border)]" style={{ padding: "4px 8px", fontSize: 12 }}>

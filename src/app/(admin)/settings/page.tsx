@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import { UserPlus, Users, UserCheck, ShieldCheck } from "lucide-react";
 
 interface UserItem {
   id: string;
@@ -19,7 +20,7 @@ interface WorkerItem {
 }
 
 export default function SettingsPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [workers, setWorkers] = useState<WorkerItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +32,7 @@ export default function SettingsPage() {
   const [role, setRole] = useState("hr_officer");
   const [workerId, setWorkerId] = useState("");
   const [saving, setSaving] = useState(false);
+  const isTenantAdmin = user?.role === "tenant_admin";
 
   const load = async () => {
     if (!token) return;
@@ -62,7 +64,7 @@ export default function SettingsPage() {
         full_name: fullName,
         email,
         password,
-        role,
+        role: isTenantAdmin ? "hr_officer" : role,
         worker_id: role === "employee" ? workerId || null : null,
       }, token);
       setFullName("");
@@ -88,30 +90,70 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) return <p className="text-sm text-white/80">Loading settings...</p>;
+  if (loading) return <p className="text-sm text-[var(--muted-foreground)]">Loading settings...</p>;
+
+  const totalUsers = users.length;
+  const activeUsers = users.filter((u) => u.is_active).length;
+  const hrUsers = users.filter((u) => u.role === "hr_officer").length;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Settings</h1>
-        <p className="text-sm text-white/70 mt-1">User management for HR and employee access.</p>
+        <h1 className="admin-page-title">Settings</h1>
+        <p className="admin-page-subtitle" style={{ marginTop: 6 }}>
+          {isTenantAdmin
+            ? "HR management for your tenant organisation."
+            : "User management for HR and employee access."}
+        </p>
       </div>
 
-      {error && <p className="text-sm text-red-200">{error}</p>}
+      {error && (
+        <div
+          className="rounded-xl border border-red-200 bg-red-50 text-red-700"
+          style={{ padding: "10px 12px", fontSize: 13 }}
+        >
+          {error}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 12 }}>
+        <StatCard icon={<Users size={15} />} label="Total Users" value={totalUsers} />
+        <StatCard icon={<UserCheck size={15} />} label="Active Users" value={activeUsers} />
+        <StatCard icon={<ShieldCheck size={15} />} label="HR Users" value={hrUsers} />
+      </div>
 
       <div className="data-card" style={{ padding: 14 }}>
-        <h3 className="text-sm font-semibold text-gray-900">Create User</h3>
+        <div className="flex items-center gap-2">
+          <UserPlus size={15} className="text-[#1a5296]" />
+          <h3 className="text-sm font-semibold text-gray-900">
+            {isTenantAdmin ? "Add HR User" : "Create User"}
+          </h3>
+        </div>
+        <p className="text-xs text-[var(--muted-foreground)]" style={{ marginTop: 4 }}>
+          {isTenantAdmin
+            ? "Tenant admins can only create HR users in their own organisation."
+            : "Create internal users and assign portal access roles."}
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10, marginTop: 10 }}>
           <input className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900" style={{ height: 38, padding: "0 12px" }} placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
           <input className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900" style={{ height: 38, padding: "0 12px" }} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900" style={{ height: 38, padding: "0 12px" }} placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <select className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900" style={{ height: 38, padding: "0 12px" }} value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="hr_officer">HR Officer</option>
-            <option value="employee">Employee</option>
-            <option value="compliance_manager">Compliance Manager</option>
-            <option value="payroll_officer">Payroll Officer</option>
-            <option value="inspector">Inspector</option>
-          </select>
+          {isTenantAdmin ? (
+            <input
+              className="rounded-xl border border-gray-300 bg-gray-100 text-sm text-gray-700"
+              style={{ height: 38, padding: "0 12px" }}
+              value="HR Officer"
+              disabled
+            />
+          ) : (
+            <select className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900" style={{ height: 38, padding: "0 12px" }} value={role} onChange={(e) => setRole(e.target.value)}>
+              <option value="hr_officer">HR Officer</option>
+              <option value="employee">Employee</option>
+              <option value="compliance_manager">Compliance Manager</option>
+              <option value="payroll_officer">Payroll Officer</option>
+              <option value="inspector">Inspector</option>
+            </select>
+          )}
           {role === "employee" && (
             <select className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900 md:col-span-2" style={{ height: 38, padding: "0 12px" }} value={workerId} onChange={(e) => setWorkerId(e.target.value)}>
               <option value="">Select linked worker</option>
@@ -123,7 +165,7 @@ export default function SettingsPage() {
         </div>
         <button
           onClick={createUser}
-          className="rounded-xl bg-brand-600 text-white hover:bg-brand-700"
+          className="rounded-xl bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-60 transition-all"
           style={{ height: 36, padding: "0 14px", marginTop: 10 }}
           disabled={saving}
         >
@@ -132,14 +174,32 @@ export default function SettingsPage() {
       </div>
 
       <div className="data-card" style={{ padding: 14 }}>
-        <h3 className="text-sm font-semibold text-gray-900">Existing Users</h3>
+        <h3 className="text-sm font-semibold text-gray-900">
+          {isTenantAdmin ? "HR Users" : "Existing Users"}
+        </h3>
         <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
           {users.map((u) => (
             <div key={u.id} className="rounded-xl border border-gray-200 bg-gray-50" style={{ padding: "10px 12px" }}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{u.full_name}</p>
-                  <p className="text-xs text-gray-600">{u.email} · {u.role}</p>
+                  <p className="text-xs text-gray-600" style={{ marginTop: 2 }}>
+                    {u.email}
+                  </p>
+                  <div style={{ marginTop: 6 }}>
+                    <span
+                      className="rounded-full"
+                      style={{
+                        padding: "2px 8px",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        background: u.role === "hr_officer" ? "#e0ecff" : "#eef2ff",
+                        color: u.role === "hr_officer" ? "#1e40af" : "#4338ca",
+                      }}
+                    >
+                      {u.role.replaceAll("_", " ")}
+                    </span>
+                  </div>
                 </div>
                 <button
                   onClick={() => toggleActive(u)}
@@ -153,6 +213,22 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[var(--border)]" style={{ padding: 14 }}>
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+          {label}
+        </p>
+        <span className="text-[#1a5296]">{icon}</span>
+      </div>
+      <p className="admin-value-number text-[#0f1f3a]" style={{ marginTop: 8 }}>
+        {value}
+      </p>
     </div>
   );
 }

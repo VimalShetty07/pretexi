@@ -33,23 +33,10 @@ type VisaEvent = {
   type: "visa_expiry";
 };
 
-type BgVerificationEvent = {
-  id: string;
-  worker_id: string;
-  worker_name: string;
-  worker_department?: string | null;
-  referee_name: string;
-  date: string;
-  reference_status?: string | null;
-  verification_status?: string | null;
-  type: "bg_verification";
-};
-
 type EventsResponse = {
   holidays: Holiday[];
   leaves: LeaveEvent[];
   visa_expiries: VisaEvent[];
-  bg_verifications: BgVerificationEvent[];
 };
 
 const STAFF_ROLES = ["super_admin", "compliance_manager", "hr_officer", "payroll_officer"];
@@ -68,7 +55,6 @@ export default function CalendarPage() {
     holidays: [],
     leaves: [],
     visa_expiries: [],
-    bg_verifications: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -130,9 +116,9 @@ export default function CalendarPage() {
   const monthIndex = monthDate.getMonth();
 
   const dayStats = useMemo(() => {
-    const map = new Map<string, { holidays: number; leaves: number; visa: number; bg: number }>();
+    const map = new Map<string, { holidays: number; leaves: number; visa: number }>();
     const ensure = (key: string) => {
-      if (!map.has(key)) map.set(key, { holidays: 0, leaves: 0, visa: 0, bg: 0 });
+      if (!map.has(key)) map.set(key, { holidays: 0, leaves: 0, visa: 0 });
       return map.get(key)!;
     };
 
@@ -153,11 +139,6 @@ export default function CalendarPage() {
     events.visa_expiries.forEach((v) => {
       const d = parseDate(v.date);
       if (!Number.isNaN(d.getTime()) && inCurrentMonth(d)) ensure(keyOf(d)).visa += 1;
-    });
-
-    events.bg_verifications.forEach((b) => {
-      const d = parseDate(b.date);
-      if (!Number.isNaN(d.getTime()) && inCurrentMonth(d)) ensure(keyOf(d)).bg += 1;
     });
 
     events.leaves.forEach((l) => {
@@ -233,11 +214,6 @@ export default function CalendarPage() {
       return !Number.isNaN(d.getTime()) && keyOf(d) === selectedDateKey;
     });
 
-    const bg = events.bg_verifications.filter((b) => {
-      const d = parseDate(b.date);
-      return !Number.isNaN(d.getTime()) && keyOf(d) === selectedDateKey;
-    });
-
     const leaves = events.leaves.filter((l) => {
       const start = parseDate(l.start_date);
       const end = parseDate(l.end_date);
@@ -251,18 +227,18 @@ export default function CalendarPage() {
       return false;
     });
 
-    return { holidays, leaves, visa, bg };
+    return { holidays, leaves, visa };
   }, [events, selectedDateKey]);
 
   if (loading) return <p className="text-sm text-gray-500">Loading calendar...</p>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div className="flex items-center justify-between flex-wrap" style={{ gap: 12 }}>
         <div>
           <h1 className="admin-page-title">Calendar</h1>
           <p className="admin-page-subtitle" style={{ marginTop: 6 }}>
-            Holidays, approved leave, visa expiry and BG verification milestones
+            Holidays, approved leave, and visa expiry milestones
           </p>
         </div>
         <div className="flex items-center" style={{ gap: 8 }}>
@@ -305,13 +281,13 @@ export default function CalendarPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="data-card" style={{ padding: 16 }}>
+      <div className="data-card" style={{ padding: 10 }}>
         <div className="grid grid-cols-7 border border-[var(--border)] rounded-xl overflow-hidden">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
             <div
               key={d}
               className="bg-[var(--muted)] text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]"
-              style={{ padding: "10px 8px", borderRight: "1px solid var(--border)" }}
+              style={{ padding: "7px 6px", borderRight: "1px solid var(--border)" }}
             >
               {d}
             </div>
@@ -319,8 +295,8 @@ export default function CalendarPage() {
 
           {calendarCells.map(({ date, inCurrentMonth }, idx) => {
             const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-            const stat = dayStats.get(key) || { holidays: 0, leaves: 0, visa: 0, bg: 0 };
-            const total = stat.holidays + stat.leaves + stat.visa + stat.bg;
+            const stat = dayStats.get(key) || { holidays: 0, leaves: 0, visa: 0 };
+            const total = stat.holidays + stat.leaves + stat.visa;
             const isToday =
               date.getFullYear() === new Date().getFullYear() &&
               date.getMonth() === new Date().getMonth() &&
@@ -331,8 +307,8 @@ export default function CalendarPage() {
                 key={`${key}-${idx}`}
                 className={inCurrentMonth ? "bg-white" : "bg-gray-50"}
                 style={{
-                  minHeight: 112,
-                  padding: 8,
+                  minHeight: 86,
+                  padding: 6,
                   borderTop: "1px solid var(--border)",
                   borderRight: (idx + 1) % 7 === 0 ? "none" : "1px solid var(--border)",
                   boxShadow:
@@ -375,25 +351,20 @@ export default function CalendarPage() {
                 </div>
 
                 {inCurrentMonth && (
-                  <div style={{ marginTop: 8, display: "grid", gap: 5 }}>
+                  <div style={{ marginTop: 5, display: "grid", gap: 3 }}>
                     {stat.holidays > 0 && (
-                      <div className="rounded-md bg-blue-50 text-blue-700" style={{ fontSize: 11, padding: "3px 6px" }}>
+                      <div className="rounded-md bg-blue-50 text-blue-700" style={{ fontSize: 10, padding: "2px 5px", lineHeight: 1.2 }}>
                         Holiday: {stat.holidays}
                       </div>
                     )}
                     {stat.leaves > 0 && (
-                      <div className="rounded-md bg-purple-50 text-purple-700" style={{ fontSize: 11, padding: "3px 6px" }}>
+                      <div className="rounded-md bg-purple-50 text-purple-700" style={{ fontSize: 10, padding: "2px 5px", lineHeight: 1.2 }}>
                         Leave: {stat.leaves}
                       </div>
                     )}
                     {stat.visa > 0 && (
-                      <div className="rounded-md bg-amber-50 text-amber-700" style={{ fontSize: 11, padding: "3px 6px" }}>
+                      <div className="rounded-md bg-amber-50 text-amber-700" style={{ fontSize: 10, padding: "2px 5px", lineHeight: 1.2 }}>
                         Visa: {stat.visa}
-                      </div>
-                    )}
-                    {stat.bg > 0 && (
-                      <div className="rounded-md bg-pink-50 text-pink-700" style={{ fontSize: 11, padding: "3px 6px" }}>
-                        BG Verify: {stat.bg}
                       </div>
                     )}
                   </div>
@@ -404,7 +375,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="data-card" style={{ padding: 16 }}>
+      <div className="data-card" style={{ padding: 12 }}>
         <div className="flex items-center justify-between flex-wrap" style={{ gap: 8 }}>
           <h3 className="text-sm font-semibold text-gray-900">Details for {selectedDateLabel}</h3>
           <span className="text-xs text-[var(--muted-foreground)]">Click any date in calendar</span>
@@ -412,14 +383,13 @@ export default function CalendarPage() {
 
         {detailsForSelectedDate.holidays.length === 0 &&
         detailsForSelectedDate.leaves.length === 0 &&
-        detailsForSelectedDate.visa.length === 0 &&
-        detailsForSelectedDate.bg.length === 0 ? (
+        detailsForSelectedDate.visa.length === 0 ? (
           <p className="text-sm text-gray-500" style={{ marginTop: 8 }}>
             No calendar records on this date.
           </p>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 10, marginTop: 10 }}>
-            <div className="rounded-xl border border-blue-100 bg-blue-50" style={{ padding: "10px 12px" }}>
+          <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 8, marginTop: 8, maxHeight: 180, overflowY: "auto", paddingRight: 2 }}>
+            <div className="rounded-xl border border-blue-100 bg-blue-50" style={{ padding: "8px 10px" }}>
               <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">Holidays</p>
               {detailsForSelectedDate.holidays.length === 0 ? (
                 <p className="text-xs text-blue-700" style={{ marginTop: 6 }}>None</p>
@@ -432,7 +402,7 @@ export default function CalendarPage() {
               )}
             </div>
 
-            <div className="rounded-xl border border-purple-100 bg-purple-50" style={{ padding: "10px 12px" }}>
+            <div className="rounded-xl border border-purple-100 bg-purple-50" style={{ padding: "8px 10px" }}>
               <p className="text-xs font-semibold uppercase tracking-wide text-purple-800">Approved Leave</p>
               {detailsForSelectedDate.leaves.length === 0 ? (
                 <p className="text-xs text-purple-700" style={{ marginTop: 6 }}>None</p>
@@ -447,7 +417,7 @@ export default function CalendarPage() {
               )}
             </div>
 
-            <div className="rounded-xl border border-amber-100 bg-amber-50" style={{ padding: "10px 12px" }}>
+            <div className="rounded-xl border border-amber-100 bg-amber-50" style={{ padding: "8px 10px" }}>
               <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Visa Expiry</p>
               {detailsForSelectedDate.visa.length === 0 ? (
                 <p className="text-xs text-amber-700" style={{ marginTop: 6 }}>None</p>
@@ -462,20 +432,6 @@ export default function CalendarPage() {
               )}
             </div>
 
-            <div className="rounded-xl border border-pink-100 bg-pink-50" style={{ padding: "10px 12px" }}>
-              <p className="text-xs font-semibold uppercase tracking-wide text-pink-800">BG Verification</p>
-              {detailsForSelectedDate.bg.length === 0 ? (
-                <p className="text-xs text-pink-700" style={{ marginTop: 6 }}>None</p>
-              ) : (
-                <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-                  {detailsForSelectedDate.bg.map((b) => (
-                    <p key={b.id} className="text-sm text-pink-900">
-                      {b.worker_name} · Referee: {b.referee_name}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         )}
       </div>

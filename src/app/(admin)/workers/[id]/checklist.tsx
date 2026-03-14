@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Download, Upload, CheckCircle2, XCircle, Ban, Loader2 } from "lucide-react";
+import { Download, Upload, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://pretexi-backend.onrender.com/api";
+const API_PROXY_URL = "/api";
 
 interface DocFile {
   id: string;
@@ -22,6 +23,22 @@ export interface ChecklistItem {
   documents: DocFile[];
 }
 
+const STATUS_LABEL: Record<ChecklistItem["status"], string> = {
+  not_started: "Approval Pending",
+  uploaded: "Approval Pending",
+  verified: "Verified",
+  rejected: "Rejected",
+  not_applicable: "Approval Pending",
+};
+
+const STATUS_STYLE: Record<ChecklistItem["status"], string> = {
+  not_started: "bg-amber-50 border-amber-200 text-amber-700",
+  uploaded: "bg-amber-50 border-amber-200 text-amber-700",
+  verified: "bg-emerald-50 border-emerald-200 text-emerald-700",
+  rejected: "bg-red-50 border-red-200 text-red-700",
+  not_applicable: "bg-gray-50 border-gray-200 text-gray-700",
+};
+
 export default function DocumentChecklist({
   workerId,
   items,
@@ -34,6 +51,8 @@ export default function DocumentChecklist({
   const { token } = useAuth();
   const [uploading, setUploading] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingItem, setPendingItem] = useState<string | null>(null);
 
@@ -52,15 +71,24 @@ export default function DocumentChecklist({
     const file = e.target.files?.[0];
     if (!file || !pendingItem) return;
     setUploading(pendingItem);
+    setError("");
+    setSuccess("");
     try {
       const fd = new FormData();
       fd.append("file", file);
-      await fetch(`${API_URL}/workers/${workerId}/checklist/${pendingItem}/upload`, {
+      const res = await fetch(`${API_PROXY_URL}/workers/${workerId}/checklist/${pendingItem}/upload`, {
         method: "POST",
         headers: authHeaders,
         body: fd,
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Upload failed (${res.status})`);
+      }
       await onRefresh();
+      setSuccess("Document uploaded successfully.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploading(null);
       setPendingItem(null);
@@ -70,29 +98,47 @@ export default function DocumentChecklist({
 
   const callAction = async (itemId: string, action: "verify" | "reject" | "mark-na") => {
     setActing(itemId + action);
+    setError("");
+    setSuccess("");
     try {
       if (action === "reject") {
         const fd = new FormData();
         fd.append("reason", "Please re-upload with corrections");
-        await fetch(`${API_URL}/workers/${workerId}/checklist/${itemId}/reject`, {
+        const res = await fetch(`${API_PROXY_URL}/workers/${workerId}/checklist/${itemId}/reject`, {
           method: "POST",
           headers: authHeaders,
           body: fd,
         });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.detail || `Reject failed (${res.status})`);
+        }
       } else {
-        await fetch(`${API_URL}/workers/${workerId}/checklist/${itemId}/${action}`, {
+        const res = await fetch(`${API_PROXY_URL}/workers/${workerId}/checklist/${itemId}/${action}`, {
           method: "POST",
           headers: authHeaders,
         });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.detail || `${action} failed (${res.status})`);
+        }
       }
       await onRefresh();
+      setSuccess(action === "verify" ? "Document verified." : action === "reject" ? "Document rejected." : "Marked as not applicable.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Action failed.");
     } finally {
       setActing(null);
     }
   };
 
   const download = async (itemId: string, docId: string, fileName: string) => {
-    const res = await fetch(`${API_URL}/workers/${workerId}/checklist/${itemId}/download/${docId}`, { headers: authHeaders });
+    const res = await fetch(`${API_PROXY_URL}/workers/${workerId}/checklist/${itemId}/download/${docId}`, { headers: authHeaders });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.detail || `Download failed (${res.status})`);
+      return;
+    }
     const blob = await res.blob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -105,6 +151,16 @@ export default function DocumentChecklist({
     <div className="data-card" style={{ padding: 14 }}>
       <input ref={fileInputRef} type="file" className="hidden" onChange={onFileChange} />
       <h3 className="text-sm font-semibold text-gray-900">Document Checklist</h3>
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 text-red-700" style={{ marginTop: 8, padding: "8px 10px", fontSize: 12 }}>
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700" style={{ marginTop: 8, padding: "8px 10px", fontSize: 12 }}>
+          {success}
+        </div>
+      )}
 
       <div style={{ marginTop: 10, display: "grid", gap: 8, maxHeight: 560, overflow: "auto" }}>
         {items.map((it) => (
@@ -115,8 +171,11 @@ export default function DocumentChecklist({
                 <p className="text-sm font-semibold text-gray-900">{it.description}</p>
                 {it.rejection_reason && <p className="text-xs text-red-600" style={{ marginTop: 4 }}>{it.rejection_reason}</p>}
               </div>
-              <span className="rounded-full bg-white border border-gray-200 text-xs font-semibold capitalize" style={{ padding: "3px 8px" }}>
-                {it.status.replace("_", " ")}
+              <span
+                className={`rounded-full border text-xs font-semibold ${STATUS_STYLE[it.status]}`}
+                style={{ padding: "3px 8px" }}
+              >
+                {STATUS_LABEL[it.status]}
               </span>
             </div>
 
@@ -136,16 +195,23 @@ export default function DocumentChecklist({
 
             <div className="flex flex-wrap" style={{ gap: 8, marginTop: 8 }}>
               <button className="rounded-lg bg-blue-600 text-white text-xs" style={{ padding: "6px 9px" }} onClick={() => triggerUpload(it.id)}>
-                {uploading === it.id ? <Loader2 className="inline animate-spin" style={{ width: 12, height: 12 }} /> : <Upload className="inline" style={{ width: 12, height: 12 }} />} Upload
+                {uploading === it.id ? <Loader2 className="inline animate-spin" style={{ width: 12, height: 12 }} /> : <Upload className="inline" style={{ width: 12, height: 12 }} />} {it.documents.length > 0 ? "Re-upload" : "Upload"}
               </button>
-              <button className="rounded-lg bg-emerald-600 text-white text-xs" style={{ padding: "6px 9px" }} onClick={() => callAction(it.id, "verify")}>
+              <button
+                className="rounded-lg bg-emerald-600 text-white text-xs disabled:opacity-50"
+                style={{ padding: "6px 9px" }}
+                onClick={() => callAction(it.id, "verify")}
+                disabled={it.documents.length === 0}
+              >
                 {acting === it.id + "verify" ? <Loader2 className="inline animate-spin" style={{ width: 12, height: 12 }} /> : <CheckCircle2 className="inline" style={{ width: 12, height: 12 }} />} Verify
               </button>
-              <button className="rounded-lg bg-red-600 text-white text-xs" style={{ padding: "6px 9px" }} onClick={() => callAction(it.id, "reject")}>
+              <button
+                className="rounded-lg bg-red-600 text-white text-xs disabled:opacity-50"
+                style={{ padding: "6px 9px" }}
+                onClick={() => callAction(it.id, "reject")}
+                disabled={it.documents.length === 0}
+              >
                 {acting === it.id + "reject" ? <Loader2 className="inline animate-spin" style={{ width: 12, height: 12 }} /> : <XCircle className="inline" style={{ width: 12, height: 12 }} />} Reject
-              </button>
-              <button className="rounded-lg bg-gray-600 text-white text-xs" style={{ padding: "6px 9px" }} onClick={() => callAction(it.id, "mark-na")}>
-                {acting === it.id + "mark-na" ? <Loader2 className="inline animate-spin" style={{ width: 12, height: 12 }} /> : <Ban className="inline" style={{ width: 12, height: 12 }} />} N/A
               </button>
             </div>
           </div>

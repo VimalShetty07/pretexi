@@ -162,6 +162,10 @@ export default function NewWorkerPage() {
       setError("Job Title is required.");
       return;
     }
+    if (!form.email.trim()) {
+      setError("Email is required.");
+      return;
+    }
 
     setError("");
     setSaving(true);
@@ -277,8 +281,8 @@ export default function NewWorkerPage() {
             <Field label="Last Name" required>
               <input type="text" value={form.last_name} onChange={set("last_name")} placeholder="e.g. Johnson" className={inputClass} style={{ height: 40, padding: "0 14px" }} />
             </Field>
-            <Field label="Email">
-              <input type="email" value={form.email} onChange={set("email")} placeholder="e.g. sarah@company.com" className={inputClass} style={{ height: 40, padding: "0 14px" }} />
+            <Field label="Email" required>
+              <input type="email" required value={form.email} onChange={set("email")} placeholder="e.g. sarah@company.com" className={inputClass} style={{ height: 40, padding: "0 14px" }} />
             </Field>
             <Field label="Phone Number">
               <input type="tel" value={form.phone} onChange={set("phone")} placeholder="+44 7700 000000" className={inputClass} style={{ height: 40, padding: "0 14px" }} />
