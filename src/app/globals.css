@@ -757,3 +757,54 @@ body {
     0 10px 24px -12px rgba(150,55,100,0.48),
     0 2px 8px rgba(0,0,0,0.15);
 }
+
+/* Marketing pages */
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(22,87,173,0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #1657ad 0%, #2563eb 60%, #0f3f86 100%);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  box-shadow: 0 3px 12px rgba(22,87,173,0.22), 0 1px 3px rgba(22,87,173,0.16);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(22,87,173,0.3), 0 3px 8px rgba(22,87,173,0.2);
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #1657ad;
+  font-weight: 700;
+  border-radius: 14px;
+  border: 2px solid #1657ad;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+}
+
+.btn-secondary:hover {
+  background: #1657ad;
+  color: #fff;
+}
+
+.card-l2 {
+  background: #fff;
+  border-radius: 24px;
+  border: 1px solid rgba(22,87,173,0.1);
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.03),
+    0 6px 18px rgba(22,87,173,0.06),
+    0 16px 42px rgba(22,87,173,0.055),
+    inset 0 1px 0 rgba(255,255,255,1);
+}

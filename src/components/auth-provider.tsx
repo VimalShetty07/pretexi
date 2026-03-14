@@ -24,7 +24,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const TOKEN_KEY = "protexi_token";
-const PUBLIC_ROUTES = new Set(["/", "/pricing", "/checkout/success", "/checkout/cancel"]);
+const PUBLIC_ROUTES = new Set(["/", "/login", "/book-demo", "/pricing", "/checkout/success", "/checkout/cancel"]);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -52,23 +52,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearAuth]);
 
   useEffect(() => {
-    const stored = localStorage.getItem(TOKEN_KEY);
-    if (stored) {
-      fetchUser(stored).finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    let active = true;
+
+    const initAuth = async () => {
+      const stored = localStorage.getItem(TOKEN_KEY);
+      if (stored) {
+        await fetchUser(stored);
+      }
+      if (active) setLoading(false);
+    };
+
+    initAuth();
+    return () => {
+      active = false;
+    };
   }, [fetchUser]);
 
   useEffect(() => {
     if (loading) return;
 
-    const isLoginPage = pathname === "/";
+    const isLoginPage = pathname === "/login";
     const isPublicRoute = PUBLIC_ROUTES.has(pathname || "");
-    const isAdminRoute = !isPublicRoute && pathname !== "/" && !pathname.startsWith("/_");
+    const isAdminRoute = !isPublicRoute && !pathname.startsWith("/_");
 
     if (!user && isAdminRoute) {
-      router.replace("/");
+      router.replace("/login");
       return;
     }
 
@@ -98,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearAuth();
-    router.push("/");
+    router.push("/login");
   }, [clearAuth, router]);
 
   const hasRole = useCallback(
