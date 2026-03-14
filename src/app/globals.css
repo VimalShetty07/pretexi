@@ -808,3 +808,52 @@ body {
     0 16px 42px rgba(22,87,173,0.055),
     inset 0 1px 0 rgba(255,255,255,1);
 }
+
+.card-3d-base {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #1657ad 0%, #2563eb 55%, #0f3f86 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-blue {
+  background: linear-gradient(135deg, #1657ad 0%, #2563eb 60%, #0891b2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 100px;
+  letter-spacing: 0.3px;
+}
+
+.badge-blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.divider-gradient {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(22,87,173,0.1), rgba(22,87,173,0.1), transparent);
+}
+
+@keyframes glow-pulse {
+  0%,100% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.04); }
+}
+
+.animate-glow-pulse { animation: glow-pulse 5s ease-in-out infinite; }
