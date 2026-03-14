@@ -1,5 +1,8 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { pricingPlans, featureMatrix } from "@/components/marketing/pricing-data";
+import { pricingPlans, featureMatrix, premiumAddons } from "@/components/marketing/pricing-data";
 import Card3D from "./Card3D";
 
 function Check({ active }: { active: boolean }) {
@@ -19,6 +22,35 @@ function Check({ active }: { active: boolean }) {
 }
 
 export default function Pricing() {
+  const [userCount, setUserCount] = useState(25);
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
+
+  const addonsTotal = useMemo(
+    () => premiumAddons.filter((a) => selectedAddons.includes(a.code)).reduce((sum, a) => sum + a.amount, 0),
+    [selectedAddons]
+  );
+
+  const quoteByPlan = useMemo(() => {
+    return pricingPlans.reduce<Record<string, { overageUsers: number; overageAmount: number; total: number }>>((acc, plan) => {
+      const included = plan.includedUsers ?? userCount;
+      const overageUsers = Math.max(0, userCount - included);
+      const overageAmount = overageUsers * plan.extraUserPrice;
+      const total = plan.baseAmount + overageAmount + addonsTotal;
+      acc[plan.name] = { overageUsers, overageAmount, total };
+      return acc;
+    }, {});
+  }, [addonsTotal, userCount]);
+
+  const recommendedPlan = useMemo(() => {
+    if (userCount <= 25) return "Starter";
+    if (userCount <= 100) return "Growth";
+    return "Enterprise";
+  }, [userCount]);
+
+  const toggleAddon = (code: string) => {
+    setSelectedAddons((prev) => (prev.includes(code) ? prev.filter((v) => v !== code) : [...prev, code]));
+  };
+
   return (
     <section id="pricing" className="py-28 bg-white relative overflow-hidden">
       <div className="absolute inset-0 dot-grid opacity-30" />
@@ -33,9 +65,45 @@ export default function Pricing() {
           <p className="text-slate-500 text-lg max-w-xl mx-auto">No hidden fees. No per-user surprises. Transparent pricing for every team size.</p>
         </div>
 
+        <div className="card-l2 p-5 md:p-6 mb-12">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Pricing Estimator</p>
+              <h3 className="text-lg font-bold text-slate-900 mt-1">Size-based with optional premium features</h3>
+              <p className="text-sm text-slate-500 mt-1">Recommended plan: <span className="font-semibold text-[#1657ad]">{recommendedPlan}</span></p>
+            </div>
+            <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
+              <p className="text-xs text-blue-700 font-semibold">Users</p>
+              <input
+                type="number"
+                min={1}
+                value={userCount}
+                onChange={(e) => setUserCount(Math.max(1, Number(e.target.value || 1)))}
+                className="mt-1 w-24 rounded-md border border-blue-200 bg-white px-2 py-1 text-sm text-blue-900 outline-none"
+              />
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {premiumAddons.map((addon) => (
+              <label key={addon.code} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 cursor-pointer">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">{addon.name}</p>
+                  <p className="text-xs text-slate-500">+£{addon.amount}/month</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={selectedAddons.includes(addon.code)}
+                  onChange={() => toggleAddon(addon.code)}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+
         <div className="grid md:grid-cols-3 gap-6 items-center mb-20">
           {pricingPlans.map((plan, i) => {
             const hi = plan.highlighted;
+            const quote = quoteByPlan[plan.name] || { overageUsers: 0, overageAmount: 0, total: plan.baseAmount };
             return hi ? (
               <div key={plan.name} className="relative rounded-3xl p-7 flex flex-col scale-[1.05]"
                 style={{
@@ -57,6 +125,14 @@ export default function Pricing() {
                     <span className="text-blue-200 mb-1">{plan.period}</span>
                   </div>
                   <p className="text-xs text-blue-200 font-medium">{plan.teamSize}</p>
+                  <p className="text-xs text-blue-100 mt-2">
+                    Est. total for {userCount} users: <span className="font-bold">£{quote.total.toFixed(0)}/month</span>
+                  </p>
+                  {quote.overageUsers > 0 && (
+                    <p className="text-[11px] text-blue-200 mt-1">
+                      Includes {quote.overageUsers} extra user(s): +£{quote.overageAmount.toFixed(0)}
+                    </p>
+                  )}
                 </div>
                 <div className="h-px bg-white/15 mb-6" />
                 <ul className="space-y-2.5 flex-1 mb-8">
@@ -86,6 +162,14 @@ export default function Pricing() {
                       <span className="text-slate-400 mb-1">{plan.period}</span>
                     </div>
                     <p className="text-xs text-slate-400 font-medium">{plan.teamSize}</p>
+                  <p className="text-xs text-slate-600 mt-2">
+                    Est. total for {userCount} users: <span className="font-bold text-[#1657ad]">£{quote.total.toFixed(0)}/month</span>
+                  </p>
+                  {quote.overageUsers > 0 && (
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Includes {quote.overageUsers} extra user(s): +£{quote.overageAmount.toFixed(0)}
+                    </p>
+                  )}
                   </div>
                   <div className="divider-gradient mb-6" />
                   <ul className="space-y-2.5 flex-1 mb-8">

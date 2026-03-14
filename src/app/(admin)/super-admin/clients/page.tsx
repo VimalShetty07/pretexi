@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Send, Plus } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
@@ -45,11 +45,11 @@ export default function SuperAdminClientsPage() {
     portal_expires_at: null,
   });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!token) return;
     const res = await api.get<OrgSummary[]>("/platform/organisations", token);
     setItems(res);
-  };
+  }, [token]);
 
   useEffect(() => {
     const run = async () => {
@@ -64,7 +64,7 @@ export default function SuperAdminClientsPage() {
       }
     };
     run();
-  }, [token]);
+  }, [load, token]);
 
   const stats = useMemo(() => {
     return {

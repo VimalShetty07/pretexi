@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import { Download, Upload, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://pretexi-backend.onrender.com/api";
 const API_PROXY_URL = "/api";
 
 interface DocFile {

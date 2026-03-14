@@ -1,8 +1,11 @@
 export type Plan = {
   name: string;
   price: string;
+  baseAmount: number;
   period: string;
   teamSize: string;
+  includedUsers: number | null;
+  extraUserPrice: number;
   description: string;
   cta: string;
   highlighted: boolean;
@@ -16,8 +19,11 @@ export const pricingPlans: Plan[] = [
   {
     name: "Starter",
     price: "£149",
+    baseAmount: 149,
     period: "/month",
     teamSize: "Up to 25 sponsored workers",
+    includedUsers: 25,
+    extraUserPrice: 2,
     description: "Perfect for small businesses taking their first step towards automated compliance.",
     cta: "Book a Demo",
     highlighted: false,
@@ -35,8 +41,11 @@ export const pricingPlans: Plan[] = [
   {
     name: "Growth",
     price: "£349",
+    baseAmount: 349,
     period: "/month",
     teamSize: "Up to 100 sponsored workers",
+    includedUsers: 100,
+    extraUserPrice: 1.5,
     description: "The most popular plan for growing UK businesses with active sponsorship programmes.",
     cta: "Book a Demo",
     highlighted: true,
@@ -57,8 +66,11 @@ export const pricingPlans: Plan[] = [
   {
     name: "Enterprise",
     price: "Custom",
+    baseAmount: 599,
     period: "",
     teamSize: "Unlimited sponsored workers",
+    includedUsers: null,
+    extraUserPrice: 0,
     description: "Full-scale compliance infrastructure for large organisations and legal teams.",
     cta: "Book a Demo",
     highlighted: false,
@@ -91,3 +103,8 @@ export const featureMatrix = [
   { feature: "Dedicated Manager", starter: false, growth: false, enterprise: true },
   { feature: "White-label Options", starter: false, growth: false, enterprise: true },
 ];
+
+export const premiumAddons = [
+  { code: "bg_verification", name: "Background Verification", amount: 49 },
+  { code: "leave_approval", name: "Leave Approval Workflow", amount: 29 },
+] as const;

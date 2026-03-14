@@ -483,6 +483,7 @@ export default function PortalDocumentsPage() {
             <div style={{ position: "relative", width: "100%", height: "calc(88vh - 70px)" }}>
               {viewing.mime.startsWith("image/") ? (
                 <div className="flex items-center justify-center bg-gray-50" style={{ width: "100%", height: "100%", border: "1px solid var(--border)", borderRadius: 12, overflow: "auto" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={viewing.url} alt={viewing.name} style={{ maxWidth: "100%", maxHeight: "100%" }} />
                 </div>
               ) : (
