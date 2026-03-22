@@ -137,7 +137,7 @@ export default function VisaExpiryPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((w, idx) => {
+                {rows.map((w) => {
                   const tone = visaTone(w.days_left);
                   const visaUrgent = w.days_left <= 90;
 

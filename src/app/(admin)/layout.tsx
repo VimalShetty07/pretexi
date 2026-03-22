@@ -1,19 +1,17 @@
 "use client";
 
-import { Sidebar } from "@/components/sidebar";
-import { Topbar } from "@/components/topbar";
+import { AdminTopbar } from "@/components/admin-topbar";
+import { AdminSubnav } from "@/components/admin-subnav";
 import { useAuth } from "@/components/auth-provider";
-import { useState } from "react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: "#1657ad" }}>
-        <div className="rounded-2xl bg-white/10 backdrop-blur-md" style={{ padding: "20px 40px" }}>
-          <p className="text-white/70 text-sm tracking-wide">Loading&hellip;</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#0f2050]">
+        <div className="rounded-2xl border border-white/10 bg-white/5 px-10 py-6 backdrop-blur-md">
+          <p className="text-sm tracking-wide text-white/70">Loading&hellip;</p>
         </div>
       </div>
     );
@@ -22,24 +20,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen admin-bg relative overflow-hidden">
-      <Sidebar
-        collapsed={collapsed}
-        onToggle={() => setCollapsed(!collapsed)}
-        userRole={user.role}
-        hideMainNav
-      />
-      <div
-        className="flex-1 flex flex-col min-h-screen transition-all duration-300"
-        style={{ marginLeft: collapsed ? 72 : 240 }}
-      >
-        <Topbar userRole={user.role} />
-        <main
-          style={{ padding: "24px 28px", flex: 1, borderTopLeftRadius: 16, background: "#f1f5fb" }}
-        >
-          {children}
-        </main>
-      </div>
+    <div className="protexi-adm-shell flex min-h-dvh flex-col bg-[#F0F4FF]">
+      <AdminTopbar userRole={user.role} />
+      <AdminSubnav />
+      <main className="adm-page flex-1">{children}</main>
     </div>
   );
 }

@@ -1,0 +1,152 @@
+.header {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 200;
+  transition: background 0.3s, box-shadow 0.3s;
+  padding-block: 1rem;
+}
+
+.header.scrolled {
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  letter-spacing: -0.5px;
+}
+
+.logoMark {
+  color: var(--blue-mid);
+  font-size: 1rem;
+}
+
+.links {
+  display: flex;
+  list-style: none;
+  gap: 0.25rem;
+  margin-inline-start: auto;
+}
+
+.link {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.link:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.ctaGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.signIn {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  transition: color 0.2s;
+}
+.signIn:hover { color: var(--ink); }
+
+.btnDemo {
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: var(--blue);
+  color: var(--white);
+  padding: 0.5rem 1.2rem;
+  border-radius: 10px;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(22,87,173,0.25);
+}
+.btnDemo:hover {
+  background: var(--blue-deep);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(22,87,173,0.3);
+}
+
+/* Hamburger */
+.burger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  padding: 4px;
+  margin-inline-start: auto;
+}
+
+.bar {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--ink);
+  border-radius: 2px;
+  transition: transform 0.25s, opacity 0.25s;
+}
+
+/* Mobile drawer */
+.drawer {
+  position: fixed;
+  inset-block-start: 64px;
+  inset-inline: 0;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  animation: slideDown 0.2s var(--ease-out);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.drawerLink {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ink);
+  padding: 0.7rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawerCta {
+  margin-block-start: 0.75rem;
+  background: var(--blue);
+  color: white;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 0.8rem;
+  border-radius: 12px;
+}
+
+@media (max-width: 768px) {
+  .links, .ctaGroup { display: none; }
+  .burger { display: flex; }
+}

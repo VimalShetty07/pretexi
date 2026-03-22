@@ -50,7 +50,7 @@ function getVisibleNav(role: UserRole): NavItem[] {
 
 export function Sidebar({ collapsed, onToggle, userRole, hideMainNav = false }: SidebarProps) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navItems = getVisibleNav(userRole);
   const showSettings = userRole === "super_admin" || userRole === "tenant_admin";
   const isNavActive = (href: string) => {
@@ -60,9 +60,6 @@ export function Sidebar({ collapsed, onToggle, userRole, hideMainNav = false }: 
     }
     return pathname === href || pathname?.startsWith(href + "/");
   };
-
-  const initials = user?.full_name
-    ?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "U";
 
   return (
     <aside

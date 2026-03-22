@@ -1,0 +1,282 @@
+/* ── Shared section tokens ── */
+.sectionTag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: 0.6rem;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 2.9rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -1.5px;
+  color: var(--ink);
+  margin-bottom: 0.85rem;
+}
+
+.sectionSub {
+  font-size: 1rem;
+  color: var(--muted);
+  line-height: 1.75;
+  max-width: 520px;
+  margin-bottom: 3rem;
+}
+
+/* ── TRUST STRIP ── */
+.trust {
+  background: var(--ink);
+  padding-block: 1.25rem;
+}
+
+.trustInner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem 3rem;
+}
+
+.trustItem {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.trustIcon { font-size: 1rem; }
+
+.trustLabel {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.75);
+  white-space: nowrap;
+}
+
+/* ── PROBLEM → SOLUTION ── */
+.ps {
+  padding-block: 7rem;
+  background: var(--surface);
+}
+
+.psGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.psCard {
+  background: var(--card-bg, #f8fafc);
+  border: 1.5px solid var(--card-border, #e2e8f0);
+  border-radius: 18px;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: transform 0.25s, box-shadow 0.25s;
+}
+.psCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.07);
+}
+
+.psEmoji { font-size: 2rem; }
+
+.psBadge, .psBadgeSolution {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 50px;
+  margin-bottom: 0.35rem;
+}
+
+.psBadge { background: rgba(239,68,68,0.12); color: #dc2626; }
+.psBadgeSolution { background: rgba(34,197,94,0.12); color: #15803d; }
+
+.psProblem p, .psSolution p {
+  font-size: 0.88rem;
+  color: var(--ink);
+  line-height: 1.65;
+  font-weight: 500;
+}
+
+.psArrow {
+  font-size: 1.4rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── FEATURES ── */
+.features {
+  padding-block: 7rem;
+  background: var(--white);
+}
+
+.featGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+.featCard {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.featCard::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--blue), var(--blue-mid));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s var(--ease-out);
+}
+
+.featCard:hover { border-color: var(--blue-pale); box-shadow: 0 8px 24px rgba(22,87,173,0.1); transform: translateY(-3px); }
+.featCard:hover::before { transform: scaleX(1); }
+
+.featIcon { font-size: 1.6rem; }
+
+.featTag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  border-radius: 50px;
+  width: fit-content;
+}
+
+.featTitle {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.featDesc {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+/* ── USE CASES ── */
+.usecases {
+  padding-block: 7rem;
+  background: var(--surface);
+}
+
+.roleTabs {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.roleTab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.6rem 1.25rem;
+  border-radius: 50px;
+  border: 1.5px solid var(--border);
+  background: white;
+  color: var(--muted);
+  transition: all 0.2s;
+}
+.roleTab:hover { border-color: var(--blue-pale); color: var(--ink); }
+.roleTabActive {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+  box-shadow: 0 4px 12px rgba(22,87,173,0.28);
+}
+
+.rolePanel {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2.5rem;
+  max-width: 640px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rolePanelTitle {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 1.25rem;
+}
+
+.rolePoints { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 2rem; }
+
+.rolePoint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.92rem;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.roleCheck {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--blue-ghost);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  margin-block-start: 1px;
+}
+
+.roleCta {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--blue);
+  border-bottom: 1.5px solid var(--blue-pale);
+  padding-bottom: 2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.roleCta:hover { color: var(--blue-deep); border-color: var(--blue-deep); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1024px) {
+  .featGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .psGrid { grid-template-columns: 1fr; }
+  .featGrid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 480px) {
+  .featGrid { grid-template-columns: 1fr; }
+}

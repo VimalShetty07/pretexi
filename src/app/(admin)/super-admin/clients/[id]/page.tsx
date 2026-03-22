@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import { ChecklistTemplateEditor } from "@/components/checklist-template-editor";
 
 type UserOut = {
   id: string;
@@ -31,7 +32,7 @@ type OrgDetail = {
 
 export default function SuperAdminClientDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [item, setItem] = useState<OrgDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -54,6 +55,8 @@ export default function SuperAdminClientDetailPage() {
 
   if (loading) return <p className="text-sm text-[var(--muted-foreground)]">Loading client details...</p>;
   if (error || !item) return <p className="text-sm text-red-600">{error || "Client not found"}</p>;
+
+  const canEditClientChecklist = user?.role === "platform_owner";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -106,6 +109,10 @@ export default function SuperAdminClientDetailPage() {
           </div>
         )}
       </div>
+
+      {token && id && (
+        <ChecklistTemplateEditor token={token} organisationId={id} canEdit={canEditClientChecklist} />
+      )}
     </div>
   );
 }

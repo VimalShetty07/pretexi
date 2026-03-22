@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, BriefcaseBusiness, Building2, Mail, ShieldCheck, Users } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import { ChecklistTemplateEditor } from "@/components/checklist-template-editor";
 
 interface Me {
   email: string;
@@ -73,6 +74,11 @@ export default function OrganisationPage() {
   const orgDisplay = me.organisation_name || `Protexi Tenant ${orgCode}`;
   const orgRef = me.organisation_slug || me.organisation_licence_number || orgCode;
   const canViewCos = user?.role !== "hr_officer";
+  const canEditChecklistTemplate =
+    user?.role === "tenant_admin" ||
+    user?.role === "compliance_manager" ||
+    user?.role === "super_admin" ||
+    user?.role === "platform_owner";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -138,6 +144,14 @@ export default function OrganisationPage() {
           </div>
         )}
       </div>
+
+      {token && me.organisation_id && (
+        <ChecklistTemplateEditor
+          token={token}
+          organisationId={me.organisation_id}
+          canEdit={!!canEditChecklistTemplate}
+        />
+      )}
 
       <div className="data-card" style={{ padding: 16 }}>
         <h3 className="text-sm font-semibold text-gray-900">Admin Account Context</h3>
