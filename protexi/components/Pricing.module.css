@@ -1,0 +1,342 @@
+.pricing {
+  padding-block: 7rem;
+  background: var(--surface);
+}
+
+.sectionTag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: 0.6rem;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 2.9rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -1.5px;
+  color: var(--ink);
+  margin-bottom: 0.85rem;
+}
+
+.sectionSub {
+  font-size: 1rem;
+  color: var(--muted);
+  line-height: 1.75;
+  max-width: 520px;
+  margin-bottom: 3rem;
+}
+
+/* ── ESTIMATOR ── */
+.estimator {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2rem 2.5rem;
+  margin-bottom: 2.5rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
+.estimatorHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.75rem;
+}
+
+.estimatorTitle {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.estimatorNote {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.estimatorControls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.control { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.controlLabel {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sliderWrap { display: flex; align-items: center; gap: 1rem; }
+
+.slider {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 5px;
+  border-radius: 50px;
+  background: linear-gradient(90deg, var(--blue) var(--pct, 13%), var(--border) 0%);
+  outline: none;
+  cursor: pointer;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--blue);
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(22,87,173,0.3);
+  cursor: pointer;
+}
+
+.sliderVal {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--blue);
+  min-width: 90px;
+  text-align: right;
+}
+
+.checkboxGroup { display: flex; flex-direction: column; gap: 0.6rem; }
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+.checkbox input { position: absolute; opacity: 0; pointer-events: none; }
+
+.checkboxBox {
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border);
+  background: white;
+  flex-shrink: 0;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+
+.checkbox input:checked + .checkboxBox {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+.checkbox input:checked + .checkboxBox::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.65rem;
+  color: white;
+  font-weight: 800;
+}
+
+.checkbox strong { color: var(--blue); }
+
+/* ── PLAN CARDS ── */
+.planGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 3rem;
+}
+
+.planCard {
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  position: relative;
+  transition: box-shadow 0.25s, transform 0.25s;
+}
+.planCard:hover { box-shadow: 0 16px 40px rgba(0,0,0,0.08); transform: translateY(-4px); }
+
+.planCardBlue {
+  background: var(--blue);
+  border-color: var(--blue);
+  box-shadow: 0 16px 48px rgba(22,87,173,0.3);
+}
+
+.planCardDark {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.recBadge {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--green);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.3rem 0.9rem;
+  border-radius: 50px;
+  white-space: nowrap;
+  letter-spacing: 0.05em;
+}
+
+.planTop { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.planName {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.planCardBlue .planName,
+.planCardDark .planName { color: white; }
+
+.planTagline {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.planCardBlue .planTagline,
+.planCardDark .planTagline { color: rgba(255,255,255,0.7); }
+
+.planPrice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+.planCurrency {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-block-start: 0.35rem;
+}
+.planCardBlue .planCurrency,
+.planCardDark .planCurrency { color: white; }
+
+.planAmount {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1;
+  letter-spacing: -2px;
+  transition: all 0.3s;
+}
+.planCardBlue .planAmount,
+.planCardDark .planAmount { color: white; }
+
+.planPer {
+  font-size: 0.82rem;
+  color: var(--muted);
+  align-self: flex-end;
+  margin-bottom: 0.4rem;
+}
+.planCardBlue .planPer,
+.planCardDark .planPer { color: rgba(255,255,255,0.65); }
+
+.planMeta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.planCardBlue .planMeta,
+.planCardDark .planMeta { color: rgba(255,255,255,0.6); }
+
+.planCta {
+  margin-block-start: auto;
+  display: block;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0.8rem;
+  border-radius: 12px;
+  background: var(--blue-ghost);
+  color: var(--blue);
+  border: 1.5px solid var(--blue-pale);
+  transition: background 0.2s, color 0.2s;
+}
+.planCta:hover { background: var(--blue); color: white; }
+
+.planCtaLight {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border-color: rgba(255,255,255,0.3);
+}
+.planCtaLight:hover { background: white; color: var(--blue); }
+
+/* ── MATRIX ── */
+.matrixWrap {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: white;
+}
+
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.matrixFeatureCol { width: 45%; text-align: left; }
+.matrixPlanCol { width: 18.33%; text-align: center; }
+
+.matrix thead th {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.matrixHighlight {
+  background: var(--blue-ghost) !important;
+  color: var(--blue) !important;
+}
+
+.matrixEven td { background: var(--surface); }
+.matrixHighlight.matrixEven { background: rgba(219,234,254,0.5) !important; }
+
+.matrixFeature {
+  padding: 0.85rem 1.25rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+}
+
+.matrixCell {
+  padding: 0.85rem 1.25rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.matrixYes  { color: var(--green);  font-weight: 800; font-size: 1rem; }
+.matrixNo   { color: var(--border); font-size: 1.1rem; }
+.matrixAdd  {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #92400e;
+  background: #fef9c3;
+  padding: 0.2rem 0.55rem;
+  border-radius: 50px;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .planGrid { grid-template-columns: 1fr; }
+  .estimatorControls { grid-template-columns: 1fr; }
+}
