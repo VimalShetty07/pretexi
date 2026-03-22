@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./protexi-admin-shell.css";
 
 @theme inline {
   --color-background: var(--background);
@@ -36,7 +37,7 @@
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
-  --font-sans: var(--font-manrope), "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-outfit), var(--font-manrope), "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 :root {
@@ -63,13 +64,19 @@
   --logo-blue-500: #2b6cd4;
 }
 
-* {
-  margin: 0;
-  padding: 0;
+/* Do not set padding on * — it can override Tailwind utilities (layer/cascade) and strip px-* / p-* on components. */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
+* {
+  margin: 0;
+}
+
 body {
+  margin: 0;
   color: var(--foreground);
   background: var(--background);
   font-family: var(--font-sans);
@@ -242,6 +249,7 @@ body {
 /* Liquid glass card */
 .glass-card {
   position: relative;
+  isolation: isolate;
   background: linear-gradient(
     165deg,
     rgba(255,255,255,0.22) 0%,
@@ -262,6 +270,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 0;
   border-radius: inherit;
   background: linear-gradient(
     105deg,
@@ -274,6 +283,115 @@ body {
   background-size: 200% 100%;
   animation: glass-shine 6s ease-in-out infinite;
   pointer-events: none;
+}
+/* Shine sits behind; all card body stays interactive and readable */
+.glass-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Login card: don’t clip button shadows (avoids pale “bar” under CTA) */
+.login-glass-panel.glass-card {
+  overflow: visible;
+  /* Explicit inset — survives any utility/cascade issues */
+  padding-inline: clamp(1.75rem, 5.5vw, 2.75rem);
+  padding-block: clamp(2rem, 4vw, 2.75rem);
+}
+.login-glass-panel .glass-cta {
+  position: relative;
+  z-index: 2;
+}
+
+/* ——— Login v2: inner form surface + fields ——— */
+.login-form-surface {
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 4px 24px -8px rgba(0, 0, 0, 0.25);
+}
+
+.login-field-icon {
+  color: rgba(255, 255, 255, 0.45);
+  transition: color 0.2s ease;
+}
+
+.login-input-wrap:focus-within .login-field-icon {
+  color: rgba(125, 211, 252, 0.95);
+}
+
+.login-input-v2 {
+  background: rgba(6, 20, 45, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.875rem;
+  color: #fff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.login-input-v2::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+}
+.login-input-v2:focus {
+  outline: none;
+  border-color: rgba(125, 211, 252, 0.45);
+  background: rgba(8, 28, 58, 0.45);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+}
+
+/* Split field: border lives on .login-input-wrap; inner input stays flush */
+.login-input-wrap .login-input-v2 {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.login-input-wrap .login-input-v2:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.login-submit-v2 {
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, #38bdf8 0%, #2563eb 48%, #1d4ed8 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 4px 14px rgba(37, 99, 235, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.login-submit-v2:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow:
+    0 8px 22px rgba(37, 99, 235, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+.login-submit-v2:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Page shell: gutters so the card never touches the viewport edge */
+.login-page-root {
+  padding-left: max(1.25rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1.25rem, env(safe-area-inset-right, 0px));
+  padding-top: clamp(2rem, 5vw, 3rem);
+  padding-bottom: clamp(2rem, 5vw, 3rem);
+  box-sizing: border-box;
+}
+
+/* Full-bleed top accent; inner body gets padding */
+.login-glass-shell.login-glass-panel.glass-card {
+  padding: 0;
+  border-radius: 1.75rem;
+  overflow: hidden;
+}
+.login-glass-shell .login-glass-shell-inner {
+  padding: clamp(1.5rem, 4.5vw, 2.25rem);
+}
+.login-glass-shell .glass-cta,
+.login-glass-shell .login-submit-v2 {
+  position: relative;
+  z-index: 2;
 }
 
 /* Glass input fields */
@@ -857,3 +975,47 @@ body {
 }
 
 .animate-glow-pulse { animation: glow-pulse 5s ease-in-out infinite; }
+
+/* Marketing component compatibility tokens */
+:root {
+  --blue: #1657ad;
+  --blue-mid: #2563eb;
+  --blue-deep: #0f3f86;
+  --blue-pale: #dbeafe;
+  --blue-ghost: #eff6ff;
+  --white: #ffffff;
+  --surface: #f8fafc;
+  --ink: #0f172a;
+  --font-display: var(--font-manrope), "Inter", sans-serif;
+  --font-body: var(--font-manrope), "Inter", sans-serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.container {
+  width: min(1180px, 100%);
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 5vw, 3rem);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.anim-fade-up { animation: fadeUp 0.7s var(--ease-out) both; }
+.anim-fade-in { animation: fadeIn 0.6s ease both; }
+.anim-scale-in { animation: scaleIn 0.6s var(--ease-out) both; }
+.delay-1 { animation-delay: 0.08s; }
+.delay-2 { animation-delay: 0.16s; }
+.delay-3 { animation-delay: 0.24s; }
+.delay-4 { animation-delay: 0.32s; }
+.delay-5 { animation-delay: 0.40s; }
+.delay-6 { animation-delay: 0.48s; }

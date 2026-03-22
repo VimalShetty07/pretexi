@@ -1,0 +1,479 @@
+/* Employees list — matches protexi_employees_page.html (scoped) */
+.protexi-adm-shell .worker-list-page {
+  padding: 0;
+}
+
+.protexi-adm-shell .wlp-ph {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+.protexi-adm-shell .wlp-ph-ey {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #3b82f6;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.protexi-adm-shell .wlp-ph-ey::before {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 1.5px;
+  background: #3b82f6;
+}
+.protexi-adm-shell .wlp-ph-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0a0f1e;
+  letter-spacing: -0.6px;
+}
+.protexi-adm-shell .wlp-ph-sub {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 3px;
+}
+
+.protexi-adm-shell .wlp-mini-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.protexi-adm-shell .wlp-ms {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #fff;
+  border: 1px solid #e8eeff;
+  border-radius: 10px;
+}
+.protexi-adm-shell .wlp-ms-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.protexi-adm-shell .wlp-ms-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #64748b;
+}
+.protexi-adm-shell .wlp-ms-val {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0a0f1e;
+  margin-left: 4px;
+}
+
+.protexi-adm-shell .wlp-toolbar {
+  background: #fff;
+  border: 1px solid #e8eeff;
+  border-radius: 14px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.04);
+  flex-wrap: wrap;
+}
+.protexi-adm-shell .wlp-tb-search {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8faff;
+  border: 1.5px solid #e8eeff;
+  border-radius: 10px;
+  padding: 9px 14px;
+  transition: border-color 0.15s;
+}
+.protexi-adm-shell .wlp-tb-search:focus-within {
+  border-color: #3b82f6;
+}
+.protexi-adm-shell .wlp-tb-search input {
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 14px;
+  color: #0a0f1e;
+  width: 100%;
+}
+.protexi-adm-shell .wlp-tb-search input::placeholder {
+  color: #cbd5e1;
+}
+.protexi-adm-shell .wlp-tb-results {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+.protexi-adm-shell .wlp-tb-sep {
+  width: 1px;
+  height: 28px;
+  background: #e8eeff;
+  flex-shrink: 0;
+}
+.protexi-adm-shell .wlp-tb-filter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1.5px solid #e8eeff;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  background: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.protexi-adm-shell .wlp-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #f8faff;
+  border: 1px solid #e8eeff;
+  border-radius: 8px;
+  padding: 3px;
+}
+.protexi-adm-shell .wlp-vt-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #94a3b8;
+  border: none;
+  background: none;
+  transition: all 0.15s;
+}
+.protexi-adm-shell .wlp-vt-btn:hover {
+  color: #1d4ed8;
+}
+.protexi-adm-shell .wlp-vt-btn.act {
+  background: #fff;
+  color: #1d4ed8;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12);
+}
+
+.protexi-adm-shell .wlp-emp-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 16px;
+}
+@media (min-width: 768px) {
+  .protexi-adm-shell .wlp-emp-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1280px) {
+  .protexi-adm-shell .wlp-emp-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.protexi-adm-shell .wlp-emp-card {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e8eeff;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  text-align: left;
+  width: 100%;
+}
+.protexi-adm-shell .wlp-emp-card:hover {
+  border-color: #bfdbfe;
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.1);
+}
+.protexi-adm-shell .wlp-emp-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #1d4ed8, #60a5fa);
+}
+@keyframes wlpFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.protexi-adm-shell .wlp-emp-card {
+  animation: wlpFadeUp 0.35s ease both;
+}
+
+.protexi-adm-shell .wlp-ec-body {
+  padding: 20px 20px 16px;
+}
+.protexi-adm-shell .wlp-ec-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.protexi-adm-shell .wlp-ec-name-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.protexi-adm-shell .wlp-ec-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1.5px solid #bfdbfe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1d4ed8;
+  flex-shrink: 0;
+}
+.protexi-adm-shell .wlp-ec-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0a0f1e;
+  line-height: 1.2;
+}
+.protexi-adm-shell .wlp-ec-role-badge {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 100px;
+  background: #f0f4ff;
+  color: #3b82f6;
+  border: 1px solid #dbeafe;
+}
+.protexi-adm-shell .wlp-ec-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.protexi-adm-shell .wlp-st-active {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+.protexi-adm-shell .wlp-st-active::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+.protexi-adm-shell .wlp-st-inactive {
+  background: #fff1f2;
+  color: #e11d48;
+  border: 1px solid #fecdd3;
+}
+.protexi-adm-shell .wlp-st-inactive::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e11d48;
+}
+.protexi-adm-shell .wlp-st-warn {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+.protexi-adm-shell .wlp-st-warn::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+.protexi-adm-shell .wlp-ec-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.protexi-adm-shell .wlp-ec-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.protexi-adm-shell .wlp-ec-info-row a {
+  color: #2563eb;
+  font-weight: 500;
+  text-decoration: none;
+}
+.protexi-adm-shell .wlp-ec-info-row a:hover {
+  text-decoration: underline;
+}
+
+.protexi-adm-shell .wlp-ec-prog-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.protexi-adm-shell .wlp-ec-prog-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+.protexi-adm-shell .wlp-ec-prog-pct {
+  font-size: 12px;
+  font-weight: 800;
+}
+.protexi-adm-shell .wlp-pct-bad {
+  color: #e11d48;
+}
+.protexi-adm-shell .wlp-pct-ok {
+  color: #f59e0b;
+}
+.protexi-adm-shell .wlp-pct-good {
+  color: #16a34a;
+}
+.protexi-adm-shell .wlp-prog-track {
+  height: 5px;
+  background: #f0f4ff;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.protexi-adm-shell .wlp-prog-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.6s ease;
+}
+.protexi-adm-shell .wlp-pf-bad {
+  background: linear-gradient(90deg, #e11d48, #fb7185);
+}
+.protexi-adm-shell .wlp-pf-ok {
+  background: linear-gradient(90deg, #f59e0b, #fcd34d);
+}
+.protexi-adm-shell .wlp-pf-good {
+  background: linear-gradient(90deg, #16a34a, #4ade80);
+}
+
+.protexi-adm-shell .wlp-ec-footer {
+  padding: 10px 20px;
+  background: #f8faff;
+  border-top: 1px solid #f0f4ff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.protexi-adm-shell .wlp-ec-added {
+  font-size: 11.5px;
+  color: #cbd5e1;
+  font-weight: 500;
+}
+.protexi-adm-shell .wlp-ec-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.protexi-adm-shell .wlp-ec-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #e8eeff;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #94a3b8;
+  transition: all 0.15s;
+}
+.protexi-adm-shell .wlp-ec-action-btn:hover {
+  border-color: #3b82f6;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.protexi-adm-shell .wlp-empty-state {
+  grid-column: 1 / -1;
+  padding: 60px 24px;
+  text-align: center;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e8eeff;
+}
+
+.protexi-adm-shell .wlp-add-card {
+  border: 2px dashed #bfdbfe;
+  background: #f8faff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  gap: 12px;
+  min-height: 200px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.protexi-adm-shell .wlp-add-card:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.protexi-adm-shell .wlp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.protexi-adm-shell .wlp-table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: #64748b;
+  font-weight: 600;
+  border-bottom: 1px solid #e8eeff;
+  background: #fafcff;
+}
+.protexi-adm-shell .wlp-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f0f4ff;
+  color: #0a0f1e;
+}
+.protexi-adm-shell .wlp-table tr:hover td {
+  background: #f8faff;
+}
