@@ -1,0 +1,404 @@
+/* Login — aligned with marketing landing (Protexi) */
+
+.protexi-login {
+  --blue: #1a4fa0;
+  --blue-dark: #0f2d5e;
+  --white: #f5f5f0;
+  --black: #0a0a0a;
+  --gray: #6b6b6b;
+  --card-bg: #f0f0eb;
+  --mono: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+
+  font-family: var(--sans);
+  background: var(--white);
+  color: var(--black);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.protexi-login *,
+.protexi-login *::before,
+.protexi-login *::after {
+  box-sizing: border-box;
+}
+
+/* Top bar — same language as marketing nav */
+.protexi-login .login-topnav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px clamp(20px, 4vw, 48px);
+  background: rgba(245, 245, 240, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.protexi-login .login-brand {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.protexi-login .login-brand img {
+  display: block;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.protexi-login .login-topnav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.protexi-login .login-btn-outline {
+  padding: 9px 18px;
+  border: 1.5px solid var(--black);
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--black);
+  transition: background 0.18s, color 0.18s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.protexi-login .login-btn-outline:hover {
+  background: var(--black);
+  color: var(--white);
+}
+
+.protexi-login .login-btn-fill {
+  padding: 9px 18px;
+  border: 1.5px solid var(--blue);
+  background: var(--blue);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #fff;
+  transition: background 0.18s, border-color 0.18s;
+}
+
+.protexi-login .login-btn-fill:hover {
+  background: var(--blue-dark);
+  border-color: var(--blue-dark);
+}
+
+/* Main layout */
+.protexi-login .login-shell {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  justify-items: center;
+  padding: clamp(28px, 5vw, 56px) clamp(20px, 4vw, 48px) clamp(40px, 8vw, 72px);
+  width: 100%;
+}
+
+@media (min-width: 960px) {
+  .protexi-login .login-shell {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 440px);
+    gap: clamp(32px, 6vw, 80px);
+    max-width: 1100px;
+    margin: 0 auto;
+    align-items: stretch;
+  }
+}
+
+/* Left column — marketing voice */
+.protexi-login .login-aside {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  max-width: 420px;
+}
+
+@media (min-width: 960px) {
+  .protexi-login .login-aside {
+    display: flex;
+  }
+}
+
+.protexi-login .login-aside-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  border: 1px solid rgba(26, 79, 160, 0.3);
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--blue);
+  background: rgba(26, 79, 160, 0.05);
+}
+
+.protexi-login .login-aside-badge-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--blue);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.protexi-login .login-aside h2 {
+  font-size: clamp(28px, 3.2vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  color: var(--black);
+}
+
+.protexi-login .login-aside h2 em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--blue);
+}
+
+.protexi-login .login-aside p {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #444;
+  max-width: 38ch;
+}
+
+.protexi-login .login-aside-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.protexi-login .login-pill {
+  padding: 7px 14px;
+  background: var(--card-bg);
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  color: var(--blue-dark);
+}
+
+/* Card — marketing dashboard-style border + offset shadow */
+.protexi-login .login-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--white);
+  border: 2px solid var(--blue-dark);
+  box-shadow: 12px 12px 0 var(--accent);
+  position: relative;
+}
+
+.protexi-login .login-card-top {
+  background: var(--blue-dark);
+  padding: 14px clamp(24px, 5vw, 36px) 12px;
+}
+
+.protexi-login .login-card-inner {
+  padding: clamp(24px, 5vw, 36px);
+}
+
+.protexi-login .login-card-top-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.protexi-login .login-card-top-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  margin-top: 4px;
+}
+
+.protexi-login .login-card-header {
+  margin-bottom: 24px;
+}
+
+.protexi-login .login-card-header h1 {
+  font-size: clamp(1.5rem, 4vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--black);
+  margin-bottom: 10px;
+}
+
+.protexi-login .login-card-header p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #555;
+  max-width: 36ch;
+}
+
+.protexi-login .login-alert {
+  border-radius: 0;
+  border: 1px solid var(--blue);
+  background: rgba(26, 79, 160, 0.08);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--blue-dark);
+  margin-bottom: 20px;
+}
+
+.protexi-login .login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.protexi-login .login-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blue-dark);
+  margin-bottom: 8px;
+  font-family: var(--mono);
+}
+
+.protexi-login .login-field {
+  display: flex;
+  align-items: stretch;
+  min-height: 48px;
+  border: 1.5px solid rgba(0, 0, 0, 0.12);
+  background: var(--card-bg);
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.protexi-login .login-field:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(26, 79, 160, 0.12);
+}
+
+.protexi-login .login-field-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--blue);
+}
+
+.protexi-login .login-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-family: var(--sans);
+  color: var(--black);
+  outline: none;
+}
+
+.protexi-login .login-field input::placeholder {
+  color: #888;
+}
+
+.protexi-login .login-field-toggle {
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+}
+
+.protexi-login .login-field-toggle button {
+  border: none;
+  background: transparent;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--gray);
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.protexi-login .login-field-toggle button:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--black);
+}
+
+.protexi-login .login-submit {
+  margin-top: 6px;
+  width: 100%;
+  padding: 15px 24px;
+  background: var(--blue);
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 2px solid var(--blue);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.protexi-login .login-submit:hover:not(:disabled) {
+  background: var(--blue-dark);
+  border-color: var(--blue-dark);
+}
+
+.protexi-login .login-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.protexi-login .login-footnote {
+  margin-top: 22px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #888;
+  line-height: 1.5;
+}
+
+/* Loading full-page */
+.protexi-login.login-loading {
+  align-items: center;
+  justify-content: center;
+}
+
+.protexi-login .login-loading-spinner {
+  color: var(--blue);
+}

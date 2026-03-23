@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import "./dashboard-marketing.css";
 import {
   Users,
   UserCheck,
@@ -150,11 +151,17 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-sm text-slate-500">Loading dashboard&hellip;</div>
+      <div className="protexi-dash-marketing-loading" role="status" aria-live="polite">
+        Loading dashboard&hellip;
+      </div>
     );
   }
   if (error || !data) {
-    return <div className="py-10 text-center text-sm text-red-600">{error || "Dashboard unavailable"}</div>;
+    return (
+      <div className="protexi-dash-marketing-error" role="alert">
+        {error || "Dashboard unavailable"}
+      </div>
+    );
   }
 
   const today = new Date().toLocaleDateString("en-GB", {
@@ -179,12 +186,14 @@ export default function DashboardPage() {
       : 100;
 
   return (
-    <div className="flex flex-col gap-0">
+    <div className="protexi-dash-marketing flex flex-col gap-0">
       {/* Page header */}
       <div className="adm-ph">
         <div>
           <div className="adm-ph-ey">Sponsor Compliance</div>
-          <h1 className="adm-ph-title">Dashboard</h1>
+          <h1 className="adm-ph-title">
+            Compliance <em className="dash-title-em">overview</em>
+          </h1>
           <div className="adm-ph-date">{today}</div>
         </div>
         {expired > 0 ? (
@@ -194,7 +203,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="adm-ph-badge">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
+            <span className="dash-status-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden />
             All systems operational
           </div>
         )}
@@ -257,7 +266,7 @@ export default function DashboardPage() {
 
       {/* CoS row */}
       {canViewCos && (
-        <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="dash-cos-row mb-0">
           <div className="adm-card">
             <div className="adm-card-h border-b border-[#E8EEFF] pb-3">
               <div className="adm-card-title">CoS Available</div>

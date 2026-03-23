@@ -1,0 +1,477 @@
+/* Organisation dashboard — Protexi marketing visual system (cream, navy, blue, black) */
+
+.protexi-adm-shell .protexi-dash-marketing {
+  --dash-blue: #1a4fa0;
+  --dash-navy: #0f2d5e;
+  --dash-cream: #f5f5f0;
+  --dash-card: #f0f0eb;
+  --dash-black: #0a0a0a;
+  --dash-mono: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+  --dash-serif: Georgia, "Times New Roman", serif;
+  --dash-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+
+  font-family: var(--dash-sans);
+  background: var(--dash-cream);
+  color: var(--dash-black);
+  margin: -22px -24px;
+  padding: 22px 24px 36px;
+  min-height: calc(100dvh - 98px);
+  box-sizing: border-box;
+}
+
+/* Page header — marketing section label + headline */
+.protexi-adm-shell .protexi-dash-marketing .adm-ph {
+  margin-bottom: 28px;
+  align-items: flex-start;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-ey {
+  font-family: var(--dash-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--dash-blue);
+  gap: 12px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-ey::before {
+  width: 20px;
+  height: 1.5px;
+  background: var(--dash-blue);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-title {
+  font-size: clamp(26px, 4vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  color: var(--dash-black);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-title .dash-title-em {
+  font-family: var(--dash-serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--dash-blue);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-date {
+  font-family: var(--dash-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b6b6b;
+  margin-top: 8px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-badge {
+  border-radius: 0;
+  font-family: var(--dash-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--dash-card);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: var(--dash-navy);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-badge-warn {
+  background: rgba(26, 79, 160, 0.08);
+  border-color: var(--dash-blue);
+  color: var(--dash-navy);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-badge-warn.border-red-200,
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-badge-warn.bg-red-50,
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-badge-warn.text-red-700 {
+  border-color: var(--dash-blue) !important;
+  background: rgba(26, 79, 160, 0.1) !important;
+  color: var(--dash-navy) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-status-dot {
+  background: var(--dash-blue);
+}
+
+/* Stat row — tight grid like marketing feature grid */
+.protexi-adm-shell .protexi-dash-marketing .adm-stat-row {
+  gap: 2px;
+  margin-bottom: 20px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc {
+  border-radius: 0;
+  border: none;
+  background: #fff;
+  padding: 22px 20px;
+  box-shadow: none;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc:hover {
+  background: var(--dash-blue);
+  border-color: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc:hover .adm-sc-num,
+.protexi-adm-shell .protexi-dash-marketing .adm-sc:hover .adm-sc-lbl,
+.protexi-adm-shell .protexi-dash-marketing .adm-sc:hover .adm-sc-sub {
+  color: #fff;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc:hover .adm-sc-icon {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #fff !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc:hover .adm-sc-pill {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc::before {
+  top: 0;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 3px;
+  border-radius: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc:hover::before {
+  transform: scaleX(1);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc-b::before,
+.protexi-adm-shell .protexi-dash-marketing .adm-sc-p::before,
+.protexi-adm-shell .protexi-dash-marketing .adm-sc-a::before,
+.protexi-adm-shell .protexi-dash-marketing .adm-sc-r::before {
+  background: var(--dash-blue);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-si-b,
+.protexi-adm-shell .protexi-dash-marketing .adm-si-p,
+.protexi-adm-shell .protexi-dash-marketing .adm-si-a,
+.protexi-adm-shell .protexi-dash-marketing .adm-si-r {
+  background: rgba(26, 79, 160, 0.08);
+  color: var(--dash-blue);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-pill-g,
+.protexi-adm-shell .protexi-dash-marketing .adm-pill-n {
+  background: var(--dash-card);
+  color: var(--dash-navy);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-family: var(--dash-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc-num {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--dash-black);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc-lbl {
+  font-family: var(--dash-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-navy);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-sc-sub {
+  color: #666;
+  font-size: 11px;
+}
+
+/* CoS + chart grids */
+.protexi-adm-shell .protexi-dash-marketing .dash-cos-row {
+  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+@media (max-width: 900px) {
+  .protexi-adm-shell .protexi-dash-marketing .dash-cos-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-chart-grid {
+  gap: 2px;
+  margin-bottom: 20px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-btm-grid {
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+/* Cards */
+.protexi-adm-shell .protexi-dash-marketing .adm-card {
+  border-radius: 0;
+  border: none;
+  background: #fff;
+  box-shadow: none;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-card-h {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-card-title {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--dash-black);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-card-sub {
+  font-size: 12px;
+  color: #555;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-card-h.border-b {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Compliance strip */
+.protexi-adm-shell .protexi-dash-marketing .adm-comp-wrap {
+  background: var(--dash-navy);
+  border: none;
+  border-radius: 0;
+  margin: 0 16px 16px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-comp-lbl {
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--dash-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-comp-val {
+  color: #fff;
+  font-size: 22px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-comp-track {
+  background: rgba(255, 255, 255, 0.12);
+  height: 4px;
+  border-radius: 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-comp-fill {
+  background: #fff;
+  border-radius: 0;
+}
+
+/* Quick actions */
+.protexi-adm-shell .protexi-dash-marketing .adm-qa {
+  border-radius: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--dash-card);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-qa:hover {
+  background: var(--dash-blue);
+  border-color: var(--dash-blue);
+  transform: none;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-qa:hover .adm-qa-t,
+.protexi-adm-shell .protexi-dash-marketing .adm-qa:hover .adm-qa-d,
+.protexi-adm-shell .protexi-dash-marketing .adm-qa:hover .adm-qa-arr {
+  color: #fff !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-qa:hover .adm-qa-ic {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-qi-b,
+.protexi-adm-shell .protexi-dash-marketing .adm-qi-p,
+.protexi-adm-shell .protexi-dash-marketing .adm-qi-g,
+.protexi-adm-shell .protexi-dash-marketing .adm-qi-a {
+  background: rgba(26, 79, 160, 0.1);
+  color: var(--dash-blue);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-view-all {
+  border-radius: 0;
+  font-family: var(--dash-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1.5px solid var(--dash-black);
+  color: var(--dash-black);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-view-all:hover {
+  background: var(--dash-black);
+  color: var(--dash-cream);
+}
+
+/* Alerts list rows */
+.protexi-adm-shell .protexi-dash-marketing .border-b.border-\[\#F8FAFF\] {
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .text-\[\#1E293B\] {
+  color: var(--dash-black) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .text-\[\#CBD5E1\] {
+  color: #666 !important;
+}
+
+/* Visa alert header icon box — neutral blue */
+.protexi-adm-shell .protexi-dash-marketing .rounded-lg.border.border-amber-200.bg-amber-50 {
+  border-color: rgba(26, 79, 160, 0.25) !important;
+  background: rgba(26, 79, 160, 0.06) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .text-amber-600 {
+  color: var(--dash-blue) !important;
+}
+
+/* Activity header icon */
+.protexi-adm-shell .protexi-dash-marketing .rounded-lg.border.border-emerald-200.bg-emerald-50 {
+  border-color: rgba(26, 79, 160, 0.25) !important;
+  background: rgba(26, 79, 160, 0.06) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .text-emerald-600 {
+  color: var(--dash-blue) !important;
+}
+
+/* Badges on list items — blue / navy only */
+.protexi-adm-shell .protexi-dash-marketing .rounded-full.border.px-2.py-0\.5 {
+  border-radius: 0 !important;
+  font-family: var(--dash-mono);
+  font-size: 9px !important;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .bg-red-50.text-red-700.border-red-200 {
+  background: rgba(15, 45, 94, 0.12) !important;
+  color: var(--dash-navy) !important;
+  border-color: var(--dash-blue) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .bg-amber-50.text-amber-800.border-amber-200 {
+  background: var(--dash-card) !important;
+  color: var(--dash-navy) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Attention tags (tailwind dynamic) */
+.protexi-adm-shell .protexi-dash-marketing .bg-amber-50.text-amber-700 {
+  background: var(--dash-card) !important;
+  color: var(--dash-navy) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .bg-red-50.text-red-700 {
+  background: rgba(26, 79, 160, 0.1) !important;
+  color: var(--dash-navy) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .bg-blue-50.text-blue-700 {
+  background: rgba(26, 79, 160, 0.1) !important;
+  color: var(--dash-blue) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .bg-emerald-50.text-emerald-700 {
+  background: var(--dash-card) !important;
+  color: var(--dash-navy) !important;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .bg-slate-100.text-slate-700 {
+  background: var(--dash-card) !important;
+  color: var(--dash-navy) !important;
+}
+
+/* Section header count badges */
+.protexi-adm-shell .protexi-dash-marketing .adm-cb-a,
+.protexi-adm-shell .protexi-dash-marketing .adm-cb-b,
+.protexi-adm-shell .protexi-dash-marketing .adm-cb-g {
+  border-radius: 0;
+  font-family: var(--dash-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  background: var(--dash-card);
+  color: var(--dash-navy);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Empty state */
+.protexi-adm-shell .protexi-dash-marketing .adm-ae-icon {
+  border-radius: 0;
+  background: var(--dash-card);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: var(--dash-blue);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ae-t {
+  color: var(--dash-navy);
+  font-weight: 800;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ae-s {
+  color: #666;
+}
+
+/* Activity dots — blue scale */
+.protexi-adm-shell .protexi-dash-marketing .adm-ad-b {
+  background: var(--dash-blue);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ad-g {
+  background: var(--dash-navy);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ad-a {
+  background: #2563c8;
+}
+
+/* CoS big numbers */
+.protexi-adm-shell .protexi-dash-marketing .text-4xl.font-black.text-\[\#0A0F1E\] {
+  color: var(--dash-black) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+}
+
+/* Loading / error */
+.protexi-dash-marketing-loading,
+.protexi-dash-marketing-error {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: #f5f5f0;
+  margin: -22px -24px;
+  padding: 48px 24px;
+  min-height: 280px;
+  text-align: center;
+  color: #555;
+  font-size: 13px;
+}
+
+.protexi-dash-marketing-error {
+  color: #0f2d5e;
+}
