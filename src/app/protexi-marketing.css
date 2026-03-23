@@ -1,0 +1,1651 @@
+/* Scoped marketing landing — matches reference HTML; does not leak globals */
+
+.protexi-marketing {
+  --blue: #1a4fa0;
+  --blue-dark: #0f2d5e;
+  --blue-light: #2563c8;
+  --blue-ultra: #3b82f6;
+  --accent: #e8f040;
+  --accent2: #ff4d2e;
+  --white: #f5f5f0;
+  --black: #0a0a0a;
+  --gray: #6b6b6b;
+  --card-bg: #f0f0eb;
+  --mono: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+
+  font-family: var(--sans);
+  background: var(--white);
+  color: var(--black);
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.protexi-marketing *,
+.protexi-marketing *::before,
+.protexi-marketing *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.protexi-marketing {
+  scroll-behavior: smooth;
+}
+
+/* MARQUEE */
+.protexi-marketing .marquee-wrap {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.protexi-marketing .marquee-track {
+  display: inline-flex;
+  animation: protexi-marquee 22s linear infinite;
+}
+
+.protexi-marketing .trust-marquee {
+  animation-duration: 32s;
+}
+
+@keyframes protexi-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* NAV */
+.protexi-marketing nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 48px;
+  transition: background 0.3s;
+}
+
+.protexi-marketing nav.scrolled {
+  background: rgba(245, 245, 240, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.protexi-marketing .nav-logo {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.protexi-marketing .nav-logo-img {
+  display: block;
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.protexi-marketing .nav-links {
+  display: flex;
+  gap: 36px;
+  list-style: none;
+}
+
+.protexi-marketing .nav-links a {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--black);
+  text-decoration: none;
+  text-transform: uppercase;
+  position: relative;
+}
+
+.protexi-marketing .nav-links a::after {
+  content: "";
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 0;
+  height: 1.5px;
+  background: var(--blue);
+  transition: width 0.22s;
+}
+
+.protexi-marketing .nav-links a:hover::after {
+  width: 100%;
+}
+
+.protexi-marketing .nav-cta {
+  display: flex;
+  gap: 10px;
+}
+
+.protexi-marketing .btn-outline {
+  padding: 9px 22px;
+  border: 1.5px solid var(--black);
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--black);
+  transition: background 0.18s, color 0.18s;
+  display: inline-block;
+  text-align: center;
+}
+
+.protexi-marketing .btn-outline:hover {
+  background: var(--black);
+  color: var(--white);
+}
+
+.protexi-marketing .btn-fill {
+  padding: 9px 22px;
+  border: 1.5px solid var(--blue);
+  background: var(--blue);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #fff;
+  transition: background 0.18s;
+  display: inline-block;
+  text-align: center;
+}
+
+.protexi-marketing .btn-fill:hover {
+  background: var(--blue-dark);
+  border-color: var(--blue-dark);
+}
+
+/* TICKER */
+.protexi-marketing .ticker {
+  background: var(--blue);
+  color: #fff;
+  padding: 11px 0;
+  margin-top: 68px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.protexi-marketing .ticker-item {
+  padding: 0 44px;
+  opacity: 0.82;
+}
+
+.protexi-marketing .ticker-sep {
+  color: var(--accent);
+  margin: 0 6px;
+}
+
+/* HERO */
+.protexi-marketing .hero {
+  min-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 72px 48px 60px;
+  gap: 60px;
+}
+
+.protexi-marketing .hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(26, 79, 160, 0.3);
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--blue);
+  background: rgba(26, 79, 160, 0.05);
+  margin-bottom: 28px;
+}
+
+.protexi-marketing .badge-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent2);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.protexi-marketing .hero-h1 {
+  font-size: clamp(52px, 6.5vw, 90px);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  margin-bottom: 26px;
+}
+
+.protexi-marketing .hero-h1 em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--blue);
+}
+
+.protexi-marketing .hero-h1 .line-accent {
+  display: inline-block;
+  background: var(--blue);
+  color: #fff;
+  padding: 2px 14px 6px;
+  margin-left: -4px;
+}
+
+.protexi-marketing .hero-sub {
+  font-size: 16px;
+  line-height: 1.7;
+  color: #444;
+  max-width: 430px;
+  margin-bottom: 32px;
+}
+
+.protexi-marketing .hero-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 36px;
+}
+
+.protexi-marketing .pill {
+  padding: 7px 14px;
+  background: var(--card-bg);
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  color: var(--blue-dark);
+}
+
+.protexi-marketing .hero-ctas {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.protexi-marketing .btn-hero {
+  padding: 15px 34px;
+  background: var(--blue);
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 2px solid var(--blue);
+  transition: background 0.18s, border-color 0.18s;
+  display: inline-block;
+}
+
+.protexi-marketing .btn-hero:hover {
+  background: var(--blue-dark);
+  border-color: var(--blue-dark);
+}
+
+.protexi-marketing .btn-ghost {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+}
+
+.protexi-marketing .btn-ghost:hover {
+  text-decoration: underline;
+}
+
+/* DASHBOARD CARD */
+.protexi-marketing .dashboard-card {
+  background: var(--blue-dark);
+  padding: 26px;
+  box-shadow: 14px 14px 0 var(--accent);
+  max-width: 460px;
+  margin-left: auto;
+}
+
+.protexi-marketing .dc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.protexi-marketing .dc-title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.protexi-marketing .dc-live {
+  background: var(--accent);
+  color: var(--black);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 3px 10px;
+  text-transform: uppercase;
+}
+
+.protexi-marketing .dc-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.protexi-marketing .dc-metric {
+  background: rgba(255, 255, 255, 0.07);
+  padding: 14px 12px;
+}
+
+.protexi-marketing .dc-metric-val {
+  color: #fff;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.protexi-marketing .dc-metric-label {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.protexi-marketing .dc-bars {
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.protexi-marketing .dc-bar-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.protexi-marketing .dc-bar-label {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 10px;
+  font-family: var(--mono);
+}
+
+.protexi-marketing .dc-bar-pct {
+  color: var(--accent);
+  font-size: 10px;
+  font-family: var(--mono);
+}
+
+.protexi-marketing .dc-bar-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.protexi-marketing .dc-bar-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.protexi-marketing .dc-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.protexi-marketing .dc-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 12px;
+  font-size: 10px;
+  font-family: var(--mono);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.protexi-marketing .dc-alert-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.protexi-marketing .dot-red {
+  background: var(--accent2);
+}
+
+.protexi-marketing .dot-yellow {
+  background: var(--accent);
+}
+
+.protexi-marketing .dot-green {
+  background: #4ade80;
+}
+
+/* TRUST STRIP */
+.protexi-marketing .trust {
+  background: var(--black);
+  padding: 18px 0;
+  overflow: hidden;
+}
+
+.protexi-marketing .trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 44px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.protexi-marketing .trust-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.protexi-marketing .trust-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.protexi-marketing .trust-sep {
+  color: rgba(255, 255, 255, 0.18);
+}
+
+/* NUMBER STRIP */
+.protexi-marketing .number-strip {
+  background: var(--accent);
+  padding: 52px 48px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.protexi-marketing .num-item {
+  padding: 0 28px;
+  border-left: 2px solid rgba(0, 0, 0, 0.13);
+}
+
+.protexi-marketing .num-item:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+
+.protexi-marketing .num-val {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--black);
+  margin-bottom: 6px;
+}
+
+.protexi-marketing .num-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* SECTION COMMON */
+.protexi-marketing section {
+  padding: 96px 48px;
+}
+
+.protexi-marketing .section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.protexi-marketing .section-label::before {
+  content: "";
+  display: block;
+  width: 20px;
+  height: 1.5px;
+  background: var(--blue);
+}
+
+.protexi-marketing .section-h2 {
+  font-size: clamp(34px, 4.5vw, 60px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  margin-bottom: 14px;
+}
+
+.protexi-marketing .section-h2 em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* PROBLEMS */
+.protexi-marketing .problems {
+  background: var(--card-bg);
+}
+
+.protexi-marketing .problems-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin-top: 56px;
+}
+
+.protexi-marketing .prob-card {
+  background: var(--white);
+  padding: 0 0 32px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.18s;
+}
+
+.protexi-marketing .prob-card:hover {
+  transform: translateY(-4px);
+}
+
+.protexi-marketing .prob-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--blue);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.28s;
+}
+
+.protexi-marketing .prob-card:hover::before {
+  transform: scaleX(1);
+}
+
+.protexi-marketing .prob-img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+  filter: grayscale(15%);
+}
+
+.protexi-marketing .prob-body {
+  padding: 24px 28px 0;
+}
+
+.protexi-marketing .prob-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--accent2);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.protexi-marketing .prob-title {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 10px;
+  line-height: 1.2;
+}
+
+.protexi-marketing .prob-text {
+  font-size: 13px;
+  line-height: 1.72;
+  color: #555;
+}
+
+.protexi-marketing .sol-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--blue);
+  text-transform: uppercase;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  line-height: 1.6;
+}
+
+.protexi-marketing .sol-label::before {
+  content: "->";
+  flex-shrink: 0;
+}
+
+/* FEATURES — white section; blue boxes; white tile on hover */
+.protexi-marketing .features-section {
+  background: var(--white);
+}
+
+.protexi-marketing .features-intro {
+  max-width: 520px;
+  margin-bottom: 56px;
+}
+
+.protexi-marketing .features-intro p {
+  font-size: 17px;
+  line-height: 1.65;
+  color: #555;
+  margin-top: 14px;
+}
+
+.protexi-marketing .features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.protexi-marketing .feat-cell {
+  background: var(--blue);
+  padding: 34px 26px;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.protexi-marketing .feat-cell:hover {
+  background: var(--white);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.protexi-marketing .features-section .feat-cell .feat-title {
+  color: #fff;
+  transition: color 0.2s ease;
+}
+
+.protexi-marketing .features-section .feat-cell .feat-desc {
+  color: rgba(255, 255, 255, 0.72);
+  transition: color 0.2s ease;
+}
+
+.protexi-marketing .features-section .feat-cell .feat-tag {
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.32);
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.protexi-marketing .features-section .feat-cell .feat-icon svg {
+  stroke: rgba(255, 255, 255, 0.95);
+  transition: stroke 0.2s ease;
+}
+
+.protexi-marketing .feat-cell:hover .feat-title {
+  color: var(--black);
+}
+
+.protexi-marketing .feat-cell:hover .feat-desc {
+  color: #666;
+}
+
+.protexi-marketing .feat-cell:hover .feat-tag {
+  color: var(--blue);
+  border-color: rgba(26, 79, 160, 0.28);
+}
+
+.protexi-marketing .feat-cell:hover .feat-icon svg {
+  stroke: var(--blue);
+}
+
+.protexi-marketing .feat-icon {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 16px;
+}
+
+.protexi-marketing .feat-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.protexi-marketing .feat-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  display: inline-block;
+  margin-bottom: 11px;
+}
+
+.protexi-marketing .feat-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 9px;
+  line-height: 1.2;
+}
+
+.protexi-marketing .feat-desc {
+  font-size: 12px;
+  line-height: 1.68;
+}
+
+/* IMAGE CALLOUT */
+.protexi-marketing .img-callout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--black);
+}
+
+.protexi-marketing .img-callout-photo {
+  overflow: hidden;
+}
+
+.protexi-marketing .img-callout-photo img {
+  width: 100%;
+  height: 100%;
+  min-height: 460px;
+  object-fit: cover;
+  display: block;
+  opacity: 0.82;
+  transition: transform 0.5s;
+}
+
+.protexi-marketing .img-callout-photo:hover img {
+  transform: scale(1.03);
+}
+
+.protexi-marketing .img-callout-text {
+  padding: 72px 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.protexi-marketing .img-callout-text .section-label {
+  color: var(--accent);
+}
+
+.protexi-marketing .img-callout-text .section-label::before {
+  background: var(--accent);
+}
+
+.protexi-marketing .img-callout-text .section-h2 {
+  color: #fff;
+  margin-bottom: 20px;
+}
+
+.protexi-marketing .img-callout-text p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 32px;
+}
+
+.protexi-marketing .btn-accent {
+  display: inline-block;
+  padding: 15px 34px;
+  background: var(--accent);
+  color: var(--black);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.18s;
+  align-self: flex-start;
+}
+
+.protexi-marketing .btn-accent:hover {
+  background: #d4d800;
+}
+
+/* TEAM STRIP */
+.protexi-marketing .team-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.protexi-marketing .team-strip-img {
+  position: relative;
+  overflow: hidden;
+  height: 260px;
+}
+
+.protexi-marketing .team-strip-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: grayscale(25%);
+  transition: filter 0.3s, transform 0.4s;
+}
+
+.protexi-marketing .team-strip-img:hover img {
+  filter: grayscale(0%);
+  transform: scale(1.04);
+}
+
+.protexi-marketing .team-strip-cap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+  padding: 28px 20px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+
+/* ROLES */
+.protexi-marketing .roles-section {
+  background: var(--blue-dark);
+  color: #fff;
+}
+
+.protexi-marketing .roles-section .section-label {
+  color: var(--accent);
+}
+
+.protexi-marketing .roles-section .section-label::before {
+  background: var(--accent);
+}
+
+.protexi-marketing .roles-section .section-h2 {
+  color: #fff;
+}
+
+.protexi-marketing .roles-tabs {
+  display: flex;
+  gap: 2px;
+  margin-top: 48px;
+}
+
+.protexi-marketing .role-tab {
+  padding: 13px 26px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  border: none;
+  font-family: var(--sans);
+  transition: background 0.18s, color 0.18s;
+}
+
+.protexi-marketing .role-tab.active {
+  background: var(--accent);
+  color: var(--black);
+}
+
+.protexi-marketing .role-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.protexi-marketing .roles-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  padding: 48px 0 0;
+  align-items: start;
+}
+
+.protexi-marketing .roles-bullets {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.protexi-marketing .roles-bullets li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  font-size: 15px;
+  line-height: 1.58;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.protexi-marketing .roles-bullets li::before {
+  content: "+";
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 18px;
+  margin-top: -1px;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+
+.protexi-marketing .roles-cta-text {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1.2;
+  margin-bottom: 26px;
+}
+
+.protexi-marketing .roles-cta-text em {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--accent);
+}
+
+/* PRICING */
+.protexi-marketing .pricing-section {
+  background: var(--white);
+}
+
+.protexi-marketing .pricing-intro {
+  max-width: 520px;
+  margin-bottom: 56px;
+}
+
+.protexi-marketing .pricing-intro p {
+  font-size: 17px;
+  color: #555;
+  line-height: 1.65;
+  margin-top: 14px;
+}
+
+.protexi-marketing .pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.protexi-marketing .price-card {
+  background: var(--white);
+  padding: 42px 34px;
+  position: relative;
+}
+
+.protexi-marketing .price-card.highlight {
+  background: var(--blue);
+  color: #fff;
+}
+
+.protexi-marketing .price-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  color: var(--gray);
+}
+
+.protexi-marketing .price-card.highlight .price-name {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.protexi-marketing .price-amount {
+  font-size: 50px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.protexi-marketing .price-mo {
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--gray);
+}
+
+.protexi-marketing .price-card.highlight .price-mo {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.protexi-marketing .price-sub {
+  font-size: 11px;
+  color: var(--gray);
+  margin-bottom: 8px;
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.protexi-marketing .price-card.highlight .price-sub {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.protexi-marketing .price-tagline {
+  font-size: 13px;
+  line-height: 1.58;
+  color: #555;
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.protexi-marketing .price-card.highlight .price-tagline {
+  color: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.13);
+}
+
+.protexi-marketing .price-badge {
+  position: absolute;
+  top: -1px;
+  right: 26px;
+  background: var(--accent);
+  color: var(--black);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  padding: 5px 12px;
+  text-transform: uppercase;
+}
+
+.protexi-marketing .price-feats {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin-bottom: 32px;
+}
+
+.protexi-marketing .price-feats li {
+  font-size: 13px;
+  display: flex;
+  gap: 9px;
+  line-height: 1.4;
+}
+
+.protexi-marketing .pf-check {
+  color: var(--blue);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.protexi-marketing .price-card.highlight .pf-check {
+  color: var(--accent);
+}
+
+.protexi-marketing .pf-no {
+  color: rgba(0, 0, 0, 0.22);
+  flex-shrink: 0;
+}
+
+.protexi-marketing .price-card.highlight .pf-no {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.protexi-marketing .btn-price {
+  width: 100%;
+  padding: 14px;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-decoration: none;
+  display: block;
+  background: transparent;
+  border: 1.5px solid var(--black);
+  color: var(--black);
+  transition: background 0.18s, color 0.18s;
+}
+
+.protexi-marketing .btn-price:hover {
+  background: var(--black);
+  color: #fff;
+}
+
+.protexi-marketing .price-card.highlight .btn-price {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--black);
+}
+
+.protexi-marketing .price-card.highlight .btn-price:hover {
+  background: #d4d800;
+  border-color: #d4d800;
+}
+
+.protexi-marketing .addons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.07);
+  margin-top: 2px;
+}
+
+.protexi-marketing .addon-cell {
+  background: var(--card-bg);
+  padding: 22px 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.protexi-marketing .addon-label {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.protexi-marketing .addon-hint {
+  font-size: 11px;
+  color: var(--gray);
+  font-family: var(--mono);
+}
+
+.protexi-marketing .addon-price {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--blue);
+}
+
+.protexi-marketing .addon-mo {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--gray);
+}
+
+/* TESTIMONIALS */
+.protexi-marketing .testimonials {
+  background: var(--black);
+  color: #fff;
+}
+
+.protexi-marketing .testimonials .section-label {
+  color: var(--accent);
+}
+
+.protexi-marketing .testimonials .section-label::before {
+  background: var(--accent);
+}
+
+.protexi-marketing .testi-h2 {
+  color: #fff;
+}
+
+.protexi-marketing .testi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  margin-top: 56px;
+}
+
+.protexi-marketing .testi-card {
+  background: var(--black);
+  padding: 40px 30px;
+}
+
+.protexi-marketing .testi-bigquote {
+  font-size: 64px;
+  line-height: 0.6;
+  color: var(--blue-ultra);
+  margin-bottom: 14px;
+  font-family: var(--serif);
+}
+
+.protexi-marketing .testi-quote {
+  font-family: var(--serif);
+  font-size: 20px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.88);
+  font-style: italic;
+  margin-bottom: 28px;
+}
+
+.protexi-marketing .testi-person {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.protexi-marketing .testi-avatar {
+  width: 42px;
+  height: 42px;
+  background: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.protexi-marketing .testi-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.protexi-marketing .testi-org {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.42);
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+
+/* FAQ */
+.protexi-marketing .faq-section {
+  background: var(--card-bg);
+}
+
+.protexi-marketing .faq-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 80px;
+  margin-top: 56px;
+}
+
+.protexi-marketing .faq-sidebar-h2 {
+  font-size: clamp(28px, 3.5vw, 46px);
+}
+
+.protexi-marketing .faq-sidebar-text {
+  font-size: 16px;
+  color: #555;
+  line-height: 1.7;
+  margin-top: 16px;
+}
+
+.protexi-marketing .faq-sidebar-cta {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.protexi-marketing .faq-cta-fill,
+.protexi-marketing .faq-cta-outline {
+  width: 100%;
+  text-align: center;
+  padding: 13px 22px;
+}
+
+.protexi-marketing .faq-item {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 22px 0;
+}
+
+.protexi-marketing .faq-item:last-child {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.protexi-marketing .faq-q {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  user-select: none;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+}
+
+.protexi-marketing .faq-arrow {
+  width: 26px;
+  height: 26px;
+  background: var(--white);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+  transition: transform 0.18s, background 0.18s;
+}
+
+.protexi-marketing .faq-item.open .faq-arrow {
+  transform: rotate(45deg);
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+
+.protexi-marketing .faq-a {
+  display: none;
+  padding-top: 12px;
+  font-size: 13px;
+  line-height: 1.78;
+  color: #555;
+}
+
+.protexi-marketing .faq-item.open .faq-a {
+  display: block;
+}
+
+/* MID CTA */
+.protexi-marketing .mid-cta {
+  background: var(--blue);
+  color: #fff;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 420px;
+}
+
+.protexi-marketing .mid-cta-text {
+  padding: 80px 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.protexi-marketing .mid-cta-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 18px;
+}
+
+.protexi-marketing .mid-cta h2 {
+  font-size: clamp(36px, 5vw, 60px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  margin-bottom: 18px;
+}
+
+.protexi-marketing .mid-cta h2 em {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--accent);
+}
+
+.protexi-marketing .mid-cta p {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.72);
+  max-width: 380px;
+  line-height: 1.65;
+  margin-bottom: 36px;
+}
+
+.protexi-marketing .mid-cta-btns {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.protexi-marketing .btn-wh {
+  padding: 15px 32px;
+  background: #fff;
+  color: var(--blue-dark);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.18s;
+  display: inline-block;
+}
+
+.protexi-marketing .btn-wh:hover {
+  background: var(--accent);
+}
+
+.protexi-marketing .btn-wh-outline {
+  padding: 15px 32px;
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: border-color 0.18s;
+  display: inline-block;
+}
+
+.protexi-marketing .btn-wh-outline:hover {
+  border-color: #fff;
+}
+
+.protexi-marketing .mid-cta-img {
+  overflow: hidden;
+}
+
+.protexi-marketing .mid-cta-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0.75;
+}
+
+/* FOOTER */
+.protexi-marketing footer {
+  background: var(--black);
+  color: rgba(255, 255, 255, 0.72);
+  padding: 68px 48px 28px;
+}
+
+.protexi-marketing .footer-top {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  gap: 40px;
+  padding-bottom: 48px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.protexi-marketing .footer-logo-text {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.04em;
+  margin-bottom: 12px;
+}
+
+.protexi-marketing .footer-tagline {
+  font-size: 13px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.45);
+  max-width: 210px;
+  margin-bottom: 22px;
+}
+
+.protexi-marketing .footer-badges {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.protexi-marketing .footer-badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  padding: 4px 10px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.protexi-marketing .footer-col-head {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 18px;
+}
+
+.protexi-marketing .footer-col ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.protexi-marketing .footer-col ul a {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  transition: color 0.18s;
+}
+
+.protexi-marketing .footer-col ul a:hover {
+  color: #fff;
+}
+
+.protexi-marketing .footer-bottom {
+  padding-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.protexi-marketing .footer-copy {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.28);
+  font-family: var(--mono);
+}
+
+.protexi-marketing .footer-legal-links {
+  display: flex;
+  gap: 22px;
+}
+
+.protexi-marketing .footer-legal-links a {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.32);
+  text-decoration: none;
+}
+
+.protexi-marketing .footer-legal-links a:hover {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* REVEAL */
+.protexi-marketing .reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.protexi-marketing .reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* RESPONSIVE */
+@media (max-width: 960px) {
+  .protexi-marketing nav {
+    padding: 14px 20px;
+  }
+
+  .protexi-marketing .nav-logo-img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .protexi-marketing .nav-links {
+    display: none;
+  }
+
+  .protexi-marketing .hero {
+    grid-template-columns: 1fr;
+    padding: 100px 20px 56px;
+    gap: 40px;
+  }
+
+  .protexi-marketing .dashboard-card {
+    max-width: 100%;
+    box-shadow: 8px 8px 0 var(--accent);
+  }
+
+  .protexi-marketing section {
+    padding: 64px 20px;
+  }
+
+  .protexi-marketing .problems-grid,
+  .protexi-marketing .features-grid,
+  .protexi-marketing .testi-grid,
+  .protexi-marketing .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .protexi-marketing .roles-panel,
+  .protexi-marketing .faq-layout,
+  .protexi-marketing .mid-cta,
+  .protexi-marketing .img-callout {
+    grid-template-columns: 1fr;
+  }
+
+  .protexi-marketing .footer-top {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .protexi-marketing .number-strip {
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    padding: 40px 20px;
+  }
+
+  .protexi-marketing .addons {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .protexi-marketing .team-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .protexi-marketing .mid-cta-img {
+    display: none;
+  }
+}

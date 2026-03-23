@@ -20,7 +20,7 @@ from app.auth_deps import (
 from app.config import get_settings
 from app.database import get_db
 from app.models import ChecklistDocument, ChecklistItemState, ChecklistTemplateItem, ItemStatus
-from app.schemas import (
+from app.checklist_schemas import (
     ChecklistItemOut,
     ChecklistTemplateItemOut,
     ChecklistTemplatePut,

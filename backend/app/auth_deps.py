@@ -2,7 +2,7 @@ from fastapi import Depends, Header, HTTPException
 from jose import JWTError, jwt
 
 from app.config import get_settings
-from app.schemas import TokenUser
+from app.checklist_schemas import TokenUser
 
 PLATFORM_ROLES = frozenset({"platform_owner"})
 # Who can read template (organisation settings UI)
