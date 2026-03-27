@@ -1,9 +1,9 @@
 import io
 import secrets
 import string
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -12,9 +12,147 @@ from app.core.security import hash_password
 from app.core.config import get_settings
 from app.routers.deps import get_current_user, require_staff
 from sqlalchemy import func as sa_func
-from app.models.models import User, Worker, UserRole, DocumentChecklist, ChecklistStatus
-from app.schemas.schemas import WorkerCreate, WorkerUpdate, WorkerOut, WorkerDetailOut
+from app.models.models import (
+    AuditLog,
+    DocumentChecklist,
+    ChecklistStatus,
+    Organisation,
+    User,
+    Worker,
+    WorkerStage,
+    UserRole,
+)
+from app.core.employment_status import employment_status_allowed
+from app.core.org_option_lists import (
+    effective_department_options,
+    effective_onboarding_stage_options,
+    effective_rtw_category_options,
+    effective_work_location_options,
+)
+from app.schemas.schemas import (
+    WorkerCreate,
+    WorkerUpdate,
+    WorkerOut,
+    WorkerDetailOut,
+    ProfilePhotoPresignOut,
+)
+from app.core.profile_photo_storage import (
+    read_and_validate_upload,
+    store_worker_profile_photo,
+    delete_stored_object,
+    presigned_get_url,
+    load_profile_photo_bytes,
+)
 from app.routers.documents import create_checklist_for_worker
+
+MANAGER_NO_PAYROLL = frozenset({UserRole.TENANT_ADMIN, UserRole.COMPLIANCE_MANAGER})
+
+UK_RESIDENCE_COUNTRIES = frozenset({"england", "northern_ireland", "wales", "scotland", "outside_uk"})
+SALARY_PAY_TYPES = frozenset({"hourly", "daily", "weekly", "monthly", "annual"})
+
+
+def _age_years_from_dob(dob: date | datetime | None) -> int | None:
+    if dob is None:
+        return None
+    d = dob.date() if isinstance(dob, datetime) else dob
+    today = date.today()
+    return today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+
+
+def _addr_snapshot(w: Worker) -> str:
+    return "|".join(
+        str(getattr(w, f, "") or "")
+        for f in ("address_line_1", "address_line_2", "address_line_3", "postal_code", "uk_residence_country", "address")
+    )
+
+
+def _salary_snapshot(w: Worker) -> str:
+    return f"{w.salary}|{w.salary_pay_type}"
+
+
+def _audit_reporting_trigger(
+    db: Session,
+    current_user: User,
+    worker_id: str,
+    summary: str,
+    before: str,
+    after: str,
+) -> None:
+    db.add(
+        AuditLog(
+            user_id=current_user.id,
+            user_email=current_user.email,
+            user_role=current_user.role.value,
+            action="UPDATE",
+            entity_type="worker",
+            entity_id=worker_id,
+            details=f"{summary} (reporting trigger)",
+            before_value=before[:8000],
+            after_value=after[:8000],
+        )
+    )
+
+
+def _validate_worker_fields_for_org(db: Session, org_id: str, data: dict) -> None:
+    org = db.query(Organisation).filter(Organisation.id == org_id).first()
+    if not org:
+        return
+    if "department" in data and data["department"] is not None:
+        v = str(data["department"]).strip()
+        if v and v not in set(effective_department_options(org)):
+            raise HTTPException(status_code=400, detail="Invalid department for this organisation")
+    if "work_location" in data and data["work_location"] is not None:
+        v = str(data["work_location"]).strip()
+        if v and v not in set(effective_work_location_options(org)):
+            raise HTTPException(status_code=400, detail="Invalid work location for this organisation")
+    if "hr_onboarding_stage" in data and data["hr_onboarding_stage"] is not None:
+        v = str(data["hr_onboarding_stage"]).strip()
+        if v and v not in set(effective_onboarding_stage_options(org)):
+            raise HTTPException(status_code=400, detail="Invalid onboarding stage for this organisation")
+    if "right_to_work_category" in data and data["right_to_work_category"] is not None:
+        v = str(data["right_to_work_category"]).strip()
+        if v and v not in set(effective_rtw_category_options(org)):
+            raise HTTPException(status_code=400, detail="Invalid right to work category for this organisation")
+
+
+def _sync_hr_stage_to_enum(worker: Worker) -> None:
+    if not worker.hr_onboarding_stage:
+        return
+    s = worker.hr_onboarding_stage.lower()
+    if "recruitment" in s:
+        worker.stage = WorkerStage.RECRUITMENT
+    elif "cos" in s and "assign" in s:
+        worker.stage = WorkerStage.COS_ASSIGNMENT
+    elif "pre" in s and "start" in s:
+        worker.stage = WorkerStage.PRE_START
+    elif "active" in s and "sponsor" in s:
+        worker.stage = WorkerStage.ACTIVE_SPONSORSHIP
+    elif "terminat" in s:
+        worker.stage = WorkerStage.TERMINATED
+
+
+def _maybe_redact_worker_list(worker: Worker, user: User) -> WorkerOut:
+    w = WorkerOut.model_validate(worker)
+    if user.role in MANAGER_NO_PAYROLL:
+        return w.model_copy(update={"salary": None})
+    return w
+
+
+def _maybe_redact_worker_detail(worker: Worker, user: User) -> WorkerDetailOut:
+    out = WorkerDetailOut.model_validate(worker)
+    has_photo = bool(worker.profile_photo_s3_key or worker.profile_photo_data)
+    age = _age_years_from_dob(worker.date_of_birth)
+    if user.role in MANAGER_NO_PAYROLL:
+        return out.model_copy(
+            update={
+                "salary": None,
+                "bank_account_number": None,
+                "sort_code": None,
+                "has_profile_photo": has_photo,
+                "age_years": age,
+            }
+        )
+    return out.model_copy(update={"has_profile_photo": has_photo, "age_years": age})
 
 settings = get_settings()
 DEFAULT_EMPLOYEE_PASSWORD = settings.DEFAULT_EMPLOYEE_PASSWORD
@@ -128,7 +266,8 @@ def list_workers(
     if search:
         query = query.filter(Worker.name.ilike(f"%{search}%"))
 
-    return query.order_by(Worker.created_at.desc()).all()
+    rows = query.order_by(Worker.created_at.desc()).all()
+    return [_maybe_redact_worker_list(w, current_user) for w in rows]
 
 
 # ── Compliance summary for all workers ──
@@ -326,6 +465,111 @@ def bulk_upload(
     }
 
 
+# ── Profile photo (S3 or DB blob) — must be before /{worker_id} ──
+
+
+def _worker_scope_or_403(
+    db: Session,
+    worker_id: str,
+    current_user: User,
+) -> Worker:
+    worker = db.query(Worker).filter(
+        Worker.id == worker_id,
+        Worker.organisation_id == current_user.organisation_id,
+    ).first()
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+    if current_user.role == UserRole.EMPLOYEE and current_user.worker_id != worker_id:
+        raise HTTPException(status_code=403, detail="You can only view your own record")
+    return worker
+
+
+@router.get("/{worker_id}/profile-photo/presign", response_model=ProfilePhotoPresignOut)
+def presign_profile_photo(
+    worker_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Optional: presigned GET URL when using S3 (e.g. external viewers)."""
+    worker = _worker_scope_or_403(db, worker_id, current_user)
+    if not worker.profile_photo_s3_key:
+        return ProfilePhotoPresignOut(url=None)
+    url = presigned_get_url(worker.profile_photo_s3_key)
+    return ProfilePhotoPresignOut(url=url)
+
+
+@router.get("/{worker_id}/profile-photo")
+def get_worker_profile_photo(
+    worker_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Authenticated download of the profile image (works with S3 or DB blob)."""
+    worker = _worker_scope_or_403(db, worker_id, current_user)
+    loaded = load_profile_photo_bytes(worker)
+    if not loaded:
+        raise HTTPException(status_code=404, detail="No profile photo")
+    body, mime = loaded
+    return Response(
+        content=body,
+        media_type=mime,
+        headers={"Cache-Control": "private, max-age=300"},
+    )
+
+
+@router.post("/{worker_id}/profile-photo", response_model=WorkerOut)
+async def upload_worker_profile_photo(
+    worker_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    worker = db.query(Worker).filter(
+        Worker.id == worker_id,
+        Worker.organisation_id == current_user.organisation_id,
+    ).first()
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+
+    raw, mime = await read_and_validate_upload(file)
+    delete_stored_object(worker.profile_photo_s3_key)
+
+    s3_key, blob = store_worker_profile_photo(
+        organisation_id=current_user.organisation_id,
+        worker_id=worker.id,
+        file_bytes=raw,
+        mime=mime,
+    )
+    worker.profile_photo_s3_key = s3_key
+    worker.profile_photo_mime = mime
+    worker.profile_photo_data = blob
+
+    db.commit()
+    db.refresh(worker)
+    return worker
+
+
+@router.delete("/{worker_id}/profile-photo", response_model=WorkerOut)
+def delete_worker_profile_photo(
+    worker_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    worker = db.query(Worker).filter(
+        Worker.id == worker_id,
+        Worker.organisation_id == current_user.organisation_id,
+    ).first()
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+    delete_stored_object(worker.profile_photo_s3_key)
+    worker.profile_photo_s3_key = None
+    worker.profile_photo_mime = None
+    worker.profile_photo_data = None
+    db.commit()
+    db.refresh(worker)
+    return worker
+
+
 # ── Single worker CRUD (dynamic {worker_id} routes last) ──
 
 @router.get("/{worker_id}", response_model=WorkerDetailOut)
@@ -343,7 +587,7 @@ def get_worker(
     ).first()
     if not worker:
         raise HTTPException(status_code=404, detail="Worker not found")
-    return worker
+    return _maybe_redact_worker_detail(worker, current_user)
 
 
 @router.post("", response_model=WorkerOut, status_code=status.HTTP_201_CREATED)
@@ -360,6 +604,26 @@ def create_worker(
     if not email:
         raise HTTPException(status_code=400, detail="Employee email is required")
     data["email"] = email
+    es = (data.get("employment_status") or "Active").strip() or "Active"
+    if not employment_status_allowed(db, current_user.organisation_id, es):
+        raise HTTPException(status_code=400, detail="Invalid employment_status for this organisation")
+    data["employment_status"] = es
+    if data.get("uk_residence_country"):
+        v = str(data["uk_residence_country"]).strip().lower()
+        if v not in UK_RESIDENCE_COUNTRIES:
+            raise HTTPException(status_code=400, detail="Invalid UK residence country")
+        data["uk_residence_country"] = v
+    if data.get("salary_pay_type"):
+        v = str(data["salary_pay_type"]).strip().lower()
+        if v not in SALARY_PAY_TYPES:
+            raise HTTPException(status_code=400, detail="Invalid salary pay type")
+        data["salary_pay_type"] = v
+    else:
+        data["salary_pay_type"] = "annual"
+    _validate_worker_fields_for_org(db, current_user.organisation_id, data)
+    if not data.get("hr_onboarding_stage") and data.get("stage"):
+        st = str(data["stage"])
+        data["hr_onboarding_stage"] = st.replace("_", " ").title()
     worker = Worker(organisation_id=current_user.organisation_id, **data)
     db.add(worker)
     db.flush()
@@ -391,8 +655,45 @@ def update_worker(
     if not worker:
         raise HTTPException(status_code=404, detail="Worker not found")
 
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    pd = payload.model_dump(exclude_unset=True)
+    if "uk_residence_country" in pd and pd["uk_residence_country"] is not None:
+        v = str(pd["uk_residence_country"]).strip().lower()
+        if v not in UK_RESIDENCE_COUNTRIES:
+            raise HTTPException(status_code=400, detail="Invalid UK residence country")
+        pd["uk_residence_country"] = v
+    if "salary_pay_type" in pd and pd["salary_pay_type"] is not None:
+        v = str(pd["salary_pay_type"]).strip().lower()
+        if v not in SALARY_PAY_TYPES:
+            raise HTTPException(status_code=400, detail="Invalid salary pay type")
+        pd["salary_pay_type"] = v
+
+    _validate_worker_fields_for_org(db, current_user.organisation_id, pd)
+
+    before_addr = _addr_snapshot(worker)
+    before_salary = _salary_snapshot(worker)
+
+    for key, value in pd.items():
+        if key == "employment_status":
+            if value is None:
+                continue
+            v = str(value).strip()
+            if not v:
+                raise HTTPException(status_code=400, detail="employment_status cannot be empty")
+            if not employment_status_allowed(db, current_user.organisation_id, v):
+                raise HTTPException(status_code=400, detail="Invalid employment_status for this organisation")
+            setattr(worker, "employment_status", v)
+            continue
         setattr(worker, key, value)
+
+    if "hr_onboarding_stage" in pd:
+        _sync_hr_stage_to_enum(worker)
+
+    after_addr = _addr_snapshot(worker)
+    after_salary = _salary_snapshot(worker)
+    if before_addr != after_addr:
+        _audit_reporting_trigger(db, current_user, worker_id, "Address fields", before_addr, after_addr)
+    if before_salary != after_salary:
+        _audit_reporting_trigger(db, current_user, worker_id, "Salary / pay type", before_salary, after_salary)
 
     db.commit()
     db.refresh(worker)

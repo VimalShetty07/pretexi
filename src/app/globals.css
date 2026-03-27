@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "./protexi-admin-shell.css";
+@import "./protexi-admin-shell.css"; /* hot-reload touch */
 
 @theme inline {
   --color-background: var(--background);
@@ -1019,3 +1019,5 @@ body {
 .delay-4 { animation-delay: 0.32s; }
 .delay-5 { animation-delay: 0.40s; }
 .delay-6 { animation-delay: 0.48s; }
+
+/* Admin top bar override — defers to protexi-admin-shell.css */

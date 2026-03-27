@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, Suspense, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useRef, Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
@@ -25,30 +25,59 @@ import {
   Plane,
   ShieldAlert,
   ArrowRight,
+  Camera,
+  Trash2,
 } from "lucide-react";
 
 interface WorkerDetail {
   id: string;
   name: string;
+  first_name?: string | null;
+  second_name?: string | null;
+  last_name?: string | null;
   job_title: string;
   email: string | null;
   phone?: string | null;
   nationality?: string | null;
   department: string | null;
-  salary?: number;
+  employment_status?: string;
+  salary?: number | null;
+  salary_pay_type?: string | null;
   route?: string;
   work_location?: string | null;
   status: string;
   stage?: string;
+  hr_onboarding_stage?: string | null;
   risk_level: string;
   visa_expiry: string | null;
   start_date?: string | null;
+  termination_date?: string | null;
+  sex?: string | null;
+  date_of_birth?: string | null;
+  age_years?: number | null;
+  address_line_1?: string | null;
+  address_line_2?: string | null;
+  address_line_3?: string | null;
+  postal_code?: string | null;
+  uk_residence_country?: string | null;
+  last_rtw_check?: string | null;
+  next_rtw_check?: string | null;
+  right_to_work_category?: string | null;
   /** Tenant that owns this worker — used for per-client checklist templates */
   organisation_id?: string | null;
+  has_profile_photo?: boolean;
 }
 
 type MainTab = "overview" | "details" | "checklist" | "records" | "bgverify";
 type RecordsSub = "documents" | "files" | "contract";
+
+const CAN_EDIT_EMPLOYMENT_ROLES = [
+  "super_admin",
+  "tenant_admin",
+  "compliance_manager",
+  "hr_officer",
+  "payroll_officer",
+];
 
 function formatDetailDate(iso: string | null | undefined): string {
   return iso
@@ -63,6 +92,59 @@ function formatSalaryGbp(salary: number | null | undefined): string {
   );
 }
 
+const DEFAULT_DEPT_OPTIONS = ["Operations", "People", "Finance", "Engineering", "Care"];
+const DEFAULT_LOC_OPTIONS = ["London HQ", "Manchester Office", "Remote", "Hybrid — UK"];
+const DEFAULT_ONBOARDING_OPTIONS = ["Recruitment", "CoS assignment", "Pre-start", "Active sponsorship"];
+const DEFAULT_RTW_CATEGORY_OPTIONS = [
+  "British or Irish citizen",
+  "Indefinite leave to remain or settled status",
+  "Limited leave to remain (time-limited permission)",
+  "EU Settlement Scheme (settled or pre-settled)",
+  "Skilled Worker / other points-based route",
+  "Student — with permitted work",
+  "Other / pending verification",
+];
+
+const UK_RESIDENCE_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "—" },
+  { value: "england", label: "England" },
+  { value: "northern_ireland", label: "Northern Ireland" },
+  { value: "wales", label: "Wales" },
+  { value: "scotland", label: "Scotland" },
+  { value: "outside_uk", label: "Outside the UK" },
+];
+
+const SALARY_PAY_OPTIONS: { value: string; label: string }[] = [
+  { value: "hourly", label: "Hourly rate" },
+  { value: "daily", label: "Daily rate" },
+  { value: "weekly", label: "Weekly rate" },
+  { value: "monthly", label: "Monthly rate" },
+  { value: "annual", label: "Annual rate" },
+];
+
+function ukCountryLabel(v: string | null | undefined): string {
+  if (!v) return "—";
+  const m: Record<string, string> = {
+    england: "England",
+    northern_ireland: "Northern Ireland",
+    wales: "Wales",
+    scotland: "Scotland",
+    outside_uk: "Outside the UK",
+  };
+  return m[v] ?? v;
+}
+
+function toDateInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = iso.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "";
+}
+
+function dateInputToIso(d: string): string | null {
+  if (!d) return null;
+  return `${d}T00:00:00.000Z`;
+}
+
 function WorkerDetailInner() {
   const { token, user } = useAuth();
   const router = useRouter();
@@ -75,9 +157,57 @@ function WorkerDetailInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hoverRow, setHoverRow] = useState<string | null>(null);
+  const managerPayrollRestricted =
+    user?.role === "tenant_admin" || user?.role === "compliance_manager";
+  const canEditEmployment = Boolean(user && CAN_EDIT_EMPLOYMENT_ROLES.includes(user.role));
   const [bgRefName, setBgRefName] = useState("");
   const [bgRefEmail, setBgRefEmail] = useState("");
   const [bgRefs, setBgRefs] = useState<Array<{ id: string; referee_name: string; referee_email: string; status: string }>>([]);
+  const [employmentOptions, setEmploymentOptions] = useState<string[]>(["Active", "Inactive", "Finished"]);
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>(DEFAULT_DEPT_OPTIONS);
+  const [workLocationOptions, setWorkLocationOptions] = useState<string[]>(DEFAULT_LOC_OPTIONS);
+  const [onboardingStageOptions, setOnboardingStageOptions] = useState<string[]>(DEFAULT_ONBOARDING_OPTIONS);
+  const [rtwCategoryOptions, setRtwCategoryOptions] = useState<string[]>(DEFAULT_RTW_CATEGORY_OPTIONS);
+  const [savingEmployment, setSavingEmployment] = useState(false);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
+  const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const firstNameRef = useRef<HTMLInputElement | null>(null);
+  const secondNameRef = useRef<HTMLInputElement | null>(null);
+  const lastNameRef = useRef<HTMLInputElement | null>(null);
+  const canUploadProfilePhoto = Boolean(user && user.role !== "employee");
+
+  const patchWorker = async (body: Record<string, unknown>) => {
+    if (!token || !params?.id) return;
+    setSavingEmployment(true);
+    try {
+      await api.patch(`/workers/${params.id}`, body, token);
+      const data = await api.get<WorkerDetail>(`/workers/${params.id}`, token);
+      setWorker(data);
+    } finally {
+      setSavingEmployment(false);
+    }
+  };
+
+  const syncNameBlur = async () => {
+    if (!token || !params?.id || !canEditEmployment || !worker) return;
+    const fn = firstNameRef.current?.value?.trim() ?? "";
+    const sn = secondNameRef.current?.value?.trim() ?? "";
+    const ln = lastNameRef.current?.value?.trim() ?? "";
+    if (
+      fn === (worker.first_name ?? "") &&
+      sn === (worker.second_name ?? "") &&
+      ln === (worker.last_name ?? "")
+    )
+      return;
+    const full = [fn, sn, ln].filter(Boolean).join(" ").trim();
+    await patchWorker({
+      first_name: fn || null,
+      second_name: sn || null,
+      last_name: ln || null,
+      name: full || worker.name,
+    });
+  };
 
   const loadAll = async () => {
     if (!token || !params?.id) return;
@@ -97,6 +227,22 @@ function WorkerDetailInner() {
           ? `/workers/${params.id}/checklist?organisation_id=${encodeURIComponent(orgForChecklist)}`
           : `/workers/${params.id}/checklist`;
       const items = await api.get<ChecklistItem[]>(checklistPath, token);
+      try {
+        const s = await api.get<{
+          employment_status_options: string[];
+          department_options: string[];
+          work_location_options: string[];
+          onboarding_stage_options: string[];
+          rtw_category_options: string[];
+        }>("/organisation/settings", token);
+        if (s.employment_status_options?.length) setEmploymentOptions(s.employment_status_options);
+        if (s.department_options?.length) setDepartmentOptions(s.department_options);
+        if (s.work_location_options?.length) setWorkLocationOptions(s.work_location_options);
+        if (s.onboarding_stage_options?.length) setOnboardingStageOptions(s.onboarding_stage_options);
+        if (s.rtw_category_options?.length) setRtwCategoryOptions(s.rtw_category_options);
+      } catch {
+        /* defaults */
+      }
       setWorker(data);
       setChecklist(items);
       setBgRefs(bg.references || []);
@@ -118,6 +264,37 @@ function WorkerDetailInner() {
       setMainTab(t);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!token || !params?.id || !worker?.has_profile_photo) {
+      setProfilePhotoUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/workers/${params.id}/profile-photo`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const blob = await res.blob();
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        setProfilePhotoUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, params?.id, worker?.has_profile_photo]);
 
   const setTab = (tab: MainTab) => {
     setMainTab(tab);
@@ -166,6 +343,44 @@ function WorkerDetailInner() {
     return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
   }, [worker?.name]);
 
+  const handleProfilePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !token || !params?.id) return;
+    setProfilePhotoUploading(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      await api.postForm(`/workers/${params.id}/profile-photo`, fd, token);
+      setWorker((prev) => (prev ? { ...prev, has_profile_photo: true } : null));
+      await loadAll();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Photo upload failed");
+    } finally {
+      setProfilePhotoUploading(false);
+    }
+  };
+
+  const handleRemoveProfilePhoto = async () => {
+    if (!token || !params?.id) return;
+    setProfilePhotoUploading(true);
+    setError("");
+    try {
+      await api.delete(`/workers/${params.id}/profile-photo`, token);
+      setWorker((prev) => (prev ? { ...prev, has_profile_photo: false } : null));
+      setProfilePhotoUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      await loadAll();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not remove photo");
+    } finally {
+      setProfilePhotoUploading(false);
+    }
+  };
+
   const allFiles = useMemo(() => {
     const out: { name: string; date: string; item: string }[] = [];
     for (const item of checklist) {
@@ -205,9 +420,9 @@ function WorkerDetailInner() {
         </Link>
       </div>
 
-      {/* Shell aligned with admin theme: #0F2050 top bar + blue accents */}
+      {/* Worker profile card — hero band below the cream shell header */}
       <div className="overflow-hidden rounded-2xl border border-[#E8EEFF] bg-white shadow-[0_8px_32px_-12px_rgba(37,99,235,0.12)]">
-        {/* Top band — matches protexi-adm-shell topnav */}
+        {/* Profile header */}
         <div className="relative overflow-hidden bg-[#0F2050] px-5 py-5 text-white md:px-8 md:py-6">
           <div
             className="pointer-events-none absolute inset-0 opacity-100"
@@ -268,6 +483,7 @@ function WorkerDetailInner() {
           {mainTab === "overview" && (
             <EmployeeDashboard
               worker={worker}
+              managerPayrollRestricted={managerPayrollRestricted}
               checklist={checklist}
               bgRefs={bgRefs}
               verifiedDocs={verifiedDocs}
@@ -294,23 +510,268 @@ function WorkerDetailInner() {
 
               <div className="grid grid-cols-1 gap-6 lg:gap-8 xl:grid-cols-2">
                 <AspectCard title="Profile & contact" subtitle="Identity and how to reach this person" icon={User} barClass="bg-[#2563EB]">
-                  <div className="divide-y divide-[#F0F4FF]">
-                    <DashRow label="Full name" value={worker.name} />
-                    <DashRow
-                      label="Email"
-                      value={
-                        worker.email ? (
-                          <a href={`mailto:${worker.email}`} className="text-[#2563EB] hover:underline">
-                            {worker.email}
-                          </a>
+                  <div className="mb-4 flex flex-col gap-4 border-b border-[#F0F4FF] pb-4 sm:flex-row sm:items-start">
+                    <div className="flex shrink-0 flex-col items-center gap-2 sm:items-start">
+                      <div
+                        className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl border border-[#E8EEFF] bg-[#F8FAFF] text-2xl font-bold text-[#94A3B8]"
+                        style={{ boxShadow: "0 4px 14px rgba(37, 99, 235, 0.08)" }}
+                      >
+                        {profilePhotoUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={profilePhotoUrl} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          "—"
-                        )
-                      }
-                    />
-                    <DashRow label="Phone" value={worker.phone || "—"} />
-                    <DashRow label="Nationality" value={worker.nationality || "—"} />
+                          <span className="text-[#2563EB]">{initials}</span>
+                        )}
+                      </div>
+                      {canUploadProfilePhoto && (
+                        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                          <input
+                            ref={profilePhotoInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            onChange={handleProfilePhotoSelect}
+                          />
+                          <button
+                            type="button"
+                            disabled={profilePhotoUploading}
+                            onClick={() => profilePhotoInputRef.current?.click()}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#BFDBFE] bg-white px-3 py-1.5 text-[11px] font-bold text-[#1d4ed8] shadow-sm hover:bg-[#EFF6FF] disabled:opacity-50"
+                          >
+                            <Camera className="h-3.5 w-3.5" />
+                            {profilePhotoUploading ? "…" : "Upload photo"}
+                          </button>
+                          {worker.has_profile_photo && (
+                            <button
+                              type="button"
+                              disabled={profilePhotoUploading}
+                              onClick={handleRemoveProfilePhoto}
+                              className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-[11px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <p className="max-w-[200px] text-center text-[10px] leading-snug text-[#94A3B8] sm:text-left">
+                        JPEG, PNG, WebP or GIF · max 5 MB · stored in your configured S3 bucket when{" "}
+                        <code className="rounded bg-slate-100 px-1">STORAGE_PROVIDER=s3</code>
+                      </p>
+                    </div>
                   </div>
+                  {!canEditEmployment ? (
+                    <div className="divide-y divide-[#F0F4FF]">
+                      <DashRow label="Full name" value={worker.name} />
+                      <DashRow label="First name" value={worker.first_name || "—"} />
+                      <DashRow label="Second name" value={worker.second_name || "—"} />
+                      <DashRow label="Surname" value={worker.last_name || "—"} />
+                      <DashRow label="Sex" value={worker.sex || "—"} />
+                      <DashRow label="Date of birth" value={formatDetailDate(worker.date_of_birth)} />
+                      <DashRow label="Age" value={worker.age_years != null ? String(worker.age_years) : "—"} />
+                      <DashRow
+                        label="Email"
+                        value={
+                          worker.email ? (
+                            <a href={`mailto:${worker.email}`} className="text-[#2563EB] hover:underline">
+                              {worker.email}
+                            </a>
+                          ) : (
+                            "—"
+                          )
+                        }
+                      />
+                      <DashRow label="Phone" value={worker.phone || "—"} />
+                      <DashRow label="Nationality" value={worker.nationality || "—"} />
+                      <DashRow label="Address line 1" value={worker.address_line_1 || "—"} />
+                      <DashRow label="Address line 2" value={worker.address_line_2 || "—"} />
+                      <DashRow label="Address line 3" value={worker.address_line_3 || "—"} />
+                      <DashRow label="Postcode" value={worker.postal_code || "—"} />
+                      <DashRow label="Country" value={ukCountryLabel(worker.uk_residence_country)} />
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <p className="text-[11px] text-[#94A3B8]">
+                        Address and salary changes are logged for reporting. Configure department, location, and onboarding
+                        lists under Organisation.
+                      </p>
+                      <div
+                        key={`nm-${worker.id}-${worker.first_name ?? ""}-${worker.second_name ?? ""}-${worker.last_name ?? ""}`}
+                        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+                      >
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          First name
+                          <input
+                            ref={firstNameRef}
+                            defaultValue={worker.first_name ?? ""}
+                            onBlur={syncNameBlur}
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          />
+                        </label>
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Second name
+                          <input
+                            ref={secondNameRef}
+                            defaultValue={worker.second_name ?? ""}
+                            onBlur={syncNameBlur}
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          />
+                        </label>
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Surname
+                          <input
+                            ref={lastNameRef}
+                            defaultValue={worker.last_name ?? ""}
+                            onBlur={syncNameBlur}
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          />
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Sex
+                          <select
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            disabled={savingEmployment}
+                            value={worker.sex ?? ""}
+                            onChange={async (e) => {
+                              const v = e.target.value;
+                              await patchWorker({ sex: v || null });
+                            }}
+                          >
+                            <option value="">—</option>
+                            <option value="Female">Female</option>
+                            <option value="Male">Male</option>
+                            <option value="Non-binary">Non-binary</option>
+                            <option value="Other">Other</option>
+                            <option value="Prefer not to say">Prefer not to say</option>
+                          </select>
+                        </label>
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Date of birth
+                          <input
+                            type="date"
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            disabled={savingEmployment}
+                            defaultValue={toDateInput(worker.date_of_birth)}
+                            key={`dob-${worker.id}-${toDateInput(worker.date_of_birth)}`}
+                            onBlur={async (e) => {
+                              const raw = e.target.value;
+                              const next = dateInputToIso(raw);
+                              const prev = worker.date_of_birth
+                                ? dateInputToIso(toDateInput(worker.date_of_birth))
+                                : null;
+                              if (next === prev) return;
+                              await patchWorker({ date_of_birth: next });
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <DashRow label="Age (from DOB)" value={worker.age_years != null ? String(worker.age_years) : "—"} />
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Phone
+                          <input
+                            defaultValue={worker.phone ?? ""}
+                            key={`ph-${worker.id}-${worker.phone ?? ""}`}
+                            onBlur={async (e) => {
+                              const v = e.target.value.trim();
+                              if (v === (worker.phone ?? "")) return;
+                              await patchWorker({ phone: v || null });
+                            }}
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          />
+                        </label>
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Email
+                          <input
+                            type="email"
+                            defaultValue={worker.email ?? ""}
+                            key={`em-${worker.id}-${worker.email ?? ""}`}
+                            onBlur={async (e) => {
+                              const v = e.target.value.trim();
+                              if (v === (worker.email ?? "")) return;
+                              await patchWorker({ email: v || null });
+                            }}
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          />
+                        </label>
+                      </div>
+                      <DashRow label="Nationality" value={worker.nationality || "—"} />
+                      <label className="text-[12px] font-semibold text-[#64748B]">
+                        Address line 1
+                        <input
+                          defaultValue={worker.address_line_1 ?? ""}
+                          key={`a1-${worker.id}-${worker.address_line_1 ?? ""}`}
+                          onBlur={async (e) => {
+                            const v = e.target.value.trim();
+                            if (v === (worker.address_line_1 ?? "")) return;
+                            await patchWorker({ address_line_1: v || null });
+                          }}
+                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                        />
+                      </label>
+                      <label className="text-[12px] font-semibold text-[#64748B]">
+                        Address line 2
+                        <input
+                          defaultValue={worker.address_line_2 ?? ""}
+                          key={`a2-${worker.id}-${worker.address_line_2 ?? ""}`}
+                          onBlur={async (e) => {
+                            const v = e.target.value.trim();
+                            if (v === (worker.address_line_2 ?? "")) return;
+                            await patchWorker({ address_line_2: v || null });
+                          }}
+                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                        />
+                      </label>
+                      <label className="text-[12px] font-semibold text-[#64748B]">
+                        Address line 3
+                        <input
+                          defaultValue={worker.address_line_3 ?? ""}
+                          key={`a3-${worker.id}-${worker.address_line_3 ?? ""}`}
+                          onBlur={async (e) => {
+                            const v = e.target.value.trim();
+                            if (v === (worker.address_line_3 ?? "")) return;
+                            await patchWorker({ address_line_3: v || null });
+                          }}
+                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                        />
+                      </label>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Postcode
+                          <input
+                            defaultValue={worker.postal_code ?? ""}
+                            key={`pc-${worker.id}-${worker.postal_code ?? ""}`}
+                            onBlur={async (e) => {
+                              const v = e.target.value.trim();
+                              if (v === (worker.postal_code ?? "")) return;
+                              await patchWorker({ postal_code: v || null });
+                            }}
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          />
+                        </label>
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Country
+                          <select
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            disabled={savingEmployment}
+                            value={worker.uk_residence_country ?? ""}
+                            onChange={async (e) => {
+                              const v = e.target.value;
+                              await patchWorker({ uk_residence_country: v || null });
+                            }}
+                          >
+                            {UK_RESIDENCE_OPTIONS.map((o) => (
+                              <option key={o.value || "unset"} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+                  )}
                 </AspectCard>
 
                 <AspectCard
@@ -319,35 +780,263 @@ function WorkerDetailInner() {
                   icon={Briefcase}
                   barClass="bg-[#7C3AED]"
                 >
-                  <div className="divide-y divide-[#F0F4FF]">
-                    <DashRow label="Job title" value={worker.job_title || "—"} />
-                    <DashRow label="Department" value={worker.department || "—"} />
-                    <DashRow label="Work location" value={worker.work_location || "—"} />
-                    <DashRow label="Employment status" value={worker.status || "—"} />
-                    <DashRow label="Onboarding stage" value={worker.stage || "—"} />
-                    <DashRow label="Start date" value={formatDetailDate(worker.start_date)} />
-                    <DashRow label="Salary (reported)" value={formatSalaryGbp(worker.salary)} />
-                  </div>
+                  {!canEditEmployment ? (
+                    <div className="divide-y divide-[#F0F4FF]">
+                      <DashRow label="Job title" value={worker.job_title || "—"} />
+                      <DashRow label="Department" value={worker.department || "—"} />
+                      <DashRow label="Work location" value={worker.work_location || "—"} />
+                      <DashRow label="Onboarding (HR label)" value={worker.hr_onboarding_stage || worker.stage || "—"} />
+                      <DashRow label="Workflow stage" value={worker.stage || "—"} />
+                      <DashRow label="Lifecycle status" value={worker.status || "—"} />
+                      <DashRow label="HR employment status" value={worker.employment_status || "—"} />
+                      <DashRow label="Start date" value={formatDetailDate(worker.start_date)} />
+                      <DashRow label="End date" value={formatDetailDate(worker.termination_date)} />
+                      <DashRow
+                        label="Salary (reported)"
+                        value={
+                          managerPayrollRestricted
+                            ? "Not visible (managers cannot view payroll-related data)"
+                            : `${formatSalaryGbp(worker.salary)} (${worker.salary_pay_type || "annual"})`
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <label className="text-[12px] font-semibold text-[#64748B]">
+                        Job title
+                        <input
+                          defaultValue={worker.job_title ?? ""}
+                          key={`jt-${worker.id}-${worker.job_title ?? ""}`}
+                            onBlur={async (e) => {
+                            const v = e.target.value.trim();
+                            if (v === (worker.job_title ?? "")) return;
+                            if (!v) return;
+                            await patchWorker({ job_title: v });
+                          }}
+                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                        />
+                      </label>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Department
+                          <select
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            disabled={savingEmployment}
+                            value={worker.department ?? ""}
+                            onChange={async (e) => {
+                              const v = e.target.value;
+                              await patchWorker({ department: v || null });
+                            }}
+                          >
+                            <option value="">—</option>
+                            {[...new Set([...departmentOptions, worker.department || ""])].filter(Boolean).map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Work location
+                          <select
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            disabled={savingEmployment}
+                            value={worker.work_location ?? ""}
+                            onChange={async (e) => {
+                              const v = e.target.value;
+                              await patchWorker({ work_location: v || null });
+                            }}
+                          >
+                            <option value="">—</option>
+                            {[...new Set([...workLocationOptions, worker.work_location || ""])].filter(Boolean).map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <label className="text-[12px] font-semibold text-[#64748B]">
+                        Onboarding stage
+                        <select
+                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          disabled={savingEmployment}
+                          value={worker.hr_onboarding_stage ?? ""}
+                          onChange={async (e) => {
+                            const v = e.target.value;
+                            await patchWorker({ hr_onboarding_stage: v || null });
+                          }}
+                        >
+                          <option value="">—</option>
+                          {[...new Set([...onboardingStageOptions, worker.hr_onboarding_stage || ""])].filter(Boolean).map(
+                            (opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </label>
+                      <div className="grid grid-cols-1 gap-2 rounded-xl border border-[#F0F4FF] bg-[#FAFCFF] p-3 sm:grid-cols-2">
+                        <DashRow label="Workflow stage" value={worker.stage || "—"} />
+                        <DashRow label="Lifecycle status" value={worker.status || "—"} />
+                      </div>
+                      <label className="text-[12px] font-semibold text-[#64748B]">
+                        HR employment status
+                        <select
+                          className="mt-1 w-full max-w-md rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          disabled={savingEmployment}
+                          value={worker.employment_status || "Active"}
+                          onChange={async (e) => {
+                            await patchWorker({ employment_status: e.target.value });
+                          }}
+                        >
+                          {[...new Set([...employmentOptions, worker.employment_status || "Active"])].map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          Start date
+                          <input
+                            type="date"
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            disabled={savingEmployment}
+                            defaultValue={toDateInput(worker.start_date)}
+                            key={`sd-${worker.id}-${toDateInput(worker.start_date)}`}
+                            onBlur={async (e) => {
+                              const raw = e.target.value;
+                              const next = dateInputToIso(raw);
+                              const prev = worker.start_date ? dateInputToIso(toDateInput(worker.start_date)) : null;
+                              if (next === prev) return;
+                              await patchWorker({ start_date: next });
+                            }}
+                          />
+                        </label>
+                        <label className="text-[12px] font-semibold text-[#64748B]">
+                          End date
+                          <input
+                            type="date"
+                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            disabled={savingEmployment}
+                            defaultValue={toDateInput(worker.termination_date)}
+                            key={`ed-${worker.id}-${toDateInput(worker.termination_date)}`}
+                            onBlur={async (e) => {
+                              const raw = e.target.value;
+                              const next = dateInputToIso(raw);
+                              const prev = worker.termination_date
+                                ? dateInputToIso(toDateInput(worker.termination_date))
+                                : null;
+                              if (next === prev) return;
+                              await patchWorker({ termination_date: next });
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {!managerPayrollRestricted ? (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <label className="text-[12px] font-semibold text-[#64748B]">
+                            Salary amount
+                            <input
+                              type="number"
+                              step="0.01"
+                              min={0}
+                              defaultValue={worker.salary != null ? String(worker.salary) : ""}
+                              key={`sal-${worker.id}-${worker.salary ?? ""}`}
+                              onBlur={async (e) => {
+                                const raw = e.target.value;
+                                const num = raw === "" ? null : Number(raw);
+                                if (num !== null && Number.isNaN(num)) return;
+                                if (num === worker.salary || (num == null && worker.salary == null)) return;
+                                await patchWorker({ salary: num ?? 0 });
+                              }}
+                              className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            />
+                          </label>
+                          <label className="text-[12px] font-semibold text-[#64748B]">
+                            Salary basis
+                            <select
+                              className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                              disabled={savingEmployment}
+                              value={worker.salary_pay_type || "annual"}
+                              onChange={async (e) => {
+                                await patchWorker({ salary_pay_type: e.target.value });
+                              }}
+                            >
+                              {SALARY_PAY_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      ) : (
+                        <DashRow
+                          label="Salary (reported)"
+                          value="Not visible (managers cannot view payroll-related data)"
+                        />
+                      )}
+                    </div>
+                  )}
                 </AspectCard>
 
-                <AspectCard title="Immigration" subtitle="Sponsor and visa dates" icon={Plane} barClass="bg-[#0D9488]">
-                  <div className="divide-y divide-[#F0F4FF]">
-                    <DashRow label="Immigration route" value={worker.route || "—"} />
-                    <DashRow label="Visa expiry" value={formatDetailDate(worker.visa_expiry)} />
-                    <DashRow
-                      label="Days to expiry"
-                      value={
-                        worker.visa_expiry
-                          ? (() => {
-                              const d = Math.ceil(
-                                (new Date(worker.visa_expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-                              );
-                              if (d < 0) return `${Math.abs(d)} days overdue`;
-                              return `${d} days`;
-                            })()
-                          : "—"
-                      }
-                    />
+                <AspectCard
+                  title="Immigration / Right to work"
+                  subtitle="Right to work category, sponsor route, visa dates, and RTW checks"
+                  icon={Plane}
+                  barClass="bg-[#0D9488]"
+                >
+                  <div className="space-y-3">
+                    {canEditEmployment ? (
+                      <label className="block text-[12px] font-semibold text-[#64748B]">
+                        Right to work category
+                        <select
+                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          disabled={savingEmployment}
+                          value={worker.right_to_work_category ?? ""}
+                          onChange={async (e) => {
+                            const v = e.target.value;
+                            await patchWorker({ right_to_work_category: v || null });
+                          }}
+                        >
+                          <option value="">—</option>
+                          {[...new Set([...rtwCategoryOptions, worker.right_to_work_category || ""])]
+                            .filter(Boolean)
+                            .map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    ) : null}
+                    <div className="divide-y divide-[#F0F4FF]">
+                      {!canEditEmployment ? (
+                        <DashRow label="Right to work category" value={worker.right_to_work_category || "—"} />
+                      ) : null}
+                      <DashRow label="Immigration route" value={worker.route || "—"} />
+                      <DashRow label="Visa expiry" value={formatDetailDate(worker.visa_expiry)} />
+                      <DashRow
+                        label="Days to expiry"
+                        value={
+                          worker.visa_expiry
+                            ? (() => {
+                                const d = Math.ceil(
+                                  (new Date(worker.visa_expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                                );
+                                if (d < 0) return `${Math.abs(d)} days overdue`;
+                                return `${d} days`;
+                              })()
+                            : "—"
+                        }
+                      />
+                      <DashRow label="Last RTW check" value={formatDetailDate(worker.last_rtw_check)} />
+                      <DashRow label="Next RTW check" value={formatDetailDate(worker.next_rtw_check)} />
+                    </div>
                   </div>
                 </AspectCard>
 
@@ -525,6 +1214,7 @@ type RiskTone = { bg: string; border: string; text: string };
 
 function EmployeeDashboard({
   worker,
+  managerPayrollRestricted,
   checklist,
   bgRefs,
   verifiedDocs,
@@ -538,6 +1228,7 @@ function EmployeeDashboard({
   onGoDetails,
 }: {
   worker: WorkerDetail;
+  managerPayrollRestricted: boolean;
   checklist: ChecklistItem[];
   bgRefs: Array<{ id: string; referee_name: string; referee_email: string; status: string }>;
   verifiedDocs: number;
@@ -561,6 +1252,9 @@ function EmployeeDashboard({
           Number(worker.salary)
         )
       : "—";
+  const salaryReportedDisplay = managerPayrollRestricted
+    ? "Not visible (managers cannot view payroll-related data)"
+    : salaryStr;
 
   const topChecklist = [...checklist].slice(0, 5);
 
@@ -595,6 +1289,7 @@ function EmployeeDashboard({
             <DashRow label="Full name" value={worker.name} />
             <DashRow label="Email" value={worker.email ? <a href={`mailto:${worker.email}`} className="text-[#2563EB] hover:underline">{worker.email}</a> : "—"} />
             <DashRow label="Phone" value={worker.phone || "—"} />
+            <DashRow label="Age" value={worker.age_years != null ? String(worker.age_years) : "—"} />
             <DashRow label="Nationality" value={worker.nationality || "—"} />
           </div>
         </AspectCard>
@@ -604,15 +1299,16 @@ function EmployeeDashboard({
             <DashRow label="Job title" value={worker.job_title || "—"} />
             <DashRow label="Department" value={worker.department || "—"} />
             <DashRow label="Work location" value={worker.work_location || "—"} />
-            <DashRow label="Employment status" value={worker.status || "—"} />
-            <DashRow label="Onboarding stage" value={worker.stage || "—"} />
+            <DashRow label="HR employment status" value={worker.employment_status || "—"} />
+            <DashRow label="Onboarding stage" value={worker.hr_onboarding_stage || worker.stage || "—"} />
             <DashRow label="Start date" value={fmtDate(worker.start_date)} />
-            <DashRow label="Salary (reported)" value={salaryStr} />
+            <DashRow label="Salary (reported)" value={salaryReportedDisplay} />
           </div>
         </AspectCard>
 
         <AspectCard title="Immigration & visa" subtitle="Sponsor compliance lens" icon={Plane} barClass="bg-[#0D9488]">
           <div className="divide-y divide-[#F0F4FF]">
+            <DashRow label="Right to work category" value={worker.right_to_work_category || "—"} />
             <DashRow label="Immigration route" value={worker.route || "—"} />
             <DashRow label="Visa expiry" value={fmtDate(worker.visa_expiry)} />
             <DashRow

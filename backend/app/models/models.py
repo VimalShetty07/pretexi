@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
     String, Integer, Float, Boolean, Text, DateTime, Date,
-    ForeignKey, Enum as SAEnum, JSON, LargeBinary,
+    ForeignKey, Enum as SAEnum, JSON, LargeBinary, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
@@ -207,6 +207,14 @@ class Organisation(Base):
     portal_show_salary: Mapped[bool] = mapped_column(Boolean, default=False)
     portal_require_edit_approval: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # HR employment status labels (dropdown options for all workers in this org)
+    employment_status_options: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    department_options: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    work_location_options: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    onboarding_stage_options: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Right to work category labels (dropdown on each worker; master list per org)
+    rtw_category_options: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -367,11 +375,17 @@ class Worker(Base):
     # ── Personal details ───────────────────────────────
     name: Mapped[str] = mapped_column(String(255))
     first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    second_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    sex: Mapped[str | None] = mapped_column(String(30), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     personal_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address_line_1: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address_line_2: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address_line_3: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    uk_residence_country: Mapped[str | None] = mapped_column(String(50), nullable=True)
     postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
     nationality: Mapped[str | None] = mapped_column(String(100), nullable=True)
     date_of_birth: Mapped[datetime | None] = mapped_column(Date, nullable=True)
@@ -386,6 +400,11 @@ class Worker(Base):
     next_of_kin_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     next_of_kin_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
+    # Profile photo (S3 key when using STORAGE_PROVIDER=s3; otherwise DB blob)
+    profile_photo_s3_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    profile_photo_mime: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    profile_photo_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
     # ── Passport details ────────────────────────────────
     passport_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     passport_place_of_issue: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -397,9 +416,12 @@ class Worker(Base):
 
     # ── Employment details ─────────────────────────────
     job_title: Mapped[str] = mapped_column(String(255))
+    # HR-facing status (Active / Inactive / Finished + org custom) — not the same as WorkerStatus
+    employment_status: Mapped[str] = mapped_column(String(100), default="Active")
     department: Mapped[str | None] = mapped_column(String(255), nullable=True)
     soc_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
     salary: Mapped[float] = mapped_column(Float, default=0)
+    salary_pay_type: Mapped[str] = mapped_column(String(20), default="annual")
     route: Mapped[str] = mapped_column(String(100), default="Skilled Worker")
     work_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_hybrid: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -425,12 +447,14 @@ class Worker(Base):
     brp_expiry: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_rtw_check: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_rtw_check: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    right_to_work_category: Mapped[str | None] = mapped_column(String(150), nullable=True)
     entry_clearance_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     dbs_check_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # ── Lifecycle & compliance ─────────────────────────
     status: Mapped[WorkerStatus] = mapped_column(SAEnum(WorkerStatus), default=WorkerStatus.ACTIVE)
     stage: Mapped[WorkerStage] = mapped_column(SAEnum(WorkerStage), default=WorkerStage.RECRUITMENT)
+    hr_onboarding_stage: Mapped[str | None] = mapped_column(String(100), nullable=True)
     risk_level: Mapped[RiskLevel] = mapped_column(SAEnum(RiskLevel), default=RiskLevel.LOW)
 
     # ── DBS / ATAS flags ──────────────────────────────
@@ -451,6 +475,7 @@ class Worker(Base):
     alerts: Mapped[list["Alert"]] = relationship(back_populates="worker", cascade="all, delete-orphan")
     reports: Mapped[list["Report"]] = relationship(back_populates="worker", cascade="all, delete-orphan")
     salary_history: Mapped[list["SalaryHistory"]] = relationship(back_populates="worker", cascade="all, delete-orphan")
+    payroll_entries: Mapped[list["PayrollEntry"]] = relationship(back_populates="worker", cascade="all, delete-orphan")
     attendance_records: Mapped[list["AttendanceRecord"]] = relationship(back_populates="worker", cascade="all, delete-orphan")
     location_changes: Mapped[list["WorkLocationChange"]] = relationship(back_populates="worker", cascade="all, delete-orphan")
     registrations: Mapped[list["ProfessionalRegistration"]] = relationship(back_populates="worker", cascade="all, delete-orphan")
@@ -640,6 +665,28 @@ class SalaryHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     worker: Mapped["Worker"] = relationship(back_populates="salary_history")
+
+
+class PayrollEntry(Base):
+    """Monthly payroll snapshot per worker (UK-style line items, illustrative)."""
+
+    __tablename__ = "payroll_entries"
+    __table_args__ = (UniqueConstraint("worker_id", "pay_period", name="uq_payroll_worker_period"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id"))
+    worker_id: Mapped[str] = mapped_column(String(36), ForeignKey("workers.id"))
+    pay_period: Mapped[str] = mapped_column(String(7))  # YYYY-MM
+    gross_pay: Mapped[float] = mapped_column(Float)
+    income_tax: Mapped[float] = mapped_column(Float)
+    employee_ni: Mapped[float] = mapped_column(Float)
+    pension_employee: Mapped[float] = mapped_column(Float, default=0)
+    net_pay: Mapped[float] = mapped_column(Float)
+    payment_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    worker: Mapped["Worker"] = relationship(back_populates="payroll_entries")
 
 
 # ═══════════════════════════════════════════════════════════

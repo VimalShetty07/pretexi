@@ -35,10 +35,12 @@ interface Worker {
   phone: string | null;
   nationality: string | null;
   department: string | null;
-  salary: number;
+  salary: number | null;
   route: string;
   work_location: string | null;
   status: string;
+  /** HR employment status (org-configurable): Active, Inactive, Finished, … */
+  employment_status?: string;
   stage: string;
   risk_level: string;
   visa_expiry: string | null;
@@ -117,6 +119,7 @@ function WorkersPageInner() {
   const [starred, setStarred] = useState<Record<string, boolean>>({});
 
   const [compliance, setCompliance] = useState<Record<string, { total: number; verified: number; uploaded: number; rejected: number }>>({});
+  const [employmentStatusOptions, setEmploymentStatusOptions] = useState<string[]>(["Active", "Inactive", "Finished"]);
 
   const canManage = user ? STAFF_ROLES.includes(user.role) : false;
 
@@ -136,6 +139,23 @@ function WorkersPageInner() {
       router.replace(`/workers?tab=${t}`, { scroll: false });
     }
   }, [searchParams, router]);
+
+  const fetchEmploymentStatusOptions = async () => {
+    if (!token) return;
+    try {
+      const s = await api.get<{ employment_status_options: string[] }>("/organisation/settings", token);
+      if (s.employment_status_options?.length) setEmploymentStatusOptions(s.employment_status_options);
+    } catch {
+      /* defaults */
+    }
+  };
+
+  const patchEmploymentStatus = async (workerId: string, value: string) => {
+    if (!token) return;
+    await api.patch(`/workers/${workerId}`, { employment_status: value }, token);
+    setWorkers((prev) => prev.map((w) => (w.id === workerId ? { ...w, employment_status: value } : w)));
+    setStatsWorkers((prev) => prev.map((w) => (w.id === workerId ? { ...w, employment_status: value } : w)));
+  };
 
   const fetchWorkers = async () => {
     try {
@@ -207,6 +227,7 @@ function WorkersPageInner() {
     if (token) {
       fetchStatsWorkers();
       fetchOnLeave();
+      fetchEmploymentStatusOptions();
     }
   }, [token]);
 
@@ -446,6 +467,9 @@ function WorkersPageInner() {
               <EmployeeHtmlCard
                 key={w.id}
                 worker={w}
+                employmentOptions={[...new Set([...employmentStatusOptions, w.employment_status || "Active"])]}
+                canEditEmployment={canManage}
+                onEmploymentChange={(value) => patchEmploymentStatus(w.id, value)}
                 compliance={compliance[w.id]}
                 starred={!!starred[w.id]}
                 onToggleStar={(e) => toggleStar(w.id, e)}
@@ -508,7 +532,8 @@ function WorkersPageInner() {
               <tr>
                 <th>Name</th>
                 <th>Role</th>
-                <th>Status</th>
+                <th>Employment</th>
+                <th>Sponsor</th>
                 <th>Email</th>
                 <th>Docs</th>
               </tr>
@@ -518,6 +543,7 @@ function WorkersPageInner() {
                 const c = compliance[w.id];
                 const pct = c && c.total > 0 ? Math.round((c.verified / c.total) * 100) : null;
                 const st = STATUS_CONFIG[w.status] ?? STATUS_CONFIG.active;
+                const empOpts = [...new Set([...employmentStatusOptions, w.employment_status || "Active"])];
                 return (
                   <tr
                     key={w.id}
@@ -526,6 +552,26 @@ function WorkersPageInner() {
                   >
                     <td className="font-semibold">{w.name}</td>
                     <td>{w.job_title || "—"}</td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      {canManage ? (
+                        <select
+                          className="max-w-[160px] cursor-pointer rounded-lg border border-[#E8EEFF] bg-white px-2 py-1 text-[12px] font-medium text-[#0f1f3a]"
+                          value={w.employment_status || "Active"}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            patchEmploymentStatus(w.id, e.target.value);
+                          }}
+                        >
+                          {empOpts.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-[12px] font-semibold text-[#334155]">{w.employment_status || "—"}</span>
+                      )}
+                    </td>
                     <td>
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
@@ -691,8 +737,19 @@ function WorkersPageInner() {
   );
 }
 
+function employmentStatusBadgeClass(label: string) {
+  const x = label.trim().toLowerCase();
+  if (x === "active") return "bg-emerald-50 text-emerald-800 border-emerald-200";
+  if (x === "inactive") return "bg-amber-50 text-amber-900 border-amber-200";
+  if (x === "finished") return "bg-slate-100 text-slate-700 border-slate-200";
+  return "bg-indigo-50 text-indigo-900 border-indigo-200";
+}
+
 function EmployeeHtmlCard({
   worker: w,
+  employmentOptions,
+  canEditEmployment,
+  onEmploymentChange,
   compliance: c,
   starred,
   onToggleStar,
@@ -701,6 +758,9 @@ function EmployeeHtmlCard({
   onMore,
 }: {
   worker: Worker;
+  employmentOptions: string[];
+  canEditEmployment: boolean;
+  onEmploymentChange: (value: string) => void;
   compliance?: { total: number; verified: number; uploaded: number; rejected: number };
   starred: boolean;
   onToggleStar: (e: React.MouseEvent) => void;
@@ -709,6 +769,7 @@ function EmployeeHtmlCard({
   onMore: (e: React.MouseEvent) => void;
 }) {
   const st = STATUS_CONFIG[w.status] ?? STATUS_CONFIG.active;
+  const emp = w.employment_status || "Active";
   const initials = w.name
     .split(" ")
     .map((n) => n[0])
@@ -731,7 +792,30 @@ function EmployeeHtmlCard({
               <div className="wlp-ec-role-badge">{w.job_title || "—"}</div>
             </div>
           </div>
-          <div className={`wlp-ec-status ${st.cls}`}>{st.label}</div>
+          <div className="flex flex-col items-end gap-1">
+            <div className={`wlp-ec-status ${st.cls}`}>{st.label}</div>
+            {canEditEmployment ? (
+              <div onClick={(e) => e.stopPropagation()}>
+                <select
+                  className={`max-w-[140px] cursor-pointer rounded-lg border px-2 py-0.5 text-[10px] font-bold ${employmentStatusBadgeClass(emp)}`}
+                  value={emp}
+                  onChange={(e) => onEmploymentChange(e.target.value)}
+                >
+                  {employmentOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <span
+                className={`inline-flex rounded-lg border px-2 py-0.5 text-[10px] font-bold ${employmentStatusBadgeClass(emp)}`}
+              >
+                {emp}
+              </span>
+            )}
+          </div>
         </div>
         <div className="wlp-ec-info">
           <div className="wlp-ec-info-row">

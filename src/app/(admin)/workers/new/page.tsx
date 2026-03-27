@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
@@ -58,6 +58,7 @@ interface FormData {
   brp_reference: string;
   brp_issue_date: string;
   dbs_check_date: string;
+  employment_status: string;
 }
 
 const INITIAL: FormData = {
@@ -112,6 +113,7 @@ const INITIAL: FormData = {
   brp_reference: "",
   brp_issue_date: "",
   dbs_check_date: "",
+  employment_status: "Active",
 };
 
 const GENDERS = ["Male", "Female", "Non-binary", "Prefer not to say"];
@@ -143,8 +145,21 @@ export default function NewWorkerPage() {
   const router = useRouter();
   const { token } = useAuth();
   const [form, setForm] = useState<FormData>(INITIAL);
+  const [employmentOptions, setEmploymentOptions] = useState<string[]>(["Active", "Inactive", "Finished"]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const s = await api.get<{ employment_status_options: string[] }>("/organisation/settings", token);
+        if (s.employment_status_options?.length) setEmploymentOptions(s.employment_status_options);
+      } catch {
+        /* defaults */
+      }
+    })();
+  }, [token]);
 
   const set = (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -181,6 +196,7 @@ export default function NewWorkerPage() {
         is_remote: form.is_remote,
         dbs_required: form.dbs_required,
         atas_required: form.atas_required,
+        employment_status: form.employment_status || "Active",
       };
 
       const optStr = (k: string, v: string) => { if (v.trim()) payload[k] = v.trim(); };
@@ -386,6 +402,20 @@ export default function NewWorkerPage() {
           <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 18 }}>
             <Field label="Job Title" required>
               <input type="text" value={form.job_title} onChange={set("job_title")} placeholder="e.g. Live in Carer" className={inputClass} style={{ height: 40, padding: "0 14px" }} />
+            </Field>
+            <Field label="Employment status">
+              <select
+                value={form.employment_status}
+                onChange={set("employment_status")}
+                className={`${inputClass} cursor-pointer`}
+                style={{ height: 40, padding: "0 14px" }}
+              >
+                {employmentOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Department">
               <input type="text" value={form.department} onChange={set("department")} placeholder="e.g. Care" className={inputClass} style={{ height: 40, padding: "0 14px" }} />

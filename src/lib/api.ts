@@ -42,4 +42,16 @@ export const api = {
 
   delete: <T>(endpoint: string, token?: string) =>
     request<T>(endpoint, { method: "DELETE", token }),
+
+  /** Multipart POST (e.g. profile photo). Do not set Content-Type — browser sets boundary. */
+  postForm: async <T>(endpoint: string, formData: FormData, token?: string): Promise<T> => {
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`${API_URL}${endpoint}`, { method: "POST", headers, body: formData });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as { detail?: string }).detail || `API error: ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  },
 };

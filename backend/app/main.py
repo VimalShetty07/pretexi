@@ -14,6 +14,8 @@ from app.routers import (
     dashboard,
     documents,
     leave,
+    organisation,
+    payroll,
     platform,
     portal,
     reports,
@@ -46,6 +48,8 @@ app.add_middleware(
 # Main app routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(workers.router, prefix="/api")
+app.include_router(organisation.router, prefix="/api")
+app.include_router(payroll.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(alerts.router, prefix="/api")

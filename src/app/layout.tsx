@@ -25,6 +25,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Tiny comment to ensure Next dev rebuilds layout assets when CSS edits are missed.
   return (
     <html lang="en">
       <body className={`${manrope.variable} ${outfit.variable} antialiased`}>

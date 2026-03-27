@@ -14,36 +14,38 @@
   background: var(--dash-cream);
   color: var(--dash-black);
   margin: -22px -24px;
-  padding: 22px 24px 36px;
-  min-height: calc(100dvh - 98px);
+  padding: 18px 24px 36px;
+  min-height: calc(100dvh - 82px);
   box-sizing: border-box;
 }
 
 /* Page header — marketing section label + headline */
 .protexi-adm-shell .protexi-dash-marketing .adm-ph {
-  margin-bottom: 28px;
-  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 12px;
+  align-items: flex-end;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .adm-ph-ey {
   font-family: var(--dash-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  color: var(--dash-blue);
-  gap: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  color: #3b82f6;
+  gap: 7px;
+  margin-bottom: 4px;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .adm-ph-ey::before {
-  width: 20px;
+  width: 14px;
   height: 1.5px;
-  background: var(--dash-blue);
+  background: #3b82f6;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .adm-ph-title {
-  font-size: clamp(26px, 4vw, 40px);
+  font-size: 24px;
   font-weight: 800;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.6px;
   line-height: 1.05;
   color: var(--dash-black);
 }
@@ -57,40 +59,47 @@
 
 .protexi-adm-shell .protexi-dash-marketing .adm-ph-date {
   font-family: var(--dash-mono);
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6b6b6b;
-  margin-top: 8px;
+  color: #94a3b8;
+  margin-top: 3px;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .adm-ph-badge {
-  border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 100px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #16a34a;
   font-family: var(--dash-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background: var(--dash-card);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  color: var(--dash-navy);
+  letter-spacing: 0.06em;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-badge svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .adm-ph-badge-warn {
-  background: rgba(26, 79, 160, 0.08);
-  border-color: var(--dash-blue);
-  color: var(--dash-navy);
-}
-
-.protexi-adm-shell .protexi-dash-marketing .adm-ph-badge-warn.border-red-200,
-.protexi-adm-shell .protexi-dash-marketing .adm-ph-badge-warn.bg-red-50,
-.protexi-adm-shell .protexi-dash-marketing .adm-ph-badge-warn.text-red-700 {
-  border-color: var(--dash-blue) !important;
-  background: rgba(26, 79, 160, 0.1) !important;
-  color: var(--dash-navy) !important;
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
+  color: #dc2626 !important;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .dash-status-dot {
-  background: var(--dash-blue);
+  background: #16a34a;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-badge .dash-status-dot {
+  width: 4px;
+  height: 4px;
 }
 
 /* Stat row — tight grid like marketing feature grid */
@@ -371,7 +380,7 @@
   text-transform: uppercase;
 }
 
-.protexi-adm-shell .protexi-dash-marketing .bg-red-50.text-red-700.border-red-200 {
+.protexi-adm-shell .protexi-dash-marketing .bg-red-50.text-red-700.border-red-200:not(.adm-ph-badge) {
   background: rgba(15, 45, 94, 0.12) !important;
   color: var(--dash-navy) !important;
   border-color: var(--dash-blue) !important;
@@ -389,7 +398,7 @@
   color: var(--dash-navy) !important;
 }
 
-.protexi-adm-shell .protexi-dash-marketing .bg-red-50.text-red-700 {
+.protexi-adm-shell .protexi-dash-marketing .bg-red-50.text-red-700:not(.adm-ph-badge) {
   background: rgba(26, 79, 160, 0.1) !important;
   color: var(--dash-navy) !important;
 }

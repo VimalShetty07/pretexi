@@ -8,7 +8,7 @@ import { useAuth } from "@/components/auth-provider";
 import {
   LayoutDashboard, Users, Building2, FileText, ClipboardList,
   ShieldAlert, Settings, LogOut, PanelLeftClose, PanelLeft,
-  UserCircle, CalendarDays, CalendarRange, type LucideIcon,
+  UserCircle, CalendarDays, CalendarRange, Wallet, type LucideIcon,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -28,6 +28,7 @@ const adminNav: NavItem[] = [
   { label: "Organisation",href: "/organisation",  icon: Building2 },
   { label: "Documents",   href: "/documents",     icon: FileText },
   { label: "Reports",     href: "/reports",       icon: ClipboardList },
+  { label: "Payroll",     href: "/payroll",       icon: Wallet },
   { label: "Risk Monitor",href: "/risk",          icon: ShieldAlert },
 ];
 
@@ -38,6 +39,7 @@ const employeeNav: NavItem[] = [
   { label: "My Leave",    href: "/portal/leave",     icon: CalendarDays },
   { label: "Calendar",    href: "/portal/calendar",  icon: CalendarRange },
   { label: "My Details",  href: "/portal/details",   icon: UserCircle },
+  { label: "My Payroll",  href: "/portal/payroll",   icon: Wallet },
 ];
 
 function getVisibleNav(role: UserRole): NavItem[] {

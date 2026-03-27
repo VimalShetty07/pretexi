@@ -201,12 +201,7 @@ export default function DashboardPage() {
             <AlertTriangle className="h-3.5 w-3.5" />
             {expired} visa{expired > 1 ? "s" : ""} expired — action required
           </div>
-        ) : (
-          <div className="adm-ph-badge">
-            <span className="dash-status-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden />
-            All systems operational
-          </div>
-        )}
+        ) : null}
       </div>
 
       {/* Stat cards */}

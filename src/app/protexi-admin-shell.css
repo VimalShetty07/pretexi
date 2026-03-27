@@ -1,241 +1,556 @@
-/* Protexi dashboard / admin shell — matches protexi_dashboard_charts.html */
+/* ============================================================
+   Protexi admin shell
+   ============================================================ */
+
 .protexi-adm-shell {
+  /* Design tokens */
+  --nav-h: 56px;
+  --nav-bg: #1a4fa0;
+  --nav-border: rgba(255, 255, 255, 0.2);
+  --nav-text: #e5e7eb;
+  --nav-muted: #cbd5e1;
+  --nav-hover-bg: rgba(255, 255, 255, 0.14);
+  --nav-active-bg: rgba(255, 255, 255, 0.2);
+  --nav-active-text: #ffffff;
+  --nav-logo: #f8fafc;
+  --nav-blue: #dbeafe;
+  --nav-radius: 0px;
+
   font-family: var(--font-outfit), var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* ---- TOP NAVIGATION BAR ---- */
+
 .protexi-adm-shell .adm-topnav {
-  background: #0f2050;
-  height: 52px;
+  background: var(--nav-bg);
+  height: var(--nav-h);
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  gap: 0;
-  position: relative;
-  overflow-x: visible;
-  overflow-y: hidden;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid var(--nav-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
-.protexi-adm-shell .adm-topnav::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 15% 50%, rgba(37, 99, 235, 0.3), transparent 55%);
-  pointer-events: none;
+
+.protexi-adm-shell .adm-tn-inner {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 20px;
+  gap: 4px;
 }
-.protexi-adm-shell .adm-logo {
-  font-size: 18px;
+
+/* Logo wordmark */
+.protexi-adm-shell .adm-tn-logo {
+  font-size: 17px;
   font-weight: 800;
-  color: #fff;
   letter-spacing: -0.5px;
-  margin-right: 28px;
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
+  color: var(--nav-logo);
   text-decoration: none;
+  flex-shrink: 0;
+  margin-right: 4px;
+  line-height: 1;
+  transition: opacity 0.15s ease;
 }
-.protexi-adm-shell .adm-logo span {
-  color: #60a5fa;
+.protexi-adm-shell .adm-tn-logo:hover {
+  opacity: 0.75;
 }
+.protexi-adm-shell .adm-tn-logo em {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--nav-blue);
+}
+
+/* Vertical divider between logo and nav */
+.protexi-adm-shell .adm-tn-vdiv {
+  width: 1px;
+  height: 18px;
+  background: var(--nav-border);
+  flex-shrink: 0;
+  margin: 0 8px;
+}
+
+/* Nav container */
 .protexi-adm-shell .adm-tn-links {
   display: flex;
   align-items: center;
-  gap: 2px;
-  position: relative;
-  z-index: 1;
   flex: 1;
-  flex-wrap: wrap;
+  min-width: 0;
+  overflow: hidden;
 }
-.protexi-adm-shell .adm-tn-btn {
+.protexi-adm-shell .adm-tn-nav-row {
   display: flex;
   align-items: center;
+  gap: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Icon size */
+.protexi-adm-shell .adm-tn-ic {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+/* Nav buttons — standard SaaS pill style */
+.protexi-adm-shell .adm-tn-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  padding: 6px 13px;
-  border-radius: 8px;
+  padding: 0 10px;
+  height: 32px;
+  border-radius: var(--nav-radius);
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.55);
-  cursor: pointer;
-  border: none;
-  background: none;
-  transition: all 0.15s;
+  color: var(--nav-text);
   text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
 }
-.protexi-adm-shell .adm-tn-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+.protexi-adm-shell .adm-tn-btn svg {
+  color: var(--nav-muted);
+  transition: color 0.13s ease;
+}
+.protexi-adm-shell .adm-tn-btn:hover:not(.act) {
+  background: var(--nav-hover-bg);
+  color: #f8fafc;
+}
+.protexi-adm-shell .adm-tn-btn:hover:not(.act) svg {
+  color: #e2e8f0;
 }
 .protexi-adm-shell .adm-tn-btn.act {
-  background: rgba(37, 99, 235, 0.45);
-  color: #fff;
+  background: var(--nav-active-bg);
+  color: var(--nav-active-text);
   font-weight: 600;
 }
-.protexi-adm-shell .adm-tn-sep {
-  width: 1px;
-  height: 16px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 0 6px;
+.protexi-adm-shell .adm-tn-btn.act svg {
+  color: var(--nav-active-text);
 }
-.protexi-adm-shell .adm-tn-right {
-  margin-left: auto;
+.protexi-adm-shell .adm-tn-btn:focus-visible {
+  outline: 2px solid var(--nav-blue);
+  outline-offset: 1px;
+}
+
+/* More button chevron */
+.protexi-adm-shell .adm-tn-chev {
+  transition: transform 0.18s ease;
+}
+.protexi-adm-shell [data-state="open"] > .adm-tn-more-btn .adm-tn-chev,
+.protexi-adm-shell .adm-tn-more-btn[data-state="open"] .adm-tn-chev {
+  transform: rotate(180deg);
+}
+
+/* "More" overflow dropdown */
+.adm-tn-more-content {
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - 24px));
+  max-height: min(62vh, 420px);
+  overflow-y: auto;
+  background: rgba(26, 79, 160, 0.86);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 0;
+  padding: 6px;
+  z-index: 9999;
+  box-shadow:
+    0 10px 28px -10px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+}
+.adm-tn-more-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-}
-.protexi-adm-shell .adm-search {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 5px 12px;
-  cursor: pointer;
-}
-.protexi-adm-shell .adm-search span {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
-}
-.protexi-adm-shell .adm-search kbd {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  padding: 1px 5px;
-  margin-left: 6px;
-}
-.protexi-adm-shell .adm-icon-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.5);
-  transition: all 0.15s;
-}
-.protexi-adm-shell .adm-icon-btn:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  color: #fff;
-}
-.protexi-adm-shell .adm-user {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 9px 4px 4px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-}
-.protexi-adm-shell .adm-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2563eb, #60a5fa);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-}
-.protexi-adm-shell .adm-uname {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-}
-.protexi-adm-shell .adm-urole {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.35);
-}
-
-/* Subnav */
-.protexi-adm-shell .adm-subnav {
-  background: #fff;
-  border-bottom: 1px solid #e8eeff;
-  min-height: 46px;
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  gap: 4px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-.protexi-adm-shell .adm-sn-tab {
-  padding: 6px 14px;
-  border-radius: 8px;
+  min-height: 38px;
+  padding: 8px 10px;
   font-size: 13px;
   font-weight: 500;
-  color: #94a3b8;
+  color: #f8fafc;
+  border-radius: 0;
+  background: transparent;
   cursor: pointer;
-  transition: all 0.15s;
+  outline: none;
+  text-decoration: none;
+  user-select: none;
+  transition: background 0.13s ease, color 0.13s ease, border-color 0.13s ease;
+  border: 1px solid transparent;
+}
+.adm-tn-more-item svg {
+  color: #dbeafe;
+  flex-shrink: 0;
+}
+.adm-tn-more-item:hover svg,
+.adm-tn-more-item[data-highlighted] svg {
+  color: #f8fafc;
+}
+.adm-tn-more-item:hover,
+.adm-tn-more-item[data-highlighted] {
+  background: rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.adm-tn-more-item--current {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.adm-tn-more-item--current svg {
+  color: #ffffff;
+}
+
+/* Right tools cluster */
+.protexi-adm-shell .adm-tn-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Search pill */
+.protexi-adm-shell .adm-search {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  min-width: 220px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--nav-border);
+  border-radius: 0;
+  cursor: text;
+  transition: border-color 0.13s ease, background 0.13s ease, box-shadow 0.13s ease;
+  color: var(--nav-muted);
+}
+.protexi-adm-shell .adm-search:hover,
+.protexi-adm-shell .adm-search:focus-within {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.protexi-adm-shell .adm-search svg {
+  color: var(--nav-muted);
+  flex-shrink: 0;
+}
+.protexi-adm-shell .adm-search-input {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 400;
+  color: #f8fafc;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.protexi-adm-shell .adm-search-input::placeholder {
+  color: #dbeafe;
+  opacity: 0.9;
+}
+.protexi-adm-shell .adm-search kbd {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--nav-border);
+  border-radius: 0;
+  padding: 1px 5px;
+  margin-left: 2px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.protexi-adm-shell .adm-search-results {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  width: 100%;
+  min-width: 260px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: rgba(26, 79, 160, 0.9);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 0;
+  z-index: 220;
+  padding: 6px;
+  box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.45);
+}
+
+.protexi-adm-shell .adm-search-result-item {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #f8fafc;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.13s ease, border-color 0.13s ease;
+}
+
+.protexi-adm-shell .adm-search-result-item:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.protexi-adm-shell .adm-search-result-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.protexi-adm-shell .adm-search-result-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f8fafc;
+  line-height: 1.15;
+}
+
+.protexi-adm-shell .adm-search-result-meta {
+  font-size: 11px;
+  color: #dbeafe;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.protexi-adm-shell .adm-search-empty {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  color: #dbeafe;
+  font-size: 13px;
+}
+
+/* Icon buttons */
+.protexi-adm-shell .adm-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--nav-radius);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #6b7280;
+  transition: background 0.13s ease, color 0.13s ease;
+  flex-shrink: 0;
+}
+.protexi-adm-shell .adm-icon-btn:hover {
+  background: var(--nav-hover-bg);
+  color: #f8fafc;
+}
+.protexi-adm-shell .adm-icon-btn:focus-visible {
+  outline: 2px solid var(--nav-blue);
+  outline-offset: 1px;
+}
+
+/* Vertical divider in right cluster */
+.protexi-adm-shell .adm-tn-rdiv {
+  width: 1px;
+  height: 18px;
+  background: var(--nav-border);
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
+/* User chip */
+.protexi-adm-shell .adm-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 6px 0 4px;
+  border-radius: 0;
+  background: transparent;
+  cursor: default;
+  border: none;
+  transition: background 0.13s ease;
+}
+.protexi-adm-shell .adm-user-chip:hover {
+  background: var(--nav-hover-bg);
+}
+
+/* Avatar circle */
+.protexi-adm-shell .adm-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1d4ed8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(29, 78, 216, 0.18);
+}
+.protexi-adm-shell .adm-user-info {
+  text-align: left;
+}
+.protexi-adm-shell .adm-uname {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f8fafc;
+  line-height: 1.25;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.protexi-adm-shell .adm-urole {
+  font-size: 11px;
+  color: var(--nav-muted);
+  line-height: 1.2;
+}
+
+/* Sign-out inside user chip */
+.protexi-adm-shell .adm-signout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  color: var(--nav-muted);
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+  flex-shrink: 0;
+}
+.protexi-adm-shell .adm-signout-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.protexi-adm-shell .adm-signout-btn:focus-visible {
+  outline: 2px solid var(--nav-blue);
+  outline-offset: 1px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .protexi-adm-shell .adm-tn-inner {
+    padding: 0 14px;
+  }
+  .protexi-adm-shell .adm-search kbd {
+    display: none;
+  }
+  .protexi-adm-shell .adm-search {
+    min-width: 160px;
+  }
+}
+@media (max-width: 600px) {
+  .protexi-adm-shell .adm-tn-vdiv {
+    display: none;
+  }
+}
+
+/* ============================================================
+   Subnav
+   ============================================================ */
+.protexi-adm-shell .adm-subnav {
+  background: #fafafa;
+  border-bottom: 1px solid var(--nav-border);
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 2px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 40;
+}
+
+.protexi-adm-shell .adm-sn-tab {
+  padding: 0 10px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--nav-radius);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--nav-muted);
+  cursor: pointer;
+  transition: color 0.13s ease, background 0.13s ease;
   border: none;
   background: none;
+  text-decoration: none;
 }
 .protexi-adm-shell .adm-sn-tab:hover {
-  color: #1e293b;
+  color: #111827;
+  background: var(--nav-hover-bg);
 }
 .protexi-adm-shell .adm-sn-tab.act {
-  color: #1d4ed8;
-  font-weight: 700;
-  background: #eff6ff;
+  color: var(--nav-active-text);
+  font-weight: 600;
+  background: var(--nav-active-bg);
 }
-.protexi-adm-shell .adm-sn-tab.act::after {
-  content: "";
-  position: absolute;
-  bottom: -1px;
-  left: 14px;
-  right: 14px;
-  height: 2px;
-  background: linear-gradient(90deg, #1d4ed8, #60a5fa);
-  border-radius: 2px;
-}
+
 .protexi-adm-shell .adm-sn-right {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
 }
+
 .protexi-adm-shell .adm-sn-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 12.5px;
+  padding: 0 12px;
+  height: 28px;
+  border-radius: 0;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.13s ease;
   border: none;
 }
 .protexi-adm-shell .adm-sn-ghost {
-  color: #64748b;
-  border: 1px solid #e2e8f0;
+  color: #374151;
+  border: 1px solid var(--nav-border);
   background: #fff;
 }
 .protexi-adm-shell .adm-sn-ghost:hover {
-  border-color: #3b82f6;
-  color: #2563eb;
+  border-color: #9ca3af;
+  color: #111827;
 }
 .protexi-adm-shell .adm-sn-primary {
   color: #fff;
-  border: none;
-  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  background: var(--nav-blue);
+  border: 1px solid transparent;
+  box-shadow: 0 1px 3px rgba(29, 78, 216, 0.3);
 }
 .protexi-adm-shell .adm-sn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+  background: #1e40af;
 }
 
-/* Page */
+/* ============================================================
+   Page layout
+   ============================================================ */
 .protexi-adm-shell .adm-page {
   flex: 1;
   padding: 22px 24px;
@@ -306,14 +621,10 @@
   margin-bottom: 20px;
 }
 @media (max-width: 1200px) {
-  .protexi-adm-shell .adm-stat-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .protexi-adm-shell .adm-stat-row { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 640px) {
-  .protexi-adm-shell .adm-stat-row {
-    grid-template-columns: 1fr;
-  }
+  .protexi-adm-shell .adm-stat-row { grid-template-columns: 1fr; }
 }
 .protexi-adm-shell .adm-sc {
   background: #fff;
@@ -340,18 +651,10 @@
   width: 3px;
   border-radius: 0 3px 3px 0;
 }
-.protexi-adm-shell .adm-sc-b::before {
-  background: #2563eb;
-}
-.protexi-adm-shell .adm-sc-p::before {
-  background: #7c3aed;
-}
-.protexi-adm-shell .adm-sc-a::before {
-  background: #f59e0b;
-}
-.protexi-adm-shell .adm-sc-r::before {
-  background: #e11d48;
-}
+.protexi-adm-shell .adm-sc-b::before { background: #2563eb; }
+.protexi-adm-shell .adm-sc-p::before { background: #7c3aed; }
+.protexi-adm-shell .adm-sc-a::before { background: #f59e0b; }
+.protexi-adm-shell .adm-sc-r::before { background: #e11d48; }
 .protexi-adm-shell .adm-sc-top {
   display: flex;
   align-items: center;
@@ -366,36 +669,18 @@
   align-items: center;
   justify-content: center;
 }
-.protexi-adm-shell .adm-si-b {
-  background: #eff6ff;
-  color: #2563eb;
-}
-.protexi-adm-shell .adm-si-p {
-  background: #f5f3ff;
-  color: #7c3aed;
-}
-.protexi-adm-shell .adm-si-a {
-  background: #fffbeb;
-  color: #d97706;
-}
-.protexi-adm-shell .adm-si-r {
-  background: #fff1f2;
-  color: #e11d48;
-}
+.protexi-adm-shell .adm-si-b { background: #eff6ff; color: #2563eb; }
+.protexi-adm-shell .adm-si-p { background: #f5f3ff; color: #7c3aed; }
+.protexi-adm-shell .adm-si-a { background: #fffbeb; color: #d97706; }
+.protexi-adm-shell .adm-si-r { background: #fff1f2; color: #e11d48; }
 .protexi-adm-shell .adm-sc-pill {
   font-size: 11px;
   font-weight: 700;
   padding: 3px 8px;
   border-radius: 100px;
 }
-.protexi-adm-shell .adm-pill-g {
-  background: #f0fdf4;
-  color: #16a34a;
-}
-.protexi-adm-shell .adm-pill-n {
-  background: #f8faff;
-  color: #94a3b8;
-}
+.protexi-adm-shell .adm-pill-g { background: #f0fdf4; color: #16a34a; }
+.protexi-adm-shell .adm-pill-n { background: #f8faff; color: #94a3b8; }
 .protexi-adm-shell .adm-sc-num {
   font-size: 32px;
   font-weight: 900;
@@ -423,9 +708,7 @@
   margin-bottom: 16px;
 }
 @media (max-width: 1024px) {
-  .protexi-adm-shell .adm-chart-grid {
-    grid-template-columns: 1fr;
-  }
+  .protexi-adm-shell .adm-chart-grid { grid-template-columns: 1fr; }
 }
 .protexi-adm-shell .adm-card {
   background: #fff;
@@ -450,9 +733,7 @@
   color: #94a3b8;
   margin-top: 2px;
 }
-.protexi-adm-shell .adm-card-body {
-  padding: 16px 20px;
-}
+.protexi-adm-shell .adm-card-body { padding: 16px 20px; }
 .protexi-adm-shell .adm-leg {
   display: flex;
   align-items: center;
@@ -480,16 +761,11 @@
   gap: 16px;
 }
 @media (max-width: 1024px) {
-  .protexi-adm-shell .adm-btm-grid {
-    grid-template-columns: 1fr;
-  }
+  .protexi-adm-shell .adm-btm-grid { grid-template-columns: 1fr; }
 }
 
 /* Alerts / empty */
-.protexi-adm-shell .adm-alert-empty {
-  padding: 24px 20px;
-  text-align: center;
-}
+.protexi-adm-shell .adm-alert-empty { padding: 24px 20px; text-align: center; }
 .protexi-adm-shell .adm-ae-icon {
   width: 40px;
   height: 40px;
@@ -502,16 +778,8 @@
   margin: 0 auto 10px;
   color: #16a34a;
 }
-.protexi-adm-shell .adm-ae-t {
-  font-size: 13px;
-  font-weight: 600;
-  color: #94a3b8;
-}
-.protexi-adm-shell .adm-ae-s {
-  font-size: 12px;
-  color: #cbd5e1;
-  margin-top: 3px;
-}
+.protexi-adm-shell .adm-ae-t { font-size: 13px; font-weight: 600; color: #94a3b8; }
+.protexi-adm-shell .adm-ae-s { font-size: 12px; color: #cbd5e1; margin-top: 3px; }
 .protexi-adm-shell .adm-comp-wrap {
   margin: 0 20px 16px;
   background: #f0f4ff;
@@ -519,37 +787,14 @@
   padding: 12px 14px;
   border: 1px solid #e8eeff;
 }
-.protexi-adm-shell .adm-comp-top {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 7px;
-}
-.protexi-adm-shell .adm-comp-lbl {
-  font-size: 12px;
-  font-weight: 600;
-  color: #64748b;
-}
-.protexi-adm-shell .adm-comp-val {
-  font-size: 13px;
-  font-weight: 800;
-  color: #1d4ed8;
-}
-.protexi-adm-shell .adm-comp-track {
-  height: 6px;
-  background: #e8eeff;
-  border-radius: 6px;
-  overflow: hidden;
-}
-.protexi-adm-shell .adm-comp-fill {
-  height: 100%;
-  border-radius: 6px;
-  background: linear-gradient(90deg, #1d4ed8, #60a5fa);
-}
+.protexi-adm-shell .adm-comp-top { display: flex; justify-content: space-between; margin-bottom: 7px; }
+.protexi-adm-shell .adm-comp-lbl { font-size: 12px; font-weight: 600; color: #64748b; }
+.protexi-adm-shell .adm-comp-val { font-size: 13px; font-weight: 800; color: #1d4ed8; }
+.protexi-adm-shell .adm-comp-track { height: 6px; background: #e8eeff; border-radius: 6px; overflow: hidden; }
+.protexi-adm-shell .adm-comp-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #1d4ed8, #60a5fa); }
 
 /* Quick actions */
-.protexi-adm-shell .adm-qa-wrap {
-  padding: 12px 14px;
-}
+.protexi-adm-shell .adm-qa-wrap { padding: 12px 14px; }
 .protexi-adm-shell .adm-qa {
   display: flex;
   align-items: center;
@@ -563,48 +808,15 @@
   text-decoration: none;
   color: inherit;
 }
-.protexi-adm-shell .adm-qa:hover {
-  border-color: #bfdbfe;
-  background: #f8faff;
-  transform: translateX(2px);
-}
-.protexi-adm-shell .adm-qa:last-child {
-  margin-bottom: 0;
-}
-.protexi-adm-shell .adm-qa-ic {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.protexi-adm-shell .adm-qi-b {
-  background: #eff6ff;
-  color: #2563eb;
-}
-.protexi-adm-shell .adm-qi-p {
-  background: #f5f3ff;
-  color: #7c3aed;
-}
-.protexi-adm-shell .adm-qi-g {
-  background: #f0fdf4;
-  color: #16a34a;
-}
-.protexi-adm-shell .adm-qi-a {
-  background: #fffbeb;
-  color: #d97706;
-}
-.protexi-adm-shell .adm-qa-t {
-  font-size: 13px;
-  font-weight: 600;
-  color: #0f172a;
-}
-.protexi-adm-shell .adm-qa-d {
-  font-size: 11.5px;
-  color: #94a3b8;
-}
+.protexi-adm-shell .adm-qa:hover { border-color: #bfdbfe; background: #f8faff; transform: translateX(2px); }
+.protexi-adm-shell .adm-qa:last-child { margin-bottom: 0; }
+.protexi-adm-shell .adm-qa-ic { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.protexi-adm-shell .adm-qi-b { background: #eff6ff; color: #2563eb; }
+.protexi-adm-shell .adm-qi-p { background: #f5f3ff; color: #7c3aed; }
+.protexi-adm-shell .adm-qi-g { background: #f0fdf4; color: #16a34a; }
+.protexi-adm-shell .adm-qi-a { background: #fffbeb; color: #d97706; }
+.protexi-adm-shell .adm-qa-t { font-size: 13px; font-weight: 600; color: #0f172a; }
+.protexi-adm-shell .adm-qa-d { font-size: 11.5px; color: #94a3b8; }
 .protexi-adm-shell .adm-view-all {
   display: flex;
   align-items: center;
@@ -621,9 +833,7 @@
 }
 
 /* Activity */
-.protexi-adm-shell .adm-act-wrap {
-  padding: 8px 16px;
-}
+.protexi-adm-shell .adm-act-wrap { padding: 8px 16px; }
 .protexi-adm-shell .adm-act-row {
   display: flex;
   align-items: flex-start;
@@ -631,58 +841,19 @@
   padding: 10px 0;
   border-bottom: 1px solid #f8faff;
 }
-.protexi-adm-shell .adm-act-row:last-child {
-  border-bottom: none;
-}
-.protexi-adm-shell .adm-a-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 5px;
-}
-.protexi-adm-shell .adm-ad-b {
-  background: #3b82f6;
-}
-.protexi-adm-shell .adm-ad-g {
-  background: #22c55e;
-}
-.protexi-adm-shell .adm-ad-a {
-  background: #f59e0b;
-}
-.protexi-adm-shell .adm-a-t {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #1e293b;
-}
-.protexi-adm-shell .adm-a-s {
-  font-size: 11px;
-  color: #cbd5e1;
-  margin-top: 1px;
-}
-.protexi-adm-shell .adm-chdr-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 100px;
-}
-.protexi-adm-shell .adm-cb-a {
-  background: #fffbeb;
-  color: #d97706;
-  border: 1px solid #fed7aa;
-}
-.protexi-adm-shell .adm-cb-b {
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #bfdbfe;
-}
-.protexi-adm-shell .adm-cb-g {
-  background: #f0fdf4;
-  color: #16a34a;
-  border: 1px solid #bbf7d0;
-}
+.protexi-adm-shell .adm-act-row:last-child { border-bottom: none; }
+.protexi-adm-shell .adm-a-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.protexi-adm-shell .adm-ad-b { background: #3b82f6; }
+.protexi-adm-shell .adm-ad-g { background: #22c55e; }
+.protexi-adm-shell .adm-ad-a { background: #f59e0b; }
+.protexi-adm-shell .adm-a-t { font-size: 12.5px; font-weight: 600; color: #1e293b; }
+.protexi-adm-shell .adm-a-s { font-size: 11px; color: #cbd5e1; margin-top: 1px; }
+.protexi-adm-shell .adm-chdr-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 100px; }
+.protexi-adm-shell .adm-cb-a { background: #fffbeb; color: #d97706; border: 1px solid #fed7aa; }
+.protexi-adm-shell .adm-cb-b { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.protexi-adm-shell .adm-cb-g { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
 
-/* Generic content surface for non-dashboard pages */
+/* Generic content surface */
 .protexi-adm-shell .adm-surface {
   background: #fff;
   border-radius: 16px;

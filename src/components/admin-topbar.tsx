@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   LayoutGrid,
   Users,
@@ -12,20 +13,29 @@ import {
   FileText,
   ClipboardList,
   ShieldAlert,
+  Wallet,
   Search,
   Bell,
   LogOut,
   LayoutDashboard,
   UserCircle,
   Settings,
+  ChevronDown,
 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
+import { api } from "@/lib/api";
 import { ROUTE_PERMISSIONS, type UserRole } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 type NavItem = { label: string; href: string; icon: typeof LayoutDashboard };
+type WorkerSearchResult = {
+  id: string;
+  name: string;
+  email?: string | null;
+  job_title?: string | null;
+};
 
-/** Same order as legacy sidebar: every section is a direct route in the top bar */
 const adminNavFlat: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
   { label: "Employees", href: "/workers", icon: Users },
@@ -35,6 +45,7 @@ const adminNavFlat: NavItem[] = [
   { label: "Organisation", href: "/organisation", icon: Building2 },
   { label: "Documents", href: "/documents", icon: FileText },
   { label: "Reports", href: "/reports", icon: ClipboardList },
+  { label: "Payroll", href: "/payroll", icon: Wallet },
   { label: "Risk", href: "/risk", icon: ShieldAlert },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
@@ -54,6 +65,8 @@ const platformNav: NavItem[] = [
   { label: "Subscriptions", href: "/super-admin/subscriptions", icon: ClipboardList },
 ];
 
+const ADMIN_PRIMARY_NAV_COUNT = 6;
+
 function filterByRole(items: NavItem[], role: UserRole): NavItem[] {
   return items.filter((item) => {
     const allowed = ROUTE_PERMISSIONS[item.href];
@@ -70,12 +83,34 @@ function isActive(pathname: string | null, href: string): boolean {
 }
 
 export function AdminTopbar({ userRole }: { userRole: UserRole }) {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [employeeResults, setEmployeeResults] = useState<WorkerSearchResult[]>([]);
+  const [employeeSearchLoading, setEmployeeSearchLoading] = useState(false);
   const isEmployee = userRole === "employee";
   const isPlatform = userRole === "platform_owner";
 
-  const mainItems = isEmployee ? employeeNav : isPlatform ? platformNav : filterByRole(adminNavFlat, userRole);
+  const navItems = useMemo(() => {
+    if (isEmployee) return employeeNav;
+    if (isPlatform) return platformNav;
+    return filterByRole(adminNavFlat, userRole);
+  }, [isEmployee, isPlatform, userRole]);
+
+  const { visible, overflow } = useMemo(() => {
+    if (!isEmployee && !isPlatform) {
+      return {
+        visible: navItems.slice(0, ADMIN_PRIMARY_NAV_COUNT),
+        overflow: navItems.slice(ADMIN_PRIMARY_NAV_COUNT),
+      };
+    }
+    return { visible: navItems, overflow: [] as NavItem[] };
+  }, [isEmployee, isPlatform, navItems]);
+
+  const overflowActive = overflow.some((item) => isActive(pathname, item.href));
 
   const initials =
     user?.full_name
@@ -85,79 +120,215 @@ export function AdminTopbar({ userRole }: { userRole: UserRole }) {
       .slice(0, 2)
       .toUpperCase() || "U";
   const roleLabel = user?.role?.replace(/_/g, " ") || "User";
+  // Wire this to real notifications API when available.
+  const unreadNotifications = 0;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const isCmdK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
+      if (!isCmdK) return;
+      event.preventDefault();
+      setSearchOpen(true);
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!searchOpen || q.length < 2 || !token || isEmployee || isPlatform) {
+      setEmployeeResults([]);
+      setEmployeeSearchLoading(false);
+      return;
+    }
+
+    let active = true;
+    setEmployeeSearchLoading(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await api.get<WorkerSearchResult[]>(`/workers?search=${encodeURIComponent(q)}`, token);
+        if (!active) return;
+        setEmployeeResults(data.slice(0, 8));
+      } catch {
+        if (!active) return;
+        setEmployeeResults([]);
+      } finally {
+        if (active) setEmployeeSearchLoading(false);
+      }
+    }, 220);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery, searchOpen, token, isEmployee, isPlatform]);
+
+  const handleEmployeeSelect = (workerId: string) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setEmployeeResults([]);
+    router.push(`/workers/${workerId}`);
+  };
+
+  const homeHref = isEmployee ? "/portal" : isPlatform ? "/super-admin/dashboard" : "/dashboard";
 
   return (
     <header className="adm-topnav">
-      <Link href={isEmployee ? "/portal" : isPlatform ? "/super-admin/dashboard" : "/dashboard"} className="adm-logo">
-        Prote<span>xi</span>
-      </Link>
+      <div className="adm-tn-inner">
 
-      <div className="adm-tn-links min-w-0 overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {!isEmployee && !isPlatform && (
-          <>
-            {mainItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn("adm-tn-btn shrink-0", isActive(pathname, item.href) && "act")}
-              >
-                <item.icon className="h-[13px] w-[13px]" />
-                {item.label}
-              </Link>
-            ))}
-          </>
-        )}
+        {/* Logo */}
+        <Link href={homeHref} className="adm-tn-logo">
+          Prote<em>xi</em>
+        </Link>
 
-        {!isEmployee && isPlatform && (
-          <div className="flex flex-wrap gap-0.5">
-            {mainItems.map((item) => (
+        {/* Logo / nav divider */}
+        <div className="adm-tn-vdiv" aria-hidden />
+
+        {/* Primary navigation */}
+        <nav className="adm-tn-links" aria-label="Main">
+          <div className="adm-tn-nav-row">
+            {visible.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn("adm-tn-btn", isActive(pathname, item.href) && "act")}
               >
-                <item.icon className="h-[13px] w-[13px]" />
+                <item.icon className="adm-tn-ic" aria-hidden />
                 {item.label}
               </Link>
             ))}
-          </div>
-        )}
 
-        {isEmployee && (
-          <div className="flex flex-wrap gap-0.5">
-            {mainItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn("adm-tn-btn", isActive(pathname, item.href) && "act")}
-              >
-                <item.icon className="h-[13px] w-[13px]" />
-                {item.label}
-              </Link>
-            ))}
+            {overflow.length > 0 && (
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    type="button"
+                    className={cn("adm-tn-btn adm-tn-more-btn", overflowActive && "act")}
+                    aria-label="More navigation"
+                  >
+                    More
+                    <ChevronDown className="adm-tn-ic adm-tn-chev" strokeWidth={2} aria-hidden />
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    className="adm-tn-more-content"
+                    side="bottom"
+                    sideOffset={6}
+                    align="end"
+                    sticky="always"
+                    avoidCollisions
+                    collisionPadding={12}
+                  >
+                    {overflow.map((item) => (
+                      <DropdownMenu.Item key={item.href} asChild>
+                        <Link
+                          href={item.href}
+                          className={cn(
+                            "adm-tn-more-item",
+                            isActive(pathname, item.href) && "adm-tn-more-item--current",
+                          )}
+                        >
+                          <item.icon className="adm-tn-ic" aria-hidden />
+                          {item.label}
+                        </Link>
+                      </DropdownMenu.Item>
+                    ))}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            )}
           </div>
-        )}
-      </div>
+        </nav>
 
-      <div className="adm-tn-right">
-        <div className="adm-search" role="search">
-          <Search className="h-3 w-3 text-white/35" />
-          <span>Search</span>
-          <kbd>⌘K</kbd>
-        </div>
-        <button type="button" className="adm-icon-btn relative" aria-label="Notifications">
-          <Bell className="h-3.5 w-3.5" />
-          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full border border-[#0f2050] bg-red-500" />
-        </button>
-        <div className="adm-user">
-          <div className="adm-avatar">{initials}</div>
-          <div className="hidden text-left sm:block">
-            <div className="adm-uname max-w-[120px] truncate">{user?.full_name || "User"}</div>
-            <div className="adm-urole capitalize">{roleLabel}</div>
+        {/* Right tools */}
+        <div className="adm-tn-right">
+          {/* Search */}
+          <div className="adm-search">
+            <Search className="adm-tn-ic" aria-hidden />
+            <input
+              ref={searchInputRef}
+              className="adm-search-input"
+              placeholder="Search employee"
+              value={searchQuery}
+              onFocus={() => setSearchOpen(true)}
+              onBlur={() => {
+                window.setTimeout(() => setSearchOpen(false), 120);
+              }}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && employeeResults.length > 0) {
+                  event.preventDefault();
+                  handleEmployeeSelect(employeeResults[0].id);
+                }
+                if (event.key === "Escape") {
+                  setSearchOpen(false);
+                  setSearchQuery("");
+                  setEmployeeResults([]);
+                  searchInputRef.current?.blur();
+                }
+              }}
+              aria-label="Search employee"
+            />
+            <kbd>⌘K</kbd>
+            {searchOpen && searchQuery.trim().length > 0 && (
+              <div className="adm-search-results" role="listbox" aria-label="Search results">
+                {employeeSearchLoading ? (
+                  <div className="adm-search-empty">Searching employees...</div>
+                ) : employeeResults.length > 0 ? (
+                  employeeResults.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="adm-search-result-item"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => handleEmployeeSelect(item.id)}
+                    >
+                      <Users className="adm-tn-ic" aria-hidden />
+                      <span className="adm-search-result-text">
+                        <span className="adm-search-result-name">{item.name}</span>
+                        <span className="adm-search-result-meta">{item.email || item.job_title || "Employee"}</span>
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="adm-search-empty">No employees found</div>
+                )}
+              </div>
+            )}
           </div>
-          <button type="button" onClick={logout} className="adm-icon-btn !border-0 !bg-transparent" title="Sign out">
-            <LogOut className="h-3.5 w-3.5" />
+
+          {/* Notifications */}
+          <button type="button" className="adm-icon-btn relative" aria-label="Notifications">
+            <Bell className="adm-tn-ic" />
+            {unreadNotifications > 0 && (
+              <span
+                className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-red-500"
+                aria-hidden
+              />
+            )}
           </button>
+
+          {/* Vertical divider */}
+          <div className="adm-tn-rdiv" aria-hidden />
+
+          {/* User chip */}
+          <div className="adm-user-chip">
+            <div className="adm-avatar" aria-hidden>{initials}</div>
+            <div className="adm-user-info hidden sm:block">
+              <div className="adm-uname">{user?.full_name || "User"}</div>
+              <div className="adm-urole capitalize">{roleLabel}</div>
+            </div>
+            <button
+              type="button"
+              onClick={logout}
+              className="adm-signout-btn"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="adm-tn-ic" />
+            </button>
+          </div>
         </div>
       </div>
     </header>

@@ -33,9 +33,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/calendar":      ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer", "payroll_officer"],
   "/organisation":  ["super_admin", "tenant_admin", "compliance_manager"],
   "/documents":     ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer"],
-  "/reports":       ["super_admin", "tenant_admin", "compliance_manager"],
-  "/risk":          ["super_admin", "tenant_admin", "compliance_manager"],
+  "/reports":       ["super_admin", "tenant_admin", "compliance_manager", "hr_officer", "payroll_officer", "inspector"],
+  "/risk":          ["super_admin", "tenant_admin", "compliance_manager", "hr_officer", "inspector"],
   "/settings":      ["super_admin", "tenant_admin"],
+  /** HR team + super admin + payroll officer — not tenant_admin / compliance_manager (managers). */
+  "/payroll":       ["super_admin", "hr_officer", "payroll_officer"],
   "/portal":        ["employee"],
 };
 

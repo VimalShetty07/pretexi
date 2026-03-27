@@ -98,7 +98,7 @@ export function AdminSubnav() {
 
   if (pathname === "/workers") {
     return (
-      <Suspense fallback={<div className="adm-subnav min-h-[46px] border-b border-[#E8EEFF] bg-white" />}>
+      <Suspense fallback={<div className="adm-subnav min-h-[36px]" />}>
         <WorkersSubnavInner />
       </Suspense>
     );
@@ -120,7 +120,7 @@ export function AdminSubnav() {
 
   return (
     <div className="adm-subnav">
-      <span className="px-3 py-1 text-[13px] font-semibold text-slate-700">{title}</span>
+      <span className="px-3 py-1 text-[13px] font-bold tracking-tight text-[#0f2d5e]">{title}</span>
     </div>
   );
 }

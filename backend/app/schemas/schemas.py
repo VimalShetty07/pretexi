@@ -229,6 +229,27 @@ class KeyPersonnelOut(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
+#  ORGANISATION SETTINGS (tenant)
+# ═══════════════════════════════════════════════════════════
+
+
+class OrganisationSettingsOut(BaseModel):
+    employment_status_options: list[str]
+    department_options: list[str]
+    work_location_options: list[str]
+    onboarding_stage_options: list[str]
+    rtw_category_options: list[str]
+
+
+class OrganisationSettingsPatch(BaseModel):
+    employment_status_options: list[str] | None = None
+    department_options: list[str] | None = None
+    work_location_options: list[str] | None = None
+    onboarding_stage_options: list[str] | None = None
+    rtw_category_options: list[str] | None = None
+
+
+# ═══════════════════════════════════════════════════════════
 #  WORKER
 # ═══════════════════════════════════════════════════════════
 
@@ -284,6 +305,16 @@ class WorkerCreate(BaseModel):
     brp_reference: str | None = None
     brp_issue_date: datetime | None = None
     dbs_check_date: datetime | None = None
+    employment_status: str | None = "Active"
+    second_name: str | None = None
+    sex: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    address_line_3: str | None = None
+    uk_residence_country: str | None = None
+    salary_pay_type: str | None = "annual"
+    hr_onboarding_stage: str | None = None
+    right_to_work_category: str | None = None
 
 
 class WorkerUpdate(BaseModel):
@@ -343,6 +374,16 @@ class WorkerUpdate(BaseModel):
     brp_reference: str | None = None
     brp_issue_date: datetime | None = None
     dbs_check_date: datetime | None = None
+    employment_status: str | None = None
+    second_name: str | None = None
+    sex: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    address_line_3: str | None = None
+    uk_residence_country: str | None = None
+    salary_pay_type: str | None = None
+    hr_onboarding_stage: str | None = None
+    right_to_work_category: str | None = None
 
 
 class WorkerOut(BaseModel):
@@ -354,7 +395,7 @@ class WorkerOut(BaseModel):
     nationality: str | None = None
     department: str | None = None
     soc_code: str | None = None
-    salary: float
+    salary: float | None = None  # omitted for roles without payroll visibility
     route: str
     work_location: str | None = None
     is_hybrid: bool
@@ -369,6 +410,10 @@ class WorkerOut(BaseModel):
     risk_level: str
     dbs_required: bool
     atas_required: bool
+    employment_status: str
+    salary_pay_type: str = "annual"
+    hr_onboarding_stage: str | None = None
+    right_to_work_category: str | None = None
     created_at: datetime
 
     class Config:
@@ -378,9 +423,15 @@ class WorkerOut(BaseModel):
 class WorkerDetailOut(WorkerOut):
     """Extended worker output for detail page — includes personal + portal fields."""
     first_name: str | None = None
+    second_name: str | None = None
     last_name: str | None = None
+    sex: str | None = None
     personal_email: str | None = None
     address: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    address_line_3: str | None = None
+    uk_residence_country: str | None = None
     postal_code: str | None = None
     date_of_birth: datetime | None = None
     place_of_birth: str | None = None
@@ -414,6 +465,31 @@ class WorkerDetailOut(WorkerOut):
     brp_reference: str | None = None
     brp_issue_date: datetime | None = None
     dbs_check_date: datetime | None = None
+    has_profile_photo: bool = False
+    age_years: int | None = None
+
+
+class ProfilePhotoPresignOut(BaseModel):
+    """Optional presigned URL when using S3 (alternative to authenticated GET stream)."""
+    url: str | None = None
+
+
+class PayrollEntryOut(BaseModel):
+    id: str
+    worker_id: str
+    worker_name: str
+    job_title: str | None = None
+    employee_id: str | None = None
+    pay_period: str
+    gross_pay: float
+    income_tax: float
+    employee_ni: float
+    pension_employee: float
+    net_pay: float
+    payment_date: datetime | None = None
+
+    class Config:
+        from_attributes = True
 
 
 # ═══════════════════════════════════════════════════════════
