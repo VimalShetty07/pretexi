@@ -17,10 +17,14 @@ import {
   CreditCard,
   CalendarRange,
   FileUp,
-  Activity,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import {
+  DEFAULT_DASHBOARD_FEATURES,
+  orderDashboardFeatures,
+  type DashboardFeatureKey,
+} from "@/lib/dashboard-features";
 import { VisaStatusBreakdownBarChart, VisaDoughnutChart } from "@/components/dashboard-charts";
 
 interface DashboardOverview {
@@ -55,6 +59,14 @@ interface DashboardOverview {
   }>;
 }
 
+interface DashboardAdminMessage {
+  id: string;
+  message: string;
+  created_at: string;
+  created_by_user_id: string;
+  created_by_name: string;
+}
+
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
@@ -63,16 +75,31 @@ export default function DashboardPage() {
   const { token, user } = useAuth();
   const router = useRouter();
   const [data, setData] = useState<DashboardOverview | null>(null);
+  const [chatMessages, setChatMessages] = useState<DashboardAdminMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [dashFeatures, setDashFeatures] = useState<DashboardFeatureKey[]>(DEFAULT_DASHBOARD_FEATURES);
+  const canPostAdminChat = ["super_admin", "tenant_admin", "compliance_manager"].includes(user?.role ?? "");
+
+  const showFeat = (key: DashboardFeatureKey) => dashFeatures.includes(key);
 
   useEffect(() => {
     const load = async () => {
       if (!token) return;
       try {
         setLoading(true);
-        const overview = await api.get<DashboardOverview>("/dashboard/overview", token);
+        const [overview, chat, featResp] = await Promise.all([
+          api.get<DashboardOverview>("/dashboard/overview", token),
+          api.get<DashboardAdminMessage[]>("/organisation/dashboard-chat", token),
+          api.get<{ features: string[] }>("/organisation/dashboard-features", token).catch(() => ({
+            features: DEFAULT_DASHBOARD_FEATURES,
+          })),
+        ]);
         setData(overview);
+        setChatMessages(chat);
+        setDashFeatures(orderDashboardFeatures(featResp.features));
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load dashboard");
       } finally {
@@ -81,6 +108,26 @@ export default function DashboardPage() {
     };
     load();
   }, [token]);
+
+  const sendChatMessage = async () => {
+    if (!token || !canPostAdminChat) return;
+    const text = chatInput.trim();
+    if (!text) return;
+    try {
+      setSendingChat(true);
+      const created = await api.post<DashboardAdminMessage>(
+        "/organisation/dashboard-chat",
+        { message: text },
+        token
+      );
+      setChatMessages((prev) => [...prev, created]);
+      setChatInput("");
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to send message");
+    } finally {
+      setSendingChat(false);
+    }
+  };
 
   const topAlerts = useMemo(() => data?.expiring_workers.slice(0, 6) ?? [], [data]);
 
@@ -196,15 +243,78 @@ export default function DashboardPage() {
           </h1>
           <div className="adm-ph-date">{today}</div>
         </div>
-        {expired > 0 ? (
-          <div className="adm-ph-badge adm-ph-badge-warn inline-flex items-center gap-2 border-red-200 bg-red-50 text-red-700">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            {expired} visa{expired > 1 ? "s" : ""} expired — action required
+
+        <div className="dash-ph-right">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {expired > 0 ? (
+              <div className="adm-ph-badge adm-ph-badge-warn inline-flex items-center gap-2 border-red-200 bg-red-50 text-red-700">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {expired} visa{expired > 1 ? "s" : ""} expired — action required
+              </div>
+            ) : null}
           </div>
-        ) : null}
+
+          {showFeat("admin_chat") ? (
+          <div className="dash-admin-note">
+            <div className="dash-admin-note-top">
+              <div className="dash-admin-note-head">
+                <div className="dash-admin-note-title">Admin chat</div>
+                <div className="dash-admin-note-meta">Shared with dashboard users in your organisation</div>
+              </div>
+            </div>
+
+            <div className="dash-admin-chat-list">
+              {chatMessages.length === 0 ? (
+                <div className="dash-admin-chat-empty">No messages yet.</div>
+              ) : (
+                chatMessages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`dash-admin-chat-item ${m.created_by_user_id === user?.id ? "mine" : ""}`}
+                  >
+                    <div className="dash-admin-chat-meta">
+                      <span className="dash-admin-chat-author">{m.created_by_name}</span>
+                      <span className="dash-admin-chat-time">
+                        {new Date(m.created_at).toLocaleString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                    <div className="dash-admin-chat-msg">{m.message}</div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {canPostAdminChat && (
+              <div className="dash-admin-chat-compose">
+                <textarea
+                  className="dash-admin-note-textarea"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Type a message for the admin chat..."
+                  maxLength={2000}
+                />
+                <button
+                  type="button"
+                  className="dash-admin-note-save"
+                  onClick={sendChatMessage}
+                  disabled={sendingChat || chatInput.trim().length === 0}
+                >
+                  {sendingChat ? "Sending..." : "Send"}
+                </button>
+              </div>
+            )}
+          </div>
+          ) : null}
+        </div>
       </div>
 
       {/* Stat cards */}
+      {showFeat("stats") ? (
       <div className="adm-stat-row">
         <button type="button" className="adm-sc adm-sc-b" onClick={() => router.push("/workers")}>
           <div className="adm-sc-top">
@@ -258,14 +368,17 @@ export default function DashboardPage() {
           <div className="adm-sc-sub">{expired} already expired</div>
         </button>
       </div>
+      ) : null}
 
       {/* CoS row */}
-      {canViewCos && (
+      {showFeat("cos") && canViewCos && (
         <div className="dash-cos-row mb-0">
           <div className="adm-card">
             <div className="adm-card-h border-b border-[#E8EEFF] pb-3">
-              <div className="adm-card-title">CoS Available</div>
-              <div className="adm-card-sub">Allocated {data.cos_allocated} · Used {data.cos_used}</div>
+              <div>
+                <div className="adm-card-title">CoS Available</div>
+                <div className="adm-card-sub">Allocated {data.cos_allocated} · Used {data.cos_used}</div>
+              </div>
             </div>
             <div className="adm-card-body">
               <div className="text-4xl font-black tracking-tight text-[#0A0F1E]">{data.cos_available}</div>
@@ -273,8 +386,10 @@ export default function DashboardPage() {
           </div>
           <div className="adm-card">
             <div className="adm-card-h border-b border-[#E8EEFF] pb-3">
-              <div className="adm-card-title">Forecasted CoS 90d</div>
-              <div className="adm-card-sub">Demand: {data.cos_forecasted_demand}</div>
+              <div>
+                <div className="adm-card-title">Forecasted CoS 90d</div>
+                <div className="adm-card-sub">Demand: {data.cos_forecasted_demand}</div>
+              </div>
             </div>
             <div className="adm-card-body">
               <div className="text-4xl font-black tracking-tight text-[#0A0F1E]">{data.cos_forecasted_required}</div>
@@ -282,8 +397,10 @@ export default function DashboardPage() {
           </div>
           <div className="adm-card">
             <div className="adm-card-h border-b border-[#E8EEFF] pb-3">
-              <div className="adm-card-title">Projected CoS 12m</div>
-              <div className="adm-card-sub">Demand: {data.cos_projected_demand}</div>
+              <div>
+                <div className="adm-card-title">Projected CoS 12m</div>
+                <div className="adm-card-sub">Demand: {data.cos_projected_demand}</div>
+              </div>
             </div>
             <div className="adm-card-body">
               <div className="text-4xl font-black tracking-tight text-[#0A0F1E]">{data.cos_projected_required}</div>
@@ -293,6 +410,7 @@ export default function DashboardPage() {
       )}
 
       {/* Charts */}
+      {showFeat("charts") ? (
       <div className="adm-chart-grid">
         <div className="adm-card">
           <div className="adm-card-h">
@@ -336,16 +454,16 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      ) : null}
 
       {/* Bottom grid */}
+      {(showFeat("visa_alerts") || showFeat("quick_actions") || showFeat("activity")) ? (
       <div className="adm-btm-grid">
         {/* Visa alerts */}
+        {showFeat("visa_alerts") ? (
         <div className="adm-card">
           <div className="adm-card-h pb-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-amber-200 bg-amber-50">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-              </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <span className="adm-card-title">Visa Expiry Alerts</span>
               <span className="adm-chdr-badge adm-cb-a">{data.expiring_workers.length}</span>
             </div>
@@ -400,11 +518,13 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+        ) : null}
 
         {/* Quick actions */}
+        {showFeat("quick_actions") ? (
         <div className="adm-card">
           <div className="adm-card-h pb-3">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <span className="adm-card-title">Quick Actions</span>
               <span className="adm-chdr-badge adm-cb-b">4</span>
             </div>
@@ -452,14 +572,13 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
+        ) : null}
 
         {/* Activity */}
+        {showFeat("activity") ? (
         <div className="adm-card">
           <div className="adm-card-h pb-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50">
-                <Activity className="h-3.5 w-3.5 text-emerald-600" />
-              </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <span className="adm-card-title">Attention &amp; activity</span>
               <span className="adm-chdr-badge adm-cb-g">{activityItems.length}</span>
             </div>
@@ -487,7 +606,9 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+        ) : null}
       </div>
+      ) : null}
     </div>
   );
 }

@@ -214,6 +214,12 @@ class Organisation(Base):
     onboarding_stage_options: Mapped[list | None] = mapped_column(JSON, nullable=True)
     # Right to work category labels (dropdown on each worker; master list per org)
     rtw_category_options: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Admin-only dashboard note shown in internal dashboard widget
+    dashboard_admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Per-role workers list table column preferences, e.g. {"hr_officer": ["name","email",...]}
+    worker_table_columns_by_role: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Org-wide dashboard section visibility, e.g. ["stats","charts",...]; null = all sections
+    dashboard_features: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -225,6 +231,9 @@ class Organisation(Base):
     org_changes: Mapped[list["OrgChangeLog"]] = relationship(back_populates="organisation", cascade="all, delete-orphan")
     subscriptions: Mapped[list["Subscription"]] = relationship(back_populates="organisation", cascade="all, delete-orphan")
     tenant_invitations: Mapped[list["TenantInvitation"]] = relationship(back_populates="organisation", cascade="all, delete-orphan")
+    dashboard_messages: Mapped[list["DashboardAdminMessage"]] = relationship(
+        back_populates="organisation", cascade="all, delete-orphan"
+    )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -299,6 +308,20 @@ class User(Base):
 
     organisation: Mapped["Organisation"] = relationship(back_populates="users")
     worker: Mapped["Worker | None"] = relationship(back_populates="portal_user", foreign_keys=[worker_id])
+    dashboard_messages: Mapped[list["DashboardAdminMessage"]] = relationship(back_populates="created_by_user")
+
+
+class DashboardAdminMessage(Base):
+    __tablename__ = "dashboard_admin_messages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id"), index=True)
+    created_by_user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    message: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, index=True)
+
+    organisation: Mapped["Organisation"] = relationship(back_populates="dashboard_messages")
+    created_by_user: Mapped["User"] = relationship(back_populates="dashboard_messages")
 
 
 class Subscription(Base):

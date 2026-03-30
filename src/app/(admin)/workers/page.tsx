@@ -24,6 +24,7 @@ import {
   Eye,
   MoreHorizontal,
   UserPlus,
+  SlidersHorizontal,
 } from "lucide-react";
 import "./workers-page.css";
 
@@ -48,6 +49,11 @@ interface Worker {
   created_at: string;
 }
 
+type WorkerTableColumnKey = "name" | "job_title" | "employment" | "status" | "email" | "docs";
+interface WorkerTableColumnsResponse {
+  visible_columns: WorkerTableColumnKey[];
+}
+
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   active: { label: "Active", cls: "wlp-st-active" },
   suspended: { label: "Suspended", cls: "wlp-st-warn" },
@@ -70,6 +76,16 @@ function relativeShort(iso: string): string {
 }
 
 const STAFF_ROLES = ["super_admin", "tenant_admin", "compliance_manager", "hr_officer"];
+const COLUMN_PREF_ROLES = ["super_admin", "tenant_admin", "compliance_manager", "hr_officer"];
+const DEFAULT_WORKER_COLUMNS: WorkerTableColumnKey[] = ["name", "job_title", "employment", "status", "email", "docs"];
+const WORKER_COLUMN_OPTIONS: Array<{ key: WorkerTableColumnKey; label: string }> = [
+  { key: "name", label: "Name" },
+  { key: "job_title", label: "Role" },
+  { key: "employment", label: "Employment" },
+  { key: "status", label: "Sponsor" },
+  { key: "email", label: "Email" },
+  { key: "docs", label: "Docs" },
+];
 
 const API_URL = "/api";
 
@@ -116,12 +132,16 @@ function WorkersPageInner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [visibleColumns, setVisibleColumns] = useState<WorkerTableColumnKey[]>(DEFAULT_WORKER_COLUMNS);
+  const [columnMenuOpen, setColumnMenuOpen] = useState(false);
+  const [savingColumns, setSavingColumns] = useState(false);
   const [starred, setStarred] = useState<Record<string, boolean>>({});
 
   const [compliance, setCompliance] = useState<Record<string, { total: number; verified: number; uploaded: number; rejected: number }>>({});
   const [employmentStatusOptions, setEmploymentStatusOptions] = useState<string[]>(["Active", "Inactive", "Finished"]);
 
   const canManage = user ? STAFF_ROLES.includes(user.role) : false;
+  const canEditTableColumns = user ? COLUMN_PREF_ROLES.includes(user.role) : false;
 
   useEffect(() => {
     try {
@@ -148,6 +168,40 @@ function WorkersPageInner() {
     } catch {
       /* defaults */
     }
+  };
+
+  const fetchWorkerTableColumns = async () => {
+    if (!token) return;
+    try {
+      const resp = await api.get<WorkerTableColumnsResponse>("/organisation/workers-table-columns", token);
+      if (resp.visible_columns?.length) setVisibleColumns(resp.visible_columns);
+      else setVisibleColumns(DEFAULT_WORKER_COLUMNS);
+    } catch {
+      setVisibleColumns(DEFAULT_WORKER_COLUMNS);
+    }
+  };
+
+  const saveWorkerTableColumns = async (next: WorkerTableColumnKey[]) => {
+    if (!token || !canEditTableColumns) return;
+    try {
+      setSavingColumns(true);
+      const resp = await api.patch<WorkerTableColumnsResponse>(
+        "/organisation/workers-table-columns",
+        { visible_columns: next },
+        token
+      );
+      setVisibleColumns(resp.visible_columns?.length ? resp.visible_columns : DEFAULT_WORKER_COLUMNS);
+    } finally {
+      setSavingColumns(false);
+    }
+  };
+
+  const toggleColumn = (key: WorkerTableColumnKey) => {
+    const has = visibleColumns.includes(key);
+    if (has && visibleColumns.length === 1) return;
+    const next = has ? visibleColumns.filter((c) => c !== key) : [...visibleColumns, key];
+    setVisibleColumns(next);
+    void saveWorkerTableColumns(next);
   };
 
   const patchEmploymentStatus = async (workerId: string, value: string) => {
@@ -228,6 +282,7 @@ function WorkersPageInner() {
       fetchStatsWorkers();
       fetchOnLeave();
       fetchEmploymentStatusOptions();
+      fetchWorkerTableColumns();
     }
   }, [token]);
 
@@ -443,6 +498,35 @@ function WorkersPageInner() {
             <List className="h-[14px] w-[14px]" />
           </button>
         </div>
+        {canEditTableColumns && (
+          <div className="relative">
+            <button
+              type="button"
+              className="wlp-tb-filter"
+              onClick={() => setColumnMenuOpen((v) => !v)}
+              aria-label="Choose table columns"
+            >
+              <SlidersHorizontal className="h-[13px] w-[13px] opacity-70" />
+              Columns
+              <ChevronDown className="h-[13px] w-[13px] opacity-50" />
+            </button>
+            {columnMenuOpen && (
+              <div className="absolute right-0 top-[110%] z-20 min-w-[220px] rounded-xl border border-[#E8EEFF] bg-white p-2 shadow-lg">
+                {WORKER_COLUMN_OPTIONS.map((col) => (
+                  <label key={col.key} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[#F8FAFF]">
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns.includes(col.key)}
+                      disabled={savingColumns || (visibleColumns.length === 1 && visibleColumns.includes(col.key))}
+                      onChange={() => toggleColumn(col.key)}
+                    />
+                    <span>{col.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -530,12 +614,12 @@ function WorkersPageInner() {
           <table className="wlp-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Employment</th>
-                <th>Sponsor</th>
-                <th>Email</th>
-                <th>Docs</th>
+                {visibleColumns.includes("name") && <th>Name</th>}
+                {visibleColumns.includes("job_title") && <th>Role</th>}
+                {visibleColumns.includes("employment") && <th>Employment</th>}
+                {visibleColumns.includes("status") && <th>Sponsor</th>}
+                {visibleColumns.includes("email") && <th>Email</th>}
+                {visibleColumns.includes("docs") && <th>Docs</th>}
               </tr>
             </thead>
             <tbody>
@@ -550,9 +634,9 @@ function WorkersPageInner() {
                     className="cursor-pointer"
                     onClick={() => router.push(`/workers/${w.id}?tab=records`)}
                   >
-                    <td className="font-semibold">{w.name}</td>
-                    <td>{w.job_title || "—"}</td>
-                    <td onClick={(e) => e.stopPropagation()}>
+                    {visibleColumns.includes("name") && <td className="font-semibold">{w.name}</td>}
+                    {visibleColumns.includes("job_title") && <td>{w.job_title || "—"}</td>}
+                    {visibleColumns.includes("employment") && <td onClick={(e) => e.stopPropagation()}>
                       {canManage ? (
                         <select
                           className="max-w-[160px] cursor-pointer rounded-lg border border-[#E8EEFF] bg-white px-2 py-1 text-[12px] font-medium text-[#0f1f3a]"
@@ -571,8 +655,8 @@ function WorkersPageInner() {
                       ) : (
                         <span className="text-[12px] font-semibold text-[#334155]">{w.employment_status || "—"}</span>
                       )}
-                    </td>
-                    <td>
+                    </td>}
+                    {visibleColumns.includes("status") && <td>
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
                           w.status === "active"
@@ -584,9 +668,9 @@ function WorkersPageInner() {
                       >
                         {st.label}
                       </span>
-                    </td>
-                    <td className="max-w-[200px] truncate text-[#2563EB]">{w.email || "—"}</td>
-                    <td>{pct !== null ? `${pct}%` : "—"}</td>
+                    </td>}
+                    {visibleColumns.includes("email") && <td className="max-w-[200px] truncate text-[#2563EB]">{w.email || "—"}</td>}
+                    {visibleColumns.includes("docs") && <td>{pct !== null ? `${pct}%` : "—"}</td>}
                   </tr>
                 );
               })}

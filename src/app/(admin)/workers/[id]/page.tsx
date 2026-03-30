@@ -410,6 +410,16 @@ function WorkerDetailInner() {
 
   return (
     <div className="flex w-full min-w-0 max-w-none flex-col gap-0">
+      {canUploadProfilePhoto && (
+        <input
+          ref={profilePhotoInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="sr-only"
+          aria-hidden
+          onChange={handleProfilePhotoSelect}
+        />
+      )}
       <div className="mb-4">
         <Link
           href="/workers"
@@ -432,8 +442,24 @@ function WorkerDetailInner() {
           />
           <div className="relative z-[1] flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
             <div className="flex min-w-0 gap-4">
-              <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xl font-bold ring-2 ring-white/20">
-                {initials}
+              <div className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/10 text-xl font-bold ring-2 ring-white/20">
+                {profilePhotoUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={profilePhotoUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                ) : (
+                  <span className="relative z-[1]">{initials}</span>
+                )}
+                {canUploadProfilePhoto && (
+                  <button
+                    type="button"
+                    disabled={profilePhotoUploading}
+                    onClick={() => profilePhotoInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 z-[2] flex h-8 w-8 items-center justify-center rounded-tl-lg rounded-br-[13px] bg-white/95 text-[#0F2050] shadow-md transition hover:bg-white disabled:opacity-50"
+                    title="Upload or change profile photo"
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               <div className="min-w-0">
                 <h1 className="text-xl font-bold tracking-tight md:text-2xl">{worker.name}</h1>
@@ -453,6 +479,15 @@ function WorkerDetailInner() {
                     {worker.email || "—"}
                     {visaDays != null && ` · Visa ${visaDays}d`}
                   </span>
+                  {canUploadProfilePhoto && (
+                    <button
+                      type="button"
+                      onClick={() => setTab("details")}
+                      className="text-xs font-semibold text-sky-200 underline decoration-white/30 underline-offset-2 hover:text-white"
+                    >
+                      Profile photo and full details
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -512,6 +547,9 @@ function WorkerDetailInner() {
                 <AspectCard title="Profile & contact" subtitle="Identity and how to reach this person" icon={User} barClass="bg-[#2563EB]">
                   <div className="mb-4 flex flex-col gap-4 border-b border-[#F0F4FF] pb-4 sm:flex-row sm:items-start">
                     <div className="flex shrink-0 flex-col items-center gap-2 sm:items-start">
+                      <p className="w-full text-center text-[11px] font-bold uppercase tracking-wide text-[#64748B] sm:text-left">
+                        Profile photo
+                      </p>
                       <div
                         className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl border border-[#E8EEFF] bg-[#F8FAFF] text-2xl font-bold text-[#94A3B8]"
                         style={{ boxShadow: "0 4px 14px rgba(37, 99, 235, 0.08)" }}
@@ -525,13 +563,6 @@ function WorkerDetailInner() {
                       </div>
                       {canUploadProfilePhoto && (
                         <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                          <input
-                            ref={profilePhotoInputRef}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif"
-                            className="hidden"
-                            onChange={handleProfilePhotoSelect}
-                          />
                           <button
                             type="button"
                             disabled={profilePhotoUploading}

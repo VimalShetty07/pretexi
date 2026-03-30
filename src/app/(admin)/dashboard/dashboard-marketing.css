@@ -66,6 +66,34 @@
   margin-top: 3px;
 }
 
+/* Header line + right note box alignment */
+.protexi-adm-shell .protexi-dash-marketing .dash-ph-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-ph-inline .adm-ph-ey,
+.protexi-adm-shell .protexi-dash-marketing .dash-ph-inline .adm-ph-date {
+  margin: 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-ph-inline .adm-ph-title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-ph-right {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: min(440px, 44vw);
+}
+
 .protexi-adm-shell .protexi-dash-marketing .adm-ph-badge {
   display: inline-flex;
   align-items: center;
@@ -100,6 +128,176 @@
 .protexi-adm-shell .protexi-dash-marketing .adm-ph-badge .dash-status-dot {
   width: 4px;
   height: 4px;
+}
+
+/* Dashboard layout page — panel matches admin note / overview cards */
+.protexi-adm-shell .protexi-dash-marketing .dash-customize-panel {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  padding: 20px 20px 24px;
+  max-width: 36rem;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-customize-lead {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/* Admin-only dashboard note */
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  padding: 14px;
+  width: 100%;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note-title {
+  font-family: var(--dash-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dash-navy);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note-meta {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note-save {
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: var(--dash-card);
+  color: var(--dash-navy);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 0;
+  text-transform: uppercase;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note-save:hover:not(:disabled) {
+  background: rgba(26, 79, 160, 0.08);
+  border-color: rgba(26, 79, 160, 0.35);
+  color: var(--dash-blue);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note-save:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note-textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: #fff;
+  color: var(--dash-black);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  border-radius: 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note-textarea:focus {
+  outline: none;
+  border-color: rgba(26, 79, 160, 0.45);
+  box-shadow: 0 0 0 2px rgba(26, 79, 160, 0.12);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note-toast {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #16a34a;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-list {
+  max-height: 250px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+  margin-bottom: 10px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-empty {
+  font-size: 12px;
+  color: #64748b;
+  padding: 10px;
+  border: 1px dashed rgba(0, 0, 0, 0.16);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-item {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-item.mine {
+  border-color: rgba(26, 79, 160, 0.3);
+  background: rgba(26, 79, 160, 0.05);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-author {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dash-navy);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-time {
+  font-size: 10px;
+  color: #64748b;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-msg {
+  font-size: 12px;
+  color: var(--dash-black);
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 1024px) {
+  .protexi-adm-shell .protexi-dash-marketing .dash-ph-right {
+    min-width: 100%;
+    align-items: stretch;
+  }
 }
 
 /* Stat row — tight grid like marketing feature grid */
@@ -483,4 +681,189 @@
 
 .protexi-dash-marketing-error {
   color: #0f2d5e;
+}
+
+/* Portal — My Details (employee) — same surface as dashboard marketing */
+.protexi-adm-shell .protexi-dash-marketing .portal-details-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-dl {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+@media (min-width: 768px) {
+  .protexi-adm-shell .protexi-dash-marketing .portal-dl {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 40px;
+  }
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-dl-row {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 14px 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-dl-label {
+  font-family: var(--dash-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-dl-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dash-black);
+  line-height: 1.35;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-photo-avatar {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  background: var(--dash-card);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--dash-blue);
+  letter-spacing: -0.02em;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-photo-lead {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+  max-width: 32rem;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-photo-btn {
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: var(--dash-card);
+  color: var(--dash-navy);
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 0;
+  text-transform: uppercase;
+  font-family: var(--dash-mono);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-photo-btn:hover:not(:disabled) {
+  background: rgba(26, 79, 160, 0.08);
+  border-color: rgba(26, 79, 160, 0.35);
+  color: var(--dash-blue);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-photo-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-photo-btn-danger {
+  border-color: rgba(220, 38, 38, 0.4);
+  background: #fff;
+  color: #991b1b;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-photo-btn-danger:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(185, 28, 28, 0.55);
+  color: #7f1d1d;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-photo-btn-primary {
+  background: var(--dash-navy);
+  color: #fff;
+  border-color: var(--dash-navy);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-photo-btn-primary:hover:not(:disabled) {
+  background: var(--dash-blue);
+  border-color: var(--dash-blue);
+  color: #fff;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-details-alert {
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  background: #fff;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--dash-navy);
+  margin-bottom: 12px;
+  font-family: var(--dash-mono);
+  letter-spacing: 0.04em;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-details-alert-error {
+  border-style: solid;
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(254, 242, 242, 0.6);
+  color: #991b1b;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-portal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-details-input {
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: #fff;
+  color: var(--dash-black);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  border-radius: 0;
+  font-family: var(--dash-sans);
+  box-sizing: border-box;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-details-input:focus {
+  outline: none;
+  border-color: rgba(26, 79, 160, 0.45);
+  box-shadow: 0 0 0 2px rgba(26, 79, 160, 0.12);
+}
+
+.protexi-adm-shell .protexi-dash-marketing textarea.portal-details-input {
+  min-height: 88px;
+  resize: vertical;
+  font-weight: 500;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .portal-details-save-ok {
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  background: rgba(240, 253, 244, 0.8);
+  color: #166534;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+  font-family: var(--dash-mono);
+  text-transform: uppercase;
 }

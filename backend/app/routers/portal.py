@@ -1,6 +1,6 @@
 """Employee Portal endpoints — accessible by EMPLOYEE role."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import hashlib
 import base64
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
@@ -15,8 +15,19 @@ from app.models.models import (
     DocumentChecklist, ChecklistStatus,
 )
 from app.schemas.schemas import (
-    WorkerDetailOut, DocumentOut, ContactChangeRequest, ContactChangeOut,
-    WorkerRequestOut, NotificationOut,
+    WorkerDetailOut,
+    WorkerOut,
+    DocumentOut,
+    ContactChangeRequest,
+    ContactChangeOut,
+    PortalMeUpdate,
+    WorkerRequestOut,
+    NotificationOut,
+)
+from app.core.profile_photo_storage import (
+    read_and_validate_upload,
+    store_worker_profile_photo,
+    delete_stored_object,
 )
 from app.routers.documents import create_checklist_for_worker
 import boto3
@@ -104,6 +115,46 @@ def _get_employee_worker(current_user: User, db: Session) -> Worker:
 
 # ── My Profile ─────────────────────────────────────────────
 
+def _age_years_from_dob(dob: date | datetime | None) -> int | None:
+    if dob is None:
+        return None
+    d = dob.date() if isinstance(dob, datetime) else dob
+    today = date.today()
+    return today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+
+
+def _worker_detail_out(worker: Worker) -> WorkerDetailOut:
+    out = WorkerDetailOut.model_validate(worker)
+    has_photo = bool(worker.profile_photo_s3_key or worker.profile_photo_data)
+    return out.model_copy(
+        update={"has_profile_photo": has_photo, "age_years": _age_years_from_dob(worker.date_of_birth)}
+    )
+
+
+PORTAL_SELF_UPDATE_FIELDS = frozenset({
+    "first_name",
+    "last_name",
+    "phone",
+    "personal_email",
+    "address",
+    "postal_code",
+    "emergency_contact_name",
+    "emergency_contact_phone",
+    "next_of_kin_name",
+    "next_of_kin_phone",
+})
+
+
+def _rebuild_worker_display_name(worker: Worker) -> None:
+    parts: list[str] = []
+    for key in ("first_name", "second_name", "last_name"):
+        v = getattr(worker, key, None)
+        if v is not None and str(v).strip():
+            parts.append(str(v).strip())
+    if parts:
+        worker.name = " ".join(parts)
+
+
 @router.get("/me", response_model=WorkerDetailOut)
 def get_my_profile(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     worker = _get_employee_worker(current_user, db)
@@ -113,6 +164,104 @@ def get_my_profile(db: Session = Depends(get_db), current_user: User = Depends(g
         details="Worker viewed their sponsorship profile",
     ))
     db.commit()
+    return _worker_detail_out(worker)
+
+
+@router.patch("/me", response_model=WorkerDetailOut)
+def patch_my_profile(
+    payload: PortalMeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    worker = _get_employee_worker(current_user, db)
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        return _worker_detail_out(worker)
+    name_affecting = False
+    for key, raw in data.items():
+        if key not in PORTAL_SELF_UPDATE_FIELDS:
+            continue
+        val: str | None = raw
+        if isinstance(val, str):
+            val = val.strip() or None
+        setattr(worker, key, val)
+        if key in ("first_name", "last_name"):
+            name_affecting = True
+    if name_affecting:
+        _rebuild_worker_display_name(worker)
+    db.add(
+        AuditLog(
+            user_id=current_user.id,
+            user_email=current_user.email,
+            user_role="employee",
+            action="UPDATE",
+            entity_type="worker",
+            entity_id=worker.id,
+            details="Employee updated their profile details",
+        )
+    )
+    db.commit()
+    db.refresh(worker)
+    return _worker_detail_out(worker)
+
+
+@router.post("/me/profile-photo", response_model=WorkerOut)
+async def upload_my_profile_photo(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    worker = _get_employee_worker(current_user, db)
+    raw, mime = await read_and_validate_upload(file)
+    delete_stored_object(worker.profile_photo_s3_key)
+    s3_key, blob = store_worker_profile_photo(
+        organisation_id=current_user.organisation_id,
+        worker_id=worker.id,
+        file_bytes=raw,
+        mime=mime,
+    )
+    worker.profile_photo_s3_key = s3_key
+    worker.profile_photo_mime = mime
+    worker.profile_photo_data = blob
+    db.add(
+        AuditLog(
+            user_id=current_user.id,
+            user_email=current_user.email,
+            user_role="employee",
+            action="UPDATE",
+            entity_type="worker",
+            entity_id=worker.id,
+            details="Employee uploaded their profile photo",
+        )
+    )
+    db.commit()
+    db.refresh(worker)
+    return worker
+
+
+@router.delete("/me/profile-photo", response_model=WorkerOut)
+def delete_my_profile_photo(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    worker = _get_employee_worker(current_user, db)
+    delete_stored_object(worker.profile_photo_s3_key)
+    worker.profile_photo_s3_key = None
+    worker.profile_photo_mime = None
+    worker.profile_photo_data = None
+    db.add(
+        AuditLog(
+            user_id=current_user.id,
+            user_email=current_user.email,
+            user_role="employee",
+            action="UPDATE",
+            entity_type="worker",
+            entity_id=worker.id,
+            details="Employee removed their profile photo",
+        )
+    )
+    db.commit()
+    db.refresh(worker)
     return worker
 
 

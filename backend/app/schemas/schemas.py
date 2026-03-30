@@ -239,6 +239,7 @@ class OrganisationSettingsOut(BaseModel):
     work_location_options: list[str]
     onboarding_stage_options: list[str]
     rtw_category_options: list[str]
+    dashboard_admin_note: str | None = None
 
 
 class OrganisationSettingsPatch(BaseModel):
@@ -247,6 +248,35 @@ class OrganisationSettingsPatch(BaseModel):
     work_location_options: list[str] | None = None
     onboarding_stage_options: list[str] | None = None
     rtw_category_options: list[str] | None = None
+    dashboard_admin_note: str | None = None
+
+
+class DashboardAdminMessageCreate(BaseModel):
+    message: str
+
+
+class DashboardAdminMessageOut(BaseModel):
+    id: str
+    message: str
+    created_at: datetime
+    created_by_user_id: str
+    created_by_name: str
+
+
+class WorkerTableColumnsOut(BaseModel):
+    visible_columns: list[str]
+
+
+class WorkerTableColumnsPatch(BaseModel):
+    visible_columns: list[str]
+
+
+class DashboardFeaturesOut(BaseModel):
+    features: list[str]
+
+
+class DashboardFeaturesPatch(BaseModel):
+    features: list[str]
 
 
 # ═══════════════════════════════════════════════════════════
@@ -739,6 +769,21 @@ class ContactChangeOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PortalMeUpdate(BaseModel):
+    """Fields an employee may update on their own record (not work email or sponsorship data)."""
+
+    first_name: str | None = Field(None, max_length=128)
+    last_name: str | None = Field(None, max_length=128)
+    phone: str | None = Field(None, max_length=50)
+    personal_email: str | None = Field(None, max_length=255)
+    address: str | None = None
+    postal_code: str | None = Field(None, max_length=20)
+    emergency_contact_name: str | None = Field(None, max_length=255)
+    emergency_contact_phone: str | None = Field(None, max_length=50)
+    next_of_kin_name: str | None = Field(None, max_length=255)
+    next_of_kin_phone: str | None = Field(None, max_length=50)
 
 
 # ═══════════════════════════════════════════════════════════
