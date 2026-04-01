@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, BarChart3, BriefcaseBusiness, type LucideIcon, ShieldCheck, TrendingUp } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
-import { AdminDataTable } from "@/components/admin-data-table";
+import "../dashboard/dashboard-marketing.css";
+import "../workers/workers-page.css";
 
 interface DashboardOverview {
   cos_allocated: number;
@@ -15,6 +16,8 @@ interface DashboardOverview {
   cos_forecasted_demand: number;
   cos_projected_demand: number;
 }
+
+const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
 
 export default function ReportsPage() {
   const { token, user } = useAuth();
@@ -38,21 +41,34 @@ export default function ReportsPage() {
     load();
   }, [token]);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading reports...</p>;
-  if (error || !data) return <p className="text-sm text-red-600">{error || "Reports unavailable"}</p>;
+  if (loading)
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>Loading reports…</p>
+      </div>
+    );
+
+  if (error || !data)
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#dc2626]" style={MONO}>{error || "Reports unavailable"}</p>
+      </div>
+    );
+
   const canViewCos = user?.role !== "hr_officer";
 
   if (!canViewCos) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div>
-          <h1 className="admin-page-title">Reports</h1>
-          <p className="admin-page-subtitle" style={{ marginTop: 6 }}>
-            CoS planning reports are restricted for HR role.
-          </p>
+      <div className="protexi-dash-marketing flex flex-col gap-0">
+        <div className="adm-ph">
+          <div>
+            <div className="adm-ph-ey">Analytics</div>
+            <h1 className="adm-ph-title">Reports</h1>
+            <div className="adm-ph-date">CoS planning reports are restricted for HR role</div>
+          </div>
         </div>
-        <div className="data-card" style={{ padding: 16 }}>
-          <p className="text-sm text-[var(--muted-foreground)]">
+        <div className="border border-[rgba(0,0,0,0.07)] bg-white px-5 py-4">
+          <p className="text-[12px] text-[#94a3b8]">
             Contact Super Admin or Compliance Manager if you need CoS allocation and demand reports.
           </p>
         </div>
@@ -64,158 +80,199 @@ export default function ReportsPage() {
   const shortfall90 = Math.max(0, data.cos_forecasted_required - data.cos_available);
   const shortfall12m = Math.max(0, data.cos_projected_required - data.cos_available);
 
+  const tableRows: {
+    label: string;
+    desc: string;
+    current: number;
+    demand: string;
+    gap: number | string;
+    good: boolean;
+    goodLabel: string;
+    badLabel: string;
+  }[] = [
+    {
+      label: "CoS Availability",
+      desc: "Current licence capacity left to allocate",
+      current: data.cos_available,
+      demand: `${data.cos_allocated} allocated / ${data.cos_used} used`,
+      gap: "—",
+      good: data.cos_available > 0,
+      goodLabel: "Healthy",
+      badLabel: "At Risk",
+    },
+    {
+      label: "Forecast (90 days)",
+      desc: "Near-term requirement from active demand",
+      current: data.cos_available,
+      demand: `Need ${data.cos_forecasted_required} · Demand ${data.cos_forecasted_demand}`,
+      gap: shortfall90 > 0 ? shortfall90 : "No gap",
+      good: shortfall90 === 0,
+      goodLabel: "Covered",
+      badLabel: "Shortfall",
+    },
+    {
+      label: "Projection (12 months)",
+      desc: "Year-long planning outlook",
+      current: data.cos_available,
+      demand: `Need ${data.cos_projected_required} · Demand ${data.cos_projected_demand}`,
+      gap: shortfall12m > 0 ? shortfall12m : "No gap",
+      good: shortfall12m === 0,
+      goodLabel: "Covered",
+      badLabel: "Needs Action",
+    },
+  ];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div>
-        <h1 className="admin-page-title">Reports</h1>
-        <p className="admin-page-subtitle" style={{ marginTop: 6 }}>
-          Capacity outlook and risk view for CoS planning.
-        </p>
+    <div className="protexi-dash-marketing flex w-full flex-col gap-0">
+      {/* ── Page header ──────────────────────────────────── */}
+      <div className="adm-ph">
+        <div>
+          <div className="adm-ph-ey">Analytics</div>
+          <h1 className="adm-ph-title">
+            Reports <em className="dash-title-em">CoS</em>
+          </h1>
+          <div className="adm-ph-date">Capacity outlook and risk view for CoS planning</div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4" style={{ gap: 12 }}>
-        <MetricCard
+      {/* ── KPI stat strip ───────────────────────────────── */}
+      <div
+        className="adm-stat-row grid grid-cols-2 md:grid-cols-4"
+        style={{ gap: 2, background: "rgba(0,0,0,0.07)", marginBottom: 16 }}
+      >
+        <MetricTile
           icon={BriefcaseBusiness}
           label="CoS Available"
           value={data.cos_available}
           sub={`Allocated ${data.cos_allocated} · Used ${data.cos_used}`}
-          tone="blue"
+          accent="#1a4fa0"
         />
-        <MetricCard
+        <MetricTile
           icon={TrendingUp}
           label="Utilisation"
           value={`${utilisation}%`}
           sub="Current CoS usage rate"
-          tone="purple"
+          accent="#0f2d5e"
         />
-        <MetricCard
+        <MetricTile
           icon={AlertTriangle}
-          label="90d Shortfall Risk"
+          label="90d Shortfall"
           value={shortfall90}
           sub={`Required ${data.cos_forecasted_required}`}
-          tone={shortfall90 > 0 ? "amber" : "emerald"}
+          accent={shortfall90 > 0 ? "#d97706" : "#16a34a"}
         />
-        <MetricCard
+        <MetricTile
           icon={BarChart3}
-          label="12m Shortfall Risk"
+          label="12m Shortfall"
           value={shortfall12m}
           sub={`Required ${data.cos_projected_required}`}
-          tone={shortfall12m > 0 ? "red" : "emerald"}
+          accent={shortfall12m > 0 ? "#dc2626" : "#16a34a"}
         />
       </div>
 
-      <AdminDataTable
-        headers={["Report Metric", "Current", "Demand Input", "Gap", "Status"]}
-        colSpan={5}
-        loading={false}
-        isEmpty={false}
-        loadingContent=""
-        emptyContent=""
-      >
-        <tr className="border-b border-[var(--border)] hover:bg-brand-50/50 transition-colors">
-          <td style={{ padding: "14px 16px" }}>
-            <p className="font-semibold text-brand-900">CoS Availability</p>
-            <p className="text-xs text-[var(--muted-foreground)]" style={{ marginTop: 2 }}>
-              Current licence capacity left to allocate
-            </p>
-          </td>
-          <td className="text-brand-900 font-semibold" style={{ padding: "14px 16px" }}>{data.cos_available}</td>
-          <td className="text-brand-700" style={{ padding: "14px 16px" }}>{data.cos_allocated} allocated / {data.cos_used} used</td>
-          <td style={{ padding: "14px 16px" }}>-</td>
-          <td style={{ padding: "14px 16px" }}>
-            <StatusPill good={data.cos_available > 0} goodLabel="Healthy" badLabel="At Risk" />
-          </td>
-        </tr>
-
-        <tr className="border-b border-[var(--border)] hover:bg-brand-50/50 transition-colors">
-          <td style={{ padding: "14px 16px" }}>
-            <p className="font-semibold text-brand-900">Forecast (90 days)</p>
-            <p className="text-xs text-[var(--muted-foreground)]" style={{ marginTop: 2 }}>
-              Near-term requirement from active demand
-            </p>
-          </td>
-          <td className="text-brand-900 font-semibold" style={{ padding: "14px 16px" }}>{data.cos_available}</td>
-          <td className="text-brand-700" style={{ padding: "14px 16px" }}>
-            Need {data.cos_forecasted_required} · Demand {data.cos_forecasted_demand}
-          </td>
-          <td className="font-semibold" style={{ padding: "14px 16px", color: shortfall90 > 0 ? "#b45309" : "#047857" }}>
-            {shortfall90 > 0 ? shortfall90 : "No gap"}
-          </td>
-          <td style={{ padding: "14px 16px" }}>
-            <StatusPill good={shortfall90 === 0} goodLabel="Covered" badLabel="Shortfall" />
-          </td>
-        </tr>
-
-        <tr className="hover:bg-brand-50/50 transition-colors">
-          <td style={{ padding: "14px 16px" }}>
-            <p className="font-semibold text-brand-900">Projection (12 months)</p>
-            <p className="text-xs text-[var(--muted-foreground)]" style={{ marginTop: 2 }}>
-              Year-long planning outlook
-            </p>
-          </td>
-          <td className="text-brand-900 font-semibold" style={{ padding: "14px 16px" }}>{data.cos_available}</td>
-          <td className="text-brand-700" style={{ padding: "14px 16px" }}>
-            Need {data.cos_projected_required} · Demand {data.cos_projected_demand}
-          </td>
-          <td className="font-semibold" style={{ padding: "14px 16px", color: shortfall12m > 0 ? "#b91c1c" : "#047857" }}>
-            {shortfall12m > 0 ? shortfall12m : "No gap"}
-          </td>
-          <td style={{ padding: "14px 16px" }}>
-            <StatusPill good={shortfall12m === 0} goodLabel="Covered" badLabel="Needs Action" />
-          </td>
-        </tr>
-      </AdminDataTable>
-
-      <div className="data-card" style={{ padding: 14 }}>
-        <div className="flex items-center" style={{ gap: 8 }}>
-          <ShieldCheck style={{ width: 16, height: 16, color: "#1d4ed8" }} />
-          <p className="text-sm font-semibold text-brand-900">Recommendation</p>
+      {/* ── Planning table ───────────────────────────────── */}
+      <div className="border border-[rgba(0,0,0,0.07)] bg-white" style={{ marginBottom: 16 }}>
+        {/* Table header */}
+        <div className="border-b border-[rgba(0,0,0,0.07)] px-5 py-4 flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center bg-[rgba(26,79,160,0.08)] text-[#1a4fa0]">
+            <BarChart3 className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-[13px] font-bold text-[#0a0a0a]">CoS Planning Detail</p>
+            <p className="text-[11px] text-[#94a3b8]">Availability, forecast and projection breakdown</p>
+          </div>
         </div>
-        <p className="text-sm text-[var(--muted-foreground)]" style={{ marginTop: 8 }}>
-          {shortfall90 > 0 || shortfall12m > 0
-            ? "Demand exceeds available CoS in one or more horizons. Prioritize high-risk sponsorship cases and request additional allocation early."
-            : "Current CoS capacity covers forecasted and projected requirements. Continue weekly monitoring for demand changes."}
-        </p>
+
+        {/* Column headings */}
+        <div
+          className="grid border-b border-[rgba(0,0,0,0.07)] px-5 py-2"
+          style={{ gridTemplateColumns: "2fr 80px 1fr 80px 90px", gap: 12 }}
+        >
+          {["Metric", "Current", "Demand / Input", "Gap", "Status"].map((h) => (
+            <span
+              key={h}
+              className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#94a3b8]"
+              style={MONO}
+            >
+              {h}
+            </span>
+          ))}
+        </div>
+
+        {/* Rows */}
+        {tableRows.map((row, i) => (
+          <div
+            key={row.label}
+            className={`grid items-center px-5 py-3.5 transition-colors hover:bg-[#f8f8f5] ${i < tableRows.length - 1 ? "border-b border-[rgba(0,0,0,0.06)]" : ""}`}
+            style={{ gridTemplateColumns: "2fr 80px 1fr 80px 90px", gap: 12 }}
+          >
+            <div>
+              <p className="text-[13px] font-semibold text-[#0f2d5e]">{row.label}</p>
+              <p className="text-[11px] text-[#94a3b8]">{row.desc}</p>
+            </div>
+            <span className="text-[13px] font-bold text-[#0f2d5e]">{row.current}</span>
+            <span className="text-[11px] text-[#94a3b8]">{row.demand}</span>
+            <span
+              className="text-[12px] font-bold"
+              style={{ color: row.good ? "#16a34a" : row.gap === shortfall12m && !row.good ? "#dc2626" : "#d97706" }}
+            >
+              {row.gap}
+            </span>
+            <StatusPill good={row.good} goodLabel={row.goodLabel} badLabel={row.badLabel} />
+          </div>
+        ))}
+      </div>
+
+      {/* ── Recommendation ───────────────────────────────── */}
+      <div className="border border-[rgba(0,0,0,0.07)] bg-white px-5 py-4 flex items-start gap-4">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center bg-[rgba(26,79,160,0.08)] text-[#1a4fa0]">
+          <ShieldCheck className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-[12px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e]" style={MONO}>
+            Recommendation
+          </p>
+          <p className="mt-1 text-[13px] leading-relaxed text-[#64748b]">
+            {shortfall90 > 0 || shortfall12m > 0
+              ? "Demand exceeds available CoS in one or more horizons. Prioritize high-risk sponsorship cases and request additional allocation early."
+              : "Current CoS capacity covers forecasted and projected requirements. Continue weekly monitoring for demand changes."}
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
-function MetricCard({
+function MetricTile({
   icon: Icon,
   label,
   value,
   sub,
-  tone,
+  accent,
 }: {
   icon: LucideIcon;
   label: string;
   value: number | string;
   sub: string;
-  tone: "blue" | "purple" | "amber" | "red" | "emerald";
+  accent: string;
 }) {
-  const tones = {
-    blue: { bg: "linear-gradient(135deg,#e9f2ff 0%,#dbeafe 100%)", border: "#bfdbfe", text: "#1e3a8a", icon: "#2563eb" },
-    purple: { bg: "linear-gradient(135deg,#f3e8ff 0%,#ede9fe 100%)", border: "#ddd6fe", text: "#5b21b6", icon: "#7c3aed" },
-    amber: { bg: "linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%)", border: "#fde68a", text: "#b45309", icon: "#d97706" },
-    red: { bg: "linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%)", border: "#fecaca", text: "#b91c1c", icon: "#dc2626" },
-    emerald: { bg: "linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%)", border: "#a7f3d0", text: "#047857", icon: "#059669" },
-  }[tone];
-
   return (
-    <div className="rounded-2xl border" style={{ background: tones.bg, borderColor: tones.border, padding: "14px 14px" }}>
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold" style={{ color: tones.text }}>{label}</p>
-        <div className="rounded-lg bg-white/80" style={{ padding: 6 }}>
-          <Icon style={{ width: 14, height: 14, color: tones.icon }} />
+    <div className="bg-white px-5 py-4">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>
+          {label}
+        </p>
+        <div
+          className="flex h-7 w-7 shrink-0 items-center justify-center"
+          style={{ background: `${accent}14` }}
+        >
+          <Icon style={{ width: 14, height: 14, color: accent }} />
         </div>
       </div>
-      <p className="admin-value-number" style={{ marginTop: 8, fontSize: 30, color: tones.text }}>
+      <p className="mt-1 text-[26px] font-extrabold tracking-tight" style={{ color: accent }}>
         {value}
       </p>
-      <p className="text-xs" style={{ marginTop: 4, color: tones.text, opacity: 0.85 }}>
-        {sub}
-      </p>
+      <p className="mt-0.5 text-[10px] leading-snug text-[#94a3b8]">{sub}</p>
     </div>
   );
 }
@@ -223,12 +280,12 @@ function MetricCard({
 function StatusPill({ good, goodLabel, badLabel }: { good: boolean; goodLabel: string; badLabel: string }) {
   return (
     <span
-      className="inline-flex items-center rounded-full font-medium"
+      className="inline-flex items-center px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.07em]"
       style={{
-        padding: "3px 10px",
-        fontSize: 12,
-        background: good ? "#ecfdf5" : "#fef2f2",
-        color: good ? "#047857" : "#b91c1c",
+        fontFamily: "var(--dash-mono)",
+        background: good ? "#f0fdf4" : "#fef2f2",
+        color: good ? "#166534" : "#dc2626",
+        border: `1px solid ${good ? "rgba(22,163,74,0.25)" : "rgba(220,38,38,0.25)"}`,
       }}
     >
       {good ? goodLabel : badLabel}

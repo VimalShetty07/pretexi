@@ -18,6 +18,7 @@ interface FormData {
   department: string;
   soc_code: string;
   salary: string;
+  right_to_work_category: string;
   route: string;
   work_location: string;
   start_date: string;
@@ -73,6 +74,7 @@ const INITIAL: FormData = {
   department: "",
   soc_code: "",
   salary: "",
+  right_to_work_category: "",
   route: "Skilled Worker",
   work_location: "",
   start_date: "",
@@ -146,6 +148,15 @@ export default function NewWorkerPage() {
   const { token } = useAuth();
   const [form, setForm] = useState<FormData>(INITIAL);
   const [employmentOptions, setEmploymentOptions] = useState<string[]>(["Active", "Inactive", "Finished"]);
+  const RTW_CATEGORY_OPTIONS_FALLBACK = [
+    "British Citizen",
+    "Irish Citizen",
+    "ILR / Settled Status",
+    "Pre-settled Status",
+    "Visa – Sponsored Worker",
+    "Visa – Non-Sponsored Worker",
+  ];
+  const [rtwCategoryOptions, setRtwCategoryOptions] = useState<string[]>(RTW_CATEGORY_OPTIONS_FALLBACK);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -153,8 +164,12 @@ export default function NewWorkerPage() {
     if (!token) return;
     (async () => {
       try {
-        const s = await api.get<{ employment_status_options: string[] }>("/organisation/settings", token);
+        const s = await api.get<{ employment_status_options: string[]; rtw_category_options: string[] }>(
+          "/organisation/settings",
+          token
+        );
         if (s.employment_status_options?.length) setEmploymentOptions(s.employment_status_options);
+        if (s.rtw_category_options?.length) setRtwCategoryOptions(s.rtw_category_options);
       } catch {
         /* defaults */
       }
@@ -229,6 +244,7 @@ export default function NewWorkerPage() {
       optStr("employee_type", form.employee_type);
       optStr("work_address", form.work_address);
       optStr("sponsorship_number", form.sponsorship_number);
+      optStr("right_to_work_category", form.right_to_work_category);
       optStr("bank_account_number", form.bank_account_number);
       optStr("sort_code", form.sort_code);
       optStr("brp_reference", form.brp_reference);
@@ -452,6 +468,21 @@ export default function NewWorkerPage() {
             Sponsorship &amp; Visa
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 18 }}>
+            <Field label="Right to work category">
+              <select
+                value={form.right_to_work_category}
+                onChange={set("right_to_work_category")}
+                className={`${inputClass} cursor-pointer`}
+                style={{ height: 40, padding: "0 14px" }}
+              >
+                <option value="">Select...</option>
+                {rtwCategoryOptions.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="Type of Visa">
               <select value={form.route} onChange={set("route")} className={`${inputClass} cursor-pointer`} style={{ height: 40, padding: "0 14px" }}>
                 {ROUTES.map((r) => <option key={r} value={r}>{r}</option>)}

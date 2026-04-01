@@ -445,6 +445,7 @@ class WorkerOut(BaseModel):
     hr_onboarding_stage: str | None = None
     right_to_work_category: str | None = None
     created_at: datetime
+    has_profile_photo: bool = False
 
     class Config:
         from_attributes = True

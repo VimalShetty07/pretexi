@@ -17,13 +17,12 @@ DEFAULT_ONBOARDING_STAGES = [
 
 # Master list for "Right to work category" — employer-facing labels; tenants may customise in Organisation settings.
 DEFAULT_RTW_CATEGORIES = [
-    "British or Irish citizen",
-    "Indefinite leave to remain or settled status",
-    "Limited leave to remain (time-limited permission)",
-    "EU Settlement Scheme (settled or pre-settled)",
-    "Skilled Worker / other points-based route",
-    "Student — with permitted work",
-    "Other / pending verification",
+    "British Citizen",
+    "Irish Citizen",
+    "ILR / Settled Status",
+    "Pre-settled Status",
+    "Visa – Sponsored Worker",
+    "Visa – Non-Sponsored Worker",
 ]
 
 

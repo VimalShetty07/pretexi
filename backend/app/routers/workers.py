@@ -133,9 +133,10 @@ def _sync_hr_stage_to_enum(worker: Worker) -> None:
 
 def _maybe_redact_worker_list(worker: Worker, user: User) -> WorkerOut:
     w = WorkerOut.model_validate(worker)
+    has_photo = bool(worker.profile_photo_s3_key or worker.profile_photo_data)
     if user.role in MANAGER_NO_PAYROLL:
-        return w.model_copy(update={"salary": None})
-    return w
+        return w.model_copy(update={"salary": None, "has_profile_photo": has_photo})
+    return w.model_copy(update={"has_profile_photo": has_photo})
 
 
 def _maybe_redact_worker_detail(worker: Worker, user: User) -> WorkerDetailOut:

@@ -59,13 +59,12 @@ const DEFAULT_DEPARTMENTS = ["Operations", "People", "Finance", "Engineering", "
 const DEFAULT_WORK_LOCATIONS = ["London HQ", "Manchester Office", "Remote", "Hybrid — UK"];
 const DEFAULT_ONBOARDING_STAGES = ["Recruitment", "CoS assignment", "Pre-start", "Active sponsorship"];
 const DEFAULT_RTW_CATEGORIES = [
-  "British or Irish citizen",
-  "Indefinite leave to remain or settled status",
-  "Limited leave to remain (time-limited permission)",
-  "EU Settlement Scheme (settled or pre-settled)",
-  "Skilled Worker / other points-based route",
-  "Student — with permitted work",
-  "Other / pending verification",
+  "British Citizen",
+  "Irish Citizen",
+  "ILR / Settled Status",
+  "Pre-settled Status",
+  "Visa – Sponsored Worker",
+  "Visa – Non-Sponsored Worker",
 ];
 
 interface OrgSettingsResponse {
