@@ -5,7 +5,9 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.email import send_tenant_admin_invite_email
 from app.core.security import hash_password
 from app.models.models import (
     Organisation,
@@ -200,6 +202,15 @@ def create_organisation(
     db.add(invitation)
     db.commit()
 
+    settings = get_settings()
+    send_tenant_admin_invite_email(
+        settings,
+        to_email=admin_user.email,
+        organisation_name=organisation.name,
+        invite_token=token,
+        is_resend=False,
+    )
+
     return PlatformOrganisationDetail(
         id=organisation.id,
         name=organisation.name,
@@ -365,6 +376,15 @@ def resend_invite(
     )
     db.add(invite)
     db.commit()
+
+    settings = get_settings()
+    send_tenant_admin_invite_email(
+        settings,
+        to_email=admin.email,
+        organisation_name=organisation.name,
+        invite_token=token,
+        is_resend=True,
+    )
 
     return {
         "message": "Invitation token regenerated",

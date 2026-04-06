@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
 import {
@@ -13,7 +13,10 @@ import {
   MessageSquare,
   ChevronDown,
   ChevronRight,
+  ListChecks,
 } from "lucide-react";
+import "../../dashboard/dashboard-marketing.css";
+import "../../workers/workers-page.css";
 
 interface DocFile {
   id: string;
@@ -38,15 +41,27 @@ interface ChecklistItem {
   documents: DocFile[];
 }
 
-const STATUS_BADGES: Record<string, { label: string; color: string; bg: string }> = {
-  not_started: { label: "Not Started", color: "text-gray-600", bg: "bg-gray-100" },
-  uploaded: { label: "Uploaded", color: "text-blue-700", bg: "bg-blue-50" },
-  verified: { label: "Verified", color: "text-emerald-700", bg: "bg-emerald-50" },
-  rejected: { label: "Rejected", color: "text-red-700", bg: "bg-red-50" },
-  not_applicable: { label: "N/A", color: "text-gray-500", bg: "bg-gray-50" },
-};
-
 const API_URL = "/api";
+
+const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
+
+function itemStatusPill(status: ChecklistItem["status"]) {
+  const map: Record<string, string> = {
+    not_started: "border-[rgba(0,0,0,0.12)] bg-[#f8fafc] text-[#64748b]",
+    uploaded: "border-[rgba(26,79,160,0.25)] bg-[rgba(26,79,160,0.08)] text-[#0f2d5e]",
+    verified: "border-[rgba(22,163,74,0.35)] bg-[#f0fdf4] text-[#166534]",
+    rejected: "border-[rgba(220,38,38,0.35)] bg-[rgba(254,242,242,0.85)] text-[#991b1b]",
+    not_applicable: "border-[rgba(0,0,0,0.1)] bg-[#f1f5f9] text-[#64748b]",
+  };
+  const label: Record<string, string> = {
+    not_started: "Not started",
+    uploaded: "Uploaded",
+    verified: "Verified",
+    rejected: "Rejected",
+    not_applicable: "N/A",
+  };
+  return { cls: map[status] ?? map.not_started, label: label[status] ?? status };
+}
 
 export default function PortalDocumentsPage() {
   const { token, user } = useAuth();
@@ -62,8 +77,10 @@ export default function PortalDocumentsPage() {
   const [filter, setFilter] = useState<string>("all");
 
   const fetchChecklist = useCallback(async () => {
+    if (!token) return;
     try {
-      const data = await api.get<ChecklistItem[]>("/portal/checklist", token ?? undefined);
+      setError("");
+      const data = await api.get<ChecklistItem[]>("/portal/checklist", token);
       setItems(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load checklist");
@@ -73,8 +90,13 @@ export default function PortalDocumentsPage() {
   }, [token]);
 
   useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     fetchChecklist();
-  }, [fetchChecklist]);
+  }, [token, fetchChecklist]);
 
   const authHeaders = (): Record<string, string> => {
     const h: Record<string, string> = {};
@@ -153,10 +175,33 @@ export default function PortalDocumentsPage() {
     setViewing({ name: fileName, url, mime: blob.type || "application/pdf", watermark: wm });
   };
 
+  const todayStr = useMemo(
+    () =>
+      new Date().toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }),
+    []
+  );
+
+  if (!token) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
+          Sign in to manage your documents.
+        </p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center" style={{ padding: 80 }}>
-        <Loader2 className="animate-spin text-brand-500" style={{ width: 24, height: 24 }} />
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
+          Loading your checklist…
+        </p>
       </div>
     );
   }
@@ -167,28 +212,35 @@ export default function PortalDocumentsPage() {
   const notStarted = items.length - completed - uploaded - rejected;
   const pct = items.length > 0 ? Math.round((completed / items.length) * 100) : 0;
 
-  const filtered = filter === "all"
-    ? items
-    : items.filter((i) => {
-        if (filter === "pending") return i.status === "not_started";
-        if (filter === "rejected") return i.status === "rejected";
-        if (filter === "uploaded") return i.status === "uploaded";
-        if (filter === "verified") return i.status === "verified" || i.status === "not_applicable";
-        return true;
-      });
+  const filtered =
+    filter === "all"
+      ? items
+      : items.filter((i) => {
+          if (filter === "pending") return i.status === "not_started";
+          if (filter === "rejected") return i.status === "rejected";
+          if (filter === "uploaded") return i.status === "uploaded";
+          if (filter === "verified") return i.status === "verified" || i.status === "not_applicable";
+          return true;
+        });
+
+  const setFilterToggle = (key: string) => {
+    if (key === "all") setFilter("all");
+    else setFilter(filter === key ? "all" : key);
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div className="protexi-dash-marketing flex flex-col gap-0">
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 text-red-700" style={{ padding: "10px 12px", fontSize: 13 }}>
+        <div className="mb-3 border border-red-200 bg-red-50 text-red-700" style={{ padding: "10px 12px", fontSize: 12, ...MONO }}>
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700" style={{ padding: "10px 12px", fontSize: 13 }}>
+        <div className="mb-3 border border-emerald-200 bg-emerald-50 text-emerald-700" style={{ padding: "10px 12px", fontSize: 12, ...MONO }}>
           {success}
         </div>
       )}
+
       <input
         ref={fileInputRef}
         type="file"
@@ -197,252 +249,287 @@ export default function PortalDocumentsPage() {
         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls"
       />
 
-      <div className="data-card" style={{ padding: 16 }}>
-        <div className="flex items-start justify-between flex-wrap" style={{ gap: 12 }}>
-          <div>
-            <h1 className="admin-page-title">My Documents</h1>
-            <p className="admin-page-subtitle" style={{ marginTop: 6 }}>
-              Upload your compliance documents. HR reviews and verifies each item.
-            </p>
-          </div>
-          <div
-            className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700"
-            style={{ padding: "10px 12px", minWidth: 120, textAlign: "center" }}
+      <div className="adm-ph adm-ph-portal">
+        <div className="min-w-0">
+          <div className="adm-ph-ey">Employee portal</div>
+          <h1 className="adm-ph-title">
+            My <em className="dash-title-em">documents</em>
+          </h1>
+          <div className="adm-ph-date">{todayStr}</div>
+          <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-[#64748b]">
+            Upload compliance documents for each checklist item. HR reviews and verifies uploads.
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <span
+            className="adm-ph-badge inline-flex min-w-[100px] flex-col items-center border border-[rgba(22,163,74,0.3)] bg-[#f0fdf4] px-3 py-2 text-[#166534]"
+            style={MONO}
           >
-            <p className="text-[11px] font-semibold uppercase tracking-wide">Completion</p>
-            <p className="text-xl font-bold" style={{ marginTop: 2 }}>{pct}%</p>
+            <span className="text-[9px] font-bold uppercase tracking-[0.1em] opacity-80">Completion</span>
+            <span className="text-xl font-extrabold tabular-nums">{pct}%</span>
+          </span>
+        </div>
+      </div>
+
+      <div
+        className="adm-stat-row grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+        style={{ gap: 2, background: "rgba(0,0,0,0.07)", marginBottom: 16 }}
+      >
+        <button
+          type="button"
+          onClick={() => setFilter("all")}
+          className={`adm-sc adm-sc-b bg-white px-3 py-4 text-left transition-shadow ${filter === "all" ? "ring-2 ring-[var(--dash-blue)] ring-offset-2" : ""}`}
+        >
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-b">
+              <ListChecks className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">All</span>
+          </div>
+          <div className="adm-sc-num">{items.length}</div>
+          <div className="adm-sc-lbl">Items</div>
+          <div className="adm-sc-sub">Full checklist</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterToggle("pending")}
+          className={`adm-sc adm-sc-a bg-white px-3 py-4 text-left transition-shadow ${filter === "pending" ? "ring-2 ring-[var(--dash-blue)] ring-offset-2" : ""}`}
+        >
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-a">
+              <Upload className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">Todo</span>
+          </div>
+          <div className="adm-sc-num">{notStarted}</div>
+          <div className="adm-sc-lbl">Pending upload</div>
+          <div className="adm-sc-sub">Not started</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterToggle("uploaded")}
+          className={`adm-sc adm-sc-a bg-white px-3 py-4 text-left transition-shadow ${filter === "uploaded" ? "ring-2 ring-[var(--dash-blue)] ring-offset-2" : ""}`}
+        >
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-a">
+              <FileText className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">Queue</span>
+          </div>
+          <div className="adm-sc-num">{uploaded}</div>
+          <div className="adm-sc-lbl">Awaiting review</div>
+          <div className="adm-sc-sub">With HR</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterToggle("rejected")}
+          className={`adm-sc adm-sc-r bg-white px-3 py-4 text-left transition-shadow ${filter === "rejected" ? "ring-2 ring-[var(--dash-blue)] ring-offset-2" : ""}`}
+        >
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-r">
+              <XCircle className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">Fix</span>
+          </div>
+          <div className="adm-sc-num">{rejected}</div>
+          <div className="adm-sc-lbl">Rejected</div>
+          <div className="adm-sc-sub">Re-upload needed</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterToggle("verified")}
+          className={`adm-sc adm-sc-b bg-white px-3 py-4 text-left sm:col-span-3 lg:col-span-1 ${filter === "verified" ? "ring-2 ring-[var(--dash-blue)] ring-offset-2" : ""}`}
+        >
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-b">
+              <CheckCircle2 className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">OK</span>
+          </div>
+          <div className="adm-sc-num">{completed}</div>
+          <div className="adm-sc-lbl">Verified / N/A</div>
+          <div className="adm-sc-sub">Complete</div>
+        </button>
+      </div>
+
+      <div className="wem-surface">
+        <div className="wem-toolbar">
+          <span className="flex items-center gap-2 text-[11px] font-extrabold text-[#0a0a0a]">
+            <ListChecks className="h-4 w-4 text-[var(--dash-blue)]" />
+            Overall progress
+          </span>
+          <span className="wem-badge-mono" style={MONO}>
+            {completed}/{items.length} complete
+          </span>
+        </div>
+        <div className="border-t border-[rgba(0,0,0,0.07)] bg-white px-4 py-3">
+          <div className="h-2 overflow-hidden bg-[rgba(0,0,0,0.06)]">
+            <div className="h-full bg-[var(--dash-blue)] transition-[width] duration-300" style={{ width: `${pct}%` }} />
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: 10 }}>
-        <SummaryCard
-          label="Pending Upload"
-          value={notStarted}
-          active={filter === "pending"}
-          tone="gray"
-          onClick={() => setFilter(filter === "pending" ? "all" : "pending")}
-        />
-        <SummaryCard
-          label="Awaiting Review"
-          value={uploaded}
-          active={filter === "uploaded"}
-          tone="blue"
-          onClick={() => setFilter(filter === "uploaded" ? "all" : "uploaded")}
-        />
-        <SummaryCard
-          label="Rejected"
-          value={rejected}
-          active={filter === "rejected"}
-          tone="red"
-          onClick={() => setFilter(filter === "rejected" ? "all" : "rejected")}
-        />
-        <SummaryCard
-          label="Verified"
-          value={completed}
-          active={filter === "verified"}
-          tone="green"
-          onClick={() => setFilter(filter === "verified" ? "all" : "verified")}
-        />
-      </div>
-
-      <div className="data-card" style={{ padding: 12 }}>
-        <div>
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-              Progress
-            </p>
-            <p className="text-xs font-semibold text-brand-700">{completed}/{items.length} complete</p>
-          </div>
-          <div className="rounded-full bg-gray-100 overflow-hidden" style={{ height: 8, marginTop: 8 }}>
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${pct}%`,
-                background: pct === 100 ? "#10b981" : pct >= 50 ? "#3b82f6" : "#f59e0b",
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Rejected banner */}
       {rejected > 0 && filter === "all" && (
         <div
-          className="flex items-center rounded-xl bg-red-50 border border-red-200 text-red-800"
-          style={{ padding: "12px 18px", marginBottom: 16, gap: 10, fontSize: 13 }}
+          className="mt-3 flex items-center gap-2 border border-red-200 bg-red-50 px-3 py-2.5 text-[12px] text-red-800"
+          style={MONO}
         >
-          <XCircle style={{ width: 16, height: 16 }} className="shrink-0" />
-          <span><strong>{rejected}</strong> document{rejected !== 1 ? "s" : ""} rejected — please re-upload with corrections.</span>
+          <XCircle className="h-4 w-4 shrink-0" />
+          <span>
+            <strong>{rejected}</strong> document{rejected !== 1 ? "s" : ""} rejected — please re-upload with corrections.
+          </span>
         </div>
       )}
 
-      <div className="flex items-center flex-wrap" style={{ gap: 8 }}>
-        {[
-          { id: "all", label: "All" },
-          { id: "pending", label: "Pending" },
-          { id: "uploaded", label: "Uploaded" },
-          { id: "rejected", label: "Rejected" },
-          { id: "verified", label: "Verified" },
-        ].map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            onClick={() => setFilter(f.id)}
-            className={`rounded-full text-xs font-semibold transition-colors ${
-              filter === f.id
-                ? "bg-brand-600 text-white"
-                : "border border-[var(--border)] bg-white text-gray-700 hover:bg-gray-50"
-            }`}
-            style={{ padding: "6px 12px" }}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Checklist Items */}
-      <div className="space-y-2">
-        {filtered.map((item) => {
-          const badge = STATUS_BADGES[item.status] ?? STATUS_BADGES.not_started;
-          const isExpanded = expandedId === item.id;
-          const isUploading = uploading === item.id;
-
-          return (
-            <div key={item.id} className="bg-white rounded-xl border border-[var(--border)] overflow-hidden">
-              {/* Row header */}
-              <button
-                type="button"
-                className="w-full flex items-center text-left cursor-pointer hover:bg-brand-50/40 transition-colors"
-                style={{ padding: "13px 16px", gap: 12 }}
-                onClick={() => setExpandedId(isExpanded ? null : item.id)}
-              >
-                {isExpanded ? (
-                  <ChevronDown style={{ width: 16, height: 16 }} className="text-gray-400 shrink-0" />
-                ) : (
-                  <ChevronRight style={{ width: 16, height: 16 }} className="text-gray-400 shrink-0" />
-                )}
-
-                <span className="text-xs font-bold text-brand-500 shrink-0" style={{ width: 28 }}>
-                  #{item.item_number}
-                </span>
-
-                <span className="text-sm text-brand-900 flex-1">{item.description}</span>
-
-                <span
-                  className={`inline-flex items-center rounded-full text-xs font-medium shrink-0 ${badge.color} ${badge.bg}`}
-                  style={{ padding: "3px 10px" }}
-                >
-                  {badge.label}
-                </span>
+      <div className="mt-4 wem-surface">
+        <div className="wem-toolbar flex-wrap">
+          <span className="wem-badge-mono" style={MONO}>
+            {filtered.length} shown
+          </span>
+          <div className="wlp-filter-group flex-wrap">
+            {[
+              { id: "all", label: "All" },
+              { id: "pending", label: "Pending" },
+              { id: "uploaded", label: "Uploaded" },
+              { id: "rejected", label: "Rejected" },
+              { id: "verified", label: "Verified" },
+            ].map((f) => (
+              <button key={f.id} type="button" onClick={() => setFilter(f.id)} className={`wlp-filter-chip ${filter === f.id ? "act" : ""}`}>
+                {f.label}
               </button>
+            ))}
+          </div>
+        </div>
 
-              {/* Expanded content */}
-              {isExpanded && (
-                <div className="border-t border-[var(--border)] bg-gray-50" style={{ padding: "16px 20px" }}>
-                  {/* Uploaded documents */}
-                  {item.documents.length > 0 && (
-                    <div style={{ marginBottom: 16 }}>
-                      <h4 className="text-xs font-semibold text-brand-800 uppercase" style={{ marginBottom: 8 }}>
-                        Uploaded Documents
-                      </h4>
-                      <div className="space-y-2">
-                        {item.documents.map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="flex items-center bg-white rounded-lg border border-[var(--border)]"
-                            style={{ padding: "10px 14px", gap: 10 }}
-                          >
-                            <FileText style={{ width: 16, height: 16 }} className="text-brand-500 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-brand-900 truncate">{doc.file_name}</div>
-                              <div className="text-xs text-[var(--muted-foreground)]">
-                                Uploaded {doc.upload_date ? `on ${new Date(doc.upload_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}` : ""}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleView(item.id, doc.id, doc.file_name)}
-                              className="flex items-center rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors cursor-pointer"
-                              style={{ padding: "6px 10px", gap: 4, fontSize: 12 }}
+        <div className="space-y-2 border-t border-[rgba(0,0,0,0.07)] bg-[var(--dash-cream)] p-3">
+          {filtered.map((item) => {
+            const pill = itemStatusPill(item.status);
+            const isExpanded = expandedId === item.id;
+            const isUploading = uploading === item.id;
+
+            return (
+              <div key={item.id} className="overflow-hidden border border-[rgba(0,0,0,0.08)] bg-white">
+                <button
+                  type="button"
+                  className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[rgba(26,79,160,0.04)]"
+                  onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4 shrink-0 text-[#94a3b8]" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[#94a3b8]" />
+                  )}
+                  <span className="w-7 shrink-0 text-[11px] font-bold text-[var(--dash-blue)]" style={MONO}>
+                    #{item.item_number}
+                  </span>
+                  <span className="min-w-0 flex-1 text-[13px] font-medium text-[#0a0a0a]">{item.description}</span>
+                  <span
+                    className={`inline-flex shrink-0 border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.07em] ${pill.cls}`}
+                    style={MONO}
+                  >
+                    {pill.label}
+                  </span>
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-[rgba(0,0,0,0.07)] bg-[#f8fafc] px-4 py-4">
+                    {item.documents.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="mb-2 text-[9px] font-bold uppercase tracking-[0.1em] text-[#64748b]" style={MONO}>
+                          Uploaded files
+                        </h4>
+                        <div className="space-y-2">
+                          {item.documents.map((doc) => (
+                            <div
+                              key={doc.id}
+                              className="flex flex-wrap items-center gap-2 border border-[rgba(0,0,0,0.08)] bg-white px-3 py-2 sm:flex-nowrap"
                             >
-                              <Eye style={{ width: 13, height: 13 }} /> View
-                            </button>
-                          </div>
-                        ))}
+                              <FileText className="h-4 w-4 shrink-0 text-[var(--dash-blue)]" />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-[13px] font-semibold text-[#0a0a0a]">{doc.file_name}</div>
+                                <div className="text-[11px] text-[#94a3b8]" style={MONO}>
+                                  {doc.upload_date
+                                    ? `Uploaded ${new Date(doc.upload_date).toLocaleDateString("en-GB", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })}`
+                                    : "Uploaded"}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleView(item.id, doc.id, doc.file_name)}
+                                className="inline-flex h-8 shrink-0 items-center gap-1.5 border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]"
+                                style={MONO}
+                              >
+                                <Eye className="h-3 w-3" /> View
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Rejection reason */}
-                  {item.status === "rejected" && item.rejection_reason && (
-                    <div
-                      className="rounded-lg bg-red-50 border border-red-200 text-red-800"
-                      style={{ padding: "10px 14px", fontSize: 13, marginBottom: 16 }}
-                    >
-                      <strong>Rejection reason:</strong> {item.rejection_reason}
-                    </div>
-                  )}
+                    {item.status === "rejected" && item.rejection_reason && (
+                      <div className="mb-4 border border-[rgba(220,38,38,0.35)] bg-[rgba(254,242,242,0.85)] px-3 py-2 text-[12px] text-[#991b1b]">
+                        <strong style={MONO}>Rejection reason:</strong> {item.rejection_reason}
+                      </div>
+                    )}
 
-                  {/* Verified info */}
-                  {item.status === "verified" && item.verified_by && (
-                    <div
-                      className="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800"
-                      style={{ padding: "10px 14px", fontSize: 13, marginBottom: 16 }}
-                    >
-                      <CheckCircle2 style={{ width: 14, height: 14, display: "inline", marginRight: 4 }} />
-                      Verified by {item.verified_by}
-                      {item.verified_at && ` on ${new Date(item.verified_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`}
-                    </div>
-                  )}
+                    {item.status === "verified" && item.verified_by && (
+                      <div className="mb-4 border border-[rgba(22,163,74,0.35)] bg-[#f0fdf4] px-3 py-2 text-[12px] text-[#166534]">
+                        <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />
+                        Verified by {item.verified_by}
+                        {item.verified_at &&
+                          ` on ${new Date(item.verified_at).toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}`}
+                      </div>
+                    )}
 
-                  {/* Notes */}
-                  {item.notes && (
-                    <div
-                      className="rounded-lg bg-blue-50 border border-blue-200 text-blue-800"
-                      style={{ padding: "10px 14px", fontSize: 13, marginBottom: 16 }}
-                    >
-                      <MessageSquare style={{ width: 14, height: 14, display: "inline", marginRight: 4 }} />
-                      {item.notes}
-                    </div>
-                  )}
+                    {item.notes && (
+                      <div className="mb-4 border border-[rgba(26,79,160,0.2)] bg-[rgba(26,79,160,0.05)] px-3 py-2 text-[12px] text-[#0f2d5e]">
+                        <MessageSquare className="mr-1 inline h-3.5 w-3.5" />
+                        {item.notes}
+                      </div>
+                    )}
 
-                  {/* Upload button */}
-                  {item.status !== "verified" && item.status !== "not_applicable" && (
-                    <button
-                      type="button"
-                      onClick={() => handleUploadClick(item.id)}
-                      disabled={isUploading}
-                      className="inline-flex items-center rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 transition-colors cursor-pointer"
-                      style={{ padding: "7px 14px", gap: 6, fontSize: 13 }}
-                    >
-                      {isUploading ? (
-                        <Loader2 className="animate-spin" style={{ width: 14, height: 14 }} />
-                      ) : (
-                        <Upload style={{ width: 14, height: 14 }} />
-                      )}
-                      {item.documents.length > 0 ? "Re-upload Document" : "Upload Document"}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                    {item.status !== "verified" && item.status !== "not_applicable" && (
+                      <button
+                        type="button"
+                        onClick={() => handleUploadClick(item.id)}
+                        disabled={isUploading}
+                        className="inline-flex h-9 items-center gap-2 border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-4 text-[9px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0] disabled:opacity-50"
+                        style={MONO}
+                      >
+                        {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                        {item.documents.length > 0 ? "Re-upload document" : "Upload document"}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {filtered.length === 0 && (
-        <div className="text-center bg-white rounded-xl border border-[var(--border)]" style={{ padding: 40 }}>
-          <CheckCircle2 className="mx-auto text-emerald-500" style={{ width: 32, height: 32, marginBottom: 8 }} />
-          <p className="text-sm text-[var(--muted-foreground)]">
-            {filter === "all" ? "No checklist items found." : `No ${filter} items.`}
-          </p>
+        <div className="mt-4 flex flex-col items-center justify-center border border-[rgba(0,0,0,0.08)] bg-white py-14">
+          <div className="adm-ae-icon">
+            <CheckCircle2 className="h-5 w-5" />
+          </div>
+          <div className="adm-ae-t mt-3">{filter === "all" ? "No checklist items" : `No ${filter} items`}</div>
+          <div className="adm-ae-s">Try another filter or contact HR if this looks wrong.</div>
           {filter !== "all" && (
             <button
               type="button"
               onClick={() => setFilter("all")}
-              className="mt-3 rounded-lg border border-[var(--border)] bg-white text-xs text-brand-700 hover:bg-gray-50"
-              style={{ padding: "6px 10px" }}
+              className="mt-4 h-8 border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[#f8fafc]"
+              style={MONO}
             >
               Show all items
             </button>
@@ -452,8 +539,7 @@ export default function PortalDocumentsPage() {
 
       {viewing && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: "rgba(12, 20, 36, 0.62)" }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               URL.revokeObjectURL(viewing.url);
@@ -462,11 +548,13 @@ export default function PortalDocumentsPage() {
           }}
           onContextMenu={(e) => e.preventDefault()}
         >
-          <div className="bg-white rounded-2xl border border-[var(--border)] shadow-xl w-full" style={{ maxWidth: 960, height: "88vh", padding: 12 }}>
-            <div className="flex items-center justify-between" style={{ gap: 8, marginBottom: 8 }}>
-              <div>
-                <p className="text-sm font-semibold text-brand-900">{viewing.name}</p>
-                <p className="text-xs text-[var(--muted-foreground)]">View only. Download is disabled.</p>
+          <div className="flex h-[88vh] w-full max-w-[960px] flex-col border border-[rgba(0,0,0,0.1)] bg-white shadow-lg">
+            <div className="flex items-center justify-between gap-2 border-b border-[rgba(0,0,0,0.07)] px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-bold text-[#0a0a0a]">{viewing.name}</p>
+                <p className="text-[10px] text-[#64748b]" style={MONO}>
+                  View only · download disabled
+                </p>
               </div>
               <button
                 type="button"
@@ -474,59 +562,37 @@ export default function PortalDocumentsPage() {
                   URL.revokeObjectURL(viewing.url);
                   setViewing(null);
                 }}
-                className="rounded-lg border border-[var(--border)] bg-white text-xs text-brand-700 hover:bg-gray-50"
-                style={{ padding: "6px 10px" }}
+                className="h-8 shrink-0 border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[#f8fafc]"
+                style={MONO}
               >
                 Close
               </button>
             </div>
-            <div style={{ position: "relative", width: "100%", height: "calc(88vh - 70px)" }}>
+            <div className="relative min-h-0 flex-1 p-2">
               {viewing.mime.startsWith("image/") ? (
-                <div className="flex items-center justify-center bg-gray-50" style={{ width: "100%", height: "100%", border: "1px solid var(--border)", borderRadius: 12, overflow: "auto" }}>
+                <div className="flex h-full w-full items-center justify-center overflow-auto border border-[rgba(0,0,0,0.08)] bg-[#f8fafc]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={viewing.url} alt={viewing.name} style={{ maxWidth: "100%", maxHeight: "100%" }} />
+                  <img src={viewing.url} alt={viewing.name} className="max-h-full max-w-full object-contain" />
                 </div>
               ) : (
                 <object
                   data={viewing.url}
                   type={viewing.mime || "application/pdf"}
-                  style={{ width: "100%", height: "100%", border: "1px solid var(--border)", borderRadius: 12, background: "#fff" }}
+                  className="h-full w-full border border-[rgba(0,0,0,0.08)] bg-white"
                 >
-                  <iframe
-                    src={viewing.url}
-                    title="Document viewer"
-                    style={{ width: "100%", height: "100%", border: "none", borderRadius: 12 }}
-                  />
+                  <iframe src={viewing.url} title="Document viewer" className="h-full w-full border-0" />
                 </object>
               )}
               <div
                 aria-hidden
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  pointerEvents: "none",
-                  overflow: "hidden",
-                  borderRadius: 12,
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, minmax(0,1fr))",
-                  gridTemplateRows: "repeat(4, minmax(0,1fr))",
-                }}
+                className="pointer-events-none absolute inset-2 grid grid-cols-3 grid-rows-4 overflow-hidden"
+                style={{ borderRadius: 0 }}
               >
                 {Array.from({ length: 12 }).map((_, idx) => (
                   <div
                     key={idx}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transform: "rotate(-22deg)",
-                      color: "rgba(15, 23, 42, 0.22)",
-                      fontSize: 16,
-                      fontWeight: 700,
-                      letterSpacing: "0.02em",
-                      userSelect: "none",
-                      textTransform: "none",
-                    }}
+                    className="flex items-center justify-center text-base font-bold tracking-wide text-[rgba(15,23,42,0.18)] select-none"
+                    style={{ transform: "rotate(-22deg)" }}
                   >
                     {viewing.watermark}
                   </div>
@@ -537,38 +603,5 @@ export default function PortalDocumentsPage() {
         </div>
       )}
     </div>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  active,
-  tone,
-  onClick,
-}: {
-  label: string;
-  value: number;
-  active: boolean;
-  tone: "gray" | "blue" | "red" | "green";
-  onClick: () => void;
-}) {
-  const tones = {
-    gray: { text: "text-gray-600", bg: active ? "bg-gray-100" : "bg-white" },
-    blue: { text: "text-blue-600", bg: active ? "bg-blue-50" : "bg-white" },
-    red: { text: "text-red-600", bg: active ? "bg-red-50" : "bg-white" },
-    green: { text: "text-emerald-600", bg: active ? "bg-emerald-50" : "bg-white" },
-  } as const;
-  const conf = tones[tone];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-xl border border-[var(--border)] text-center transition-colors hover:bg-gray-50 ${conf.bg}`}
-      style={{ padding: 10 }}
-    >
-      <p className={`text-2xl font-bold ${conf.text}`}>{value}</p>
-      <p className="text-xs text-[var(--muted-foreground)]">{label}</p>
-    </button>
   );
 }

@@ -34,6 +34,14 @@ SETTINGS_EDIT_ROLES = frozenset(
         UserRole.COMPLIANCE_MANAGER,
     }
 )
+CHAT_POST_ROLES = frozenset(
+    {
+        UserRole.SUPER_ADMIN,
+        UserRole.TENANT_ADMIN,
+        UserRole.COMPLIANCE_MANAGER,
+        UserRole.HR_OFFICER,
+    }
+)
 CHAT_VIEW_ROLES = frozenset(
     {
         UserRole.SUPER_ADMIN,
@@ -210,8 +218,8 @@ def create_dashboard_chat_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role not in SETTINGS_EDIT_ROLES:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can post")
+    if current_user.role not in CHAT_POST_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to post")
 
     message = payload.message.strip()
     if not message:

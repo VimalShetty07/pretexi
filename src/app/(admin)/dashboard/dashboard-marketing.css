@@ -23,7 +23,7 @@
 .protexi-adm-shell .protexi-dash-marketing .adm-ph {
   margin-bottom: 20px;
   gap: 12px;
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .adm-ph-ey {
@@ -66,6 +66,17 @@
   margin-top: 3px;
 }
 
+/* Subline under date (HR + admins) */
+.protexi-adm-shell .protexi-dash-marketing .adm-ph-lead {
+  margin-top: 8px;
+  max-width: min(42rem, 100%);
+  font-size: 12px;
+  line-height: 1.55;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #64748b;
+}
+
 /* Header line + right note box alignment */
 .protexi-adm-shell .protexi-dash-marketing .dash-ph-inline {
   display: flex;
@@ -91,7 +102,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
-  min-width: min(440px, 44vw);
+  min-width: min(360px, 100%);
 }
 
 .protexi-adm-shell .protexi-dash-marketing .adm-ph-badge {
@@ -154,12 +165,28 @@
   width: 100%;
 }
 
+/* Fixed footprint: chat column scrolls; compose stays pinned */
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note.dash-admin-note--chat {
+  display: flex;
+  flex-direction: column;
+  max-height: min(400px, 72vh);
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  width: 100%;
+  max-width: min(340px, 100%);
+}
+
 .protexi-adm-shell .protexi-dash-marketing .dash-admin-note-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-note--chat .dash-admin-note-top {
+  margin-bottom: 6px;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .dash-admin-note-head {
@@ -233,64 +260,284 @@
   color: #16a34a;
 }
 
+/* Admin chat — same flat box language as wem-surface / portal cards (sharp corners, borders) */
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-scroll-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 200px;
+  min-height: 140px;
+  max-height: 200px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  background: var(--dash-cream);
+  overflow: hidden;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-scroll-hint {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-family: var(--dash-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  background: #fff;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-scroll-hint-icon {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
 .protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-list {
-  max-height: 250px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-right: 2px;
-  margin-bottom: 10px;
+  padding: 10px 10px 12px;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-list:focus-visible {
+  outline: 2px solid rgba(26, 79, 160, 0.3);
+  outline-offset: 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-list::-webkit-scrollbar-thumb {
+  background: rgba(15, 45, 94, 0.2);
+  border-radius: 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 45, 94, 0.32);
 }
 
 .protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-empty {
-  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+  padding: 20px 12px;
+  font-size: 13px;
+  font-weight: 600;
   color: #64748b;
-  padding: 10px;
-  border: 1px dashed rgba(0, 0, 0, 0.16);
 }
 
-.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-item {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: #fff;
-  padding: 8px 10px;
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-empty-icon {
+  width: 28px;
+  height: 28px;
+  color: #94a3b8;
+  opacity: 0.85;
+  margin-bottom: 2px;
 }
 
-.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-item.mine {
-  border-color: rgba(26, 79, 160, 0.3);
-  background: rgba(26, 79, 160, 0.05);
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-empty-hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
 }
 
-.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-meta {
+/* Message rows — incoming left, outgoing right (flat boxes) */
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-row {
+  display: flex;
+  width: 100%;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-row--theirs {
+  justify-content: flex-start;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-row--mine {
+  justify-content: flex-end;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-cluster {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 92%;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-row--mine .dash-admin-chat-cluster {
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-avatar {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
+  font-family: var(--dash-mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0f2d5e;
+  background: rgba(26, 79, 160, 0.1);
+  border: 1px solid rgba(26, 79, 160, 0.22);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-bubble {
+  min-width: 0;
+  padding: 8px 10px 9px;
+  border-radius: 0;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-bubble--mine {
+  background: rgba(235, 242, 252, 0.95);
+  border-color: rgba(26, 79, 160, 0.28);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-bubble-top {
+  display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 4px;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-author {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--dash-navy);
+  font-family: var(--dash-mono);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-bubble--mine .dash-admin-chat-author {
+  color: #0f2d5e;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-time {
-  font-size: 10px;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--dash-mono);
+  color: #64748b;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-bubble--mine .dash-admin-chat-time {
   color: #64748b;
 }
 
 .protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-msg {
-  font-size: 12px;
-  color: var(--dash-black);
+  font-size: 12.5px;
+  color: #0a0a0a;
   white-space: pre-wrap;
-  line-height: 1.4;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-bubble--mine .dash-admin-chat-msg {
+  color: #0f2d5e;
+}
+
+/* Composer — flat row like portal / marketing inputs */
 .protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-compose {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: 2px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-compose-row {
   display: flex;
-  flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  resize: none;
+  min-height: 52px;
+  max-height: 80px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 0;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--dash-black);
+  font-family: inherit;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-textarea::placeholder {
+  color: #94a3b8;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-textarea:focus {
+  outline: none;
+  border-color: rgba(26, 79, 160, 0.45);
+  box-shadow: 0 0 0 2px rgba(26, 79, 160, 0.12);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-send-btn {
+  flex-shrink: 0;
+  align-self: stretch;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 0;
+  background: #0f2d5e;
+  color: #fff;
+  font-family: var(--dash-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-send-btn:hover:not(:disabled) {
+  background: #1a4fa0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .dash-admin-chat-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 @media (max-width: 1024px) {
@@ -867,3 +1114,4 @@
   font-family: var(--dash-mono);
   text-transform: uppercase;
 }
+

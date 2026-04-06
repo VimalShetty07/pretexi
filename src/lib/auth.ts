@@ -17,6 +17,7 @@ export interface AuthUser {
   role: UserRole;
   is_active: boolean;
   organisation_id: string;
+  phone?: string | null;
   worker_id?: string | null;
   last_login?: string | null;
 }

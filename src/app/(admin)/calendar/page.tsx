@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Loader2,
+  CalendarDays,
+  CircleDot,
+} from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import "../dashboard/dashboard-marketing.css";
+import "../workers/workers-page.css";
+import "./calendar-page.css";
 
 type Holiday = {
   id: string;
@@ -41,6 +51,8 @@ type EventsResponse = {
 
 const STAFF_ROLES = ["super_admin", "compliance_manager", "hr_officer", "payroll_officer"];
 
+const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
+
 export default function CalendarPage() {
   const { token, user } = useAuth();
   const [monthDate, setMonthDate] = useState(() => {
@@ -57,6 +69,7 @@ export default function CalendarPage() {
     visa_expiries: [],
   });
   const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState("");
 
   const [showAddHoliday, setShowAddHoliday] = useState(false);
@@ -69,7 +82,7 @@ export default function CalendarPage() {
   const month = monthDate.getMonth() + 1;
   const canManageHolidays = Boolean(user && STAFF_ROLES.includes(user.role));
 
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
     if (!token) return;
     try {
       setLoading(true);
@@ -80,23 +93,32 @@ export default function CalendarPage() {
       setError(e instanceof Error ? e.message : "Failed to load calendar events");
     } finally {
       setLoading(false);
+      setInitializing(false);
     }
-  };
+  }, [token, year, month]);
 
   useEffect(() => {
+    if (!token) {
+      setInitializing(false);
+      setLoading(false);
+      return;
+    }
     loadEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, year, month]);
+  }, [token, loadEvents]);
 
   const submitHoliday = async () => {
     if (!token || !holidayName || !holidayDate) return;
     try {
       setSavingHoliday(true);
-      await api.post("/calendar/holidays", {
-        name: holidayName,
-        date: holidayDate,
-        description: holidayDescription || null,
-      }, token);
+      await api.post(
+        "/calendar/holidays",
+        {
+          name: holidayName,
+          date: holidayDate,
+          description: holidayDescription || null,
+        },
+        token
+      );
       setHolidayName("");
       setHolidayDate("");
       setHolidayDescription("");
@@ -191,7 +213,13 @@ export default function CalendarPage() {
   }, [selectedDate]);
 
   const selectedDateLabel = useMemo(
-    () => selectedDate.toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }),
+    () =>
+      selectedDate.toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }),
     [selectedDate]
   );
 
@@ -230,254 +258,357 @@ export default function CalendarPage() {
     return { holidays, leaves, visa };
   }, [events, selectedDateKey]);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading calendar...</p>;
+  const goToToday = () => {
+    const d = new Date();
+    setMonthDate(new Date(d.getFullYear(), d.getMonth(), 1));
+    setSelectedDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+  };
+
+  if (initializing && loading && token) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
+          Loading calendar…
+        </p>
+      </div>
+    );
+  }
+
+  if (!token) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
+          Sign in to view the calendar.
+        </p>
+      </div>
+    );
+  }
+
+  if (error && initializing === false && events.holidays.length === 0 && events.leaves.length === 0 && events.visa_expiries.length === 0) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#dc2626]" style={MONO}>
+          {error}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div className="flex items-center justify-between flex-wrap" style={{ gap: 12 }}>
-        <div>
-          <h1 className="admin-page-title">Calendar</h1>
-          <p className="admin-page-subtitle" style={{ marginTop: 6 }}>
-            Holidays, approved leave, and visa expiry milestones
-          </p>
+    <div className="protexi-dash-marketing flex flex-col gap-0">
+      {error && (
+        <div className="mb-3 border border-red-200 bg-red-50 text-red-700" style={{ padding: "10px 12px", fontSize: 12, ...MONO }}>
+          {error}
         </div>
-        <div className="flex items-center" style={{ gap: 8 }}>
-          <button
-            className="rounded-xl border border-[var(--border)] bg-white text-brand-800 hover:bg-brand-50 transition-colors"
-            style={{ width: 36, height: 36 }}
-            onClick={() => {
-              const next = new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1);
-              setMonthDate(next);
-              setSelectedDate(next);
-            }}
-          >
-            <ChevronLeft style={{ width: 16, height: 16, margin: "0 auto" }} />
-          </button>
-          <div className="rounded-xl bg-white border border-[var(--border)] text-brand-900 font-semibold" style={{ padding: "7px 14px", minWidth: 180, textAlign: "center" }}>
-            {monthLabel}
-          </div>
-          <button
-            className="rounded-xl border border-[var(--border)] bg-white text-brand-800 hover:bg-brand-50 transition-colors"
-            style={{ width: 36, height: 36 }}
-            onClick={() => {
-              const next = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
-              setMonthDate(next);
-              setSelectedDate(next);
-            }}
-          >
-            <ChevronRight style={{ width: 16, height: 16, margin: "0 auto" }} />
-          </button>
-          {canManageHolidays && (
-            <button
-              className="inline-flex items-center rounded-xl bg-brand-600 text-white hover:bg-brand-700 transition-colors"
-              style={{ height: 36, padding: "0 14px", gap: 6, fontSize: 12, fontWeight: 600 }}
-              onClick={() => setShowAddHoliday(true)}
-            >
-              <Plus style={{ width: 14, height: 14 }} /> Add Holiday
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <div className="data-card" style={{ padding: 10 }}>
-        <div className="grid grid-cols-7 border border-[var(--border)] rounded-xl overflow-hidden">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-            <div
-              key={d}
-              className="bg-[var(--muted)] text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]"
-              style={{ padding: "7px 6px", borderRight: "1px solid var(--border)" }}
-            >
-              {d}
+      <div className="cal-main-grid">
+        <div className="cal-panel wem-surface min-w-0">
+          <div className="cal-panel-hd">
+            <div className="min-w-0">
+              <p className="cal-panel-hd-title">Month grid</p>
+              <p className="cal-panel-hd-sub">{monthLabel} · Sun–Sat</p>
             </div>
-          ))}
-
-          {calendarCells.map(({ date, inCurrentMonth }, idx) => {
-            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-            const stat = dayStats.get(key) || { holidays: 0, leaves: 0, visa: 0 };
-            const total = stat.holidays + stat.leaves + stat.visa;
-            const isToday =
-              date.getFullYear() === new Date().getFullYear() &&
-              date.getMonth() === new Date().getMonth() &&
-              date.getDate() === new Date().getDate();
-
-            return (
-              <div
-                key={`${key}-${idx}`}
-                className={inCurrentMonth ? "bg-white" : "bg-gray-50"}
-                style={{
-                  minHeight: 86,
-                  padding: 6,
-                  borderTop: "1px solid var(--border)",
-                  borderRight: (idx + 1) % 7 === 0 ? "none" : "1px solid var(--border)",
-                  boxShadow:
-                    selectedDateKey === key
-                      ? "inset 0 0 0 2px rgba(37,99,235,0.6)"
-                      : undefined,
-                  cursor: inCurrentMonth ? "pointer" : "default",
-                }}
-                onClick={() => {
-                  if (inCurrentMonth) setSelectedDate(new Date(date.getFullYear(), date.getMonth(), date.getDate()));
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <p
-                    className={inCurrentMonth ? "text-sm font-semibold text-brand-900" : "text-sm text-gray-400"}
-                    style={
-                      isToday
-                        ? {
-                            background: "var(--color-brand-600)",
-                            color: "#fff",
-                            width: 22,
-                            height: 22,
-                            borderRadius: 999,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 12,
-                            fontWeight: 700,
-                          }
-                        : undefined
-                    }
-                  >
-                    {date.getDate()}
-                  </p>
-                  {inCurrentMonth && total > 0 && (
-                    <span className="text-[11px] font-medium text-brand-700 bg-brand-50 rounded-full" style={{ padding: "2px 8px" }}>
-                      {total}
-                    </span>
-                  )}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center border border-[rgba(0,0,0,0.1)] bg-white text-[#0f2d5e] transition-colors hover:bg-[rgba(26,79,160,0.08)]"
+                  style={MONO}
+                  aria-label="Previous month"
+                  onClick={() => {
+                    const next = new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1);
+                    setMonthDate(next);
+                    setSelectedDate(next);
+                  }}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <div
+                  className="min-w-[140px] border border-[rgba(0,0,0,0.1)] bg-white px-2 py-2 text-center text-[10px] font-bold uppercase tracking-[0.06em] text-[#0a0a0a] sm:min-w-[160px] sm:px-3 sm:text-[11px]"
+                  style={MONO}
+                >
+                  {monthLabel}
                 </div>
-
-                {inCurrentMonth && (
-                  <div style={{ marginTop: 5, display: "grid", gap: 3 }}>
-                    {stat.holidays > 0 && (
-                      <div className="rounded-md bg-blue-50 text-blue-700" style={{ fontSize: 10, padding: "2px 5px", lineHeight: 1.2 }}>
-                        Holiday: {stat.holidays}
-                      </div>
-                    )}
-                    {stat.leaves > 0 && (
-                      <div className="rounded-md bg-purple-50 text-purple-700" style={{ fontSize: 10, padding: "2px 5px", lineHeight: 1.2 }}>
-                        Leave: {stat.leaves}
-                      </div>
-                    )}
-                    {stat.visa > 0 && (
-                      <div className="rounded-md bg-amber-50 text-amber-700" style={{ fontSize: 10, padding: "2px 5px", lineHeight: 1.2 }}>
-                        Visa: {stat.visa}
-                      </div>
-                    )}
-                  </div>
-                )}
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center border border-[rgba(0,0,0,0.1)] bg-white text-[#0f2d5e] transition-colors hover:bg-[rgba(26,79,160,0.08)]"
+                  style={MONO}
+                  aria-label="Next month"
+                  onClick={() => {
+                    const next = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
+                    setMonthDate(next);
+                    setSelectedDate(next);
+                  }}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="data-card" style={{ padding: 12 }}>
-        <div className="flex items-center justify-between flex-wrap" style={{ gap: 8 }}>
-          <h3 className="text-sm font-semibold text-gray-900">Details for {selectedDateLabel}</h3>
-          <span className="text-xs text-[var(--muted-foreground)]">Click any date in calendar</span>
-        </div>
-
-        {detailsForSelectedDate.holidays.length === 0 &&
-        detailsForSelectedDate.leaves.length === 0 &&
-        detailsForSelectedDate.visa.length === 0 ? (
-          <p className="text-sm text-gray-500" style={{ marginTop: 8 }}>
-            No calendar records on this date.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 8, marginTop: 8, maxHeight: 180, overflowY: "auto", paddingRight: 2 }}>
-            <div className="rounded-xl border border-blue-100 bg-blue-50" style={{ padding: "8px 10px" }}>
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">Holidays</p>
-              {detailsForSelectedDate.holidays.length === 0 ? (
-                <p className="text-xs text-blue-700" style={{ marginTop: 6 }}>None</p>
-              ) : (
-                <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-                  {detailsForSelectedDate.holidays.map((h) => (
-                    <p key={h.id} className="text-sm text-blue-900">{h.name}</p>
-                  ))}
-                </div>
+              {canManageHolidays && (
+                <button
+                  type="button"
+                  className="inline-flex h-9 items-center gap-2 border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0]"
+                  style={MONO}
+                  onClick={() => setShowAddHoliday(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add holiday
+                </button>
               )}
             </div>
-
-            <div className="rounded-xl border border-purple-100 bg-purple-50" style={{ padding: "8px 10px" }}>
-              <p className="text-xs font-semibold uppercase tracking-wide text-purple-800">Approved Leave</p>
-              {detailsForSelectedDate.leaves.length === 0 ? (
-                <p className="text-xs text-purple-700" style={{ marginTop: 6 }}>None</p>
-              ) : (
-                <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-                  {detailsForSelectedDate.leaves.map((l) => (
-                    <p key={l.id} className="text-sm text-purple-900">
-                      {l.worker_name} · {l.leave_type} ({l.days} day{l.days > 1 ? "s" : ""})
-                    </p>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-amber-100 bg-amber-50" style={{ padding: "8px 10px" }}>
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Visa Expiry</p>
-              {detailsForSelectedDate.visa.length === 0 ? (
-                <p className="text-xs text-amber-700" style={{ marginTop: 6 }}>None</p>
-              ) : (
-                <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-                  {detailsForSelectedDate.visa.map((v) => (
-                    <p key={v.id} className="text-sm text-amber-900">
-                      {v.worker_name} · {v.days_left <= 0 ? "Expired" : `${v.days_left} days left`}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </div>
-
           </div>
-        )}
+          <div className="wem-toolbar cal-panel-hd--toolbar border-t-0">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+              <span className="wem-badge-mono shrink-0" style={MONO}>
+                {loading ? "Updating…" : "Month view"}
+              </span>
+              <div className="hidden items-center gap-3 sm:flex" aria-hidden>
+                <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={MONO}>
+                  <span className="cal-dot cal-dot--holiday" />
+                  Holiday
+                </span>
+                <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={MONO}>
+                  <span className="cal-dot cal-dot--leave" />
+                  Leave
+                </span>
+                <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={MONO}>
+                  <span className="cal-dot cal-dot--visa" />
+                  Visa
+                </span>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {loading && <Loader2 className="h-4 w-4 animate-spin text-[#94a3b8]" aria-hidden />}
+              <button
+                type="button"
+                onClick={goToToday}
+                className="h-8 border border-[rgba(0,0,0,0.1)] bg-white px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]"
+                style={MONO}
+              >
+                Today
+              </button>
+            </div>
+          </div>
+
+          <div className="cal-grid-body">
+            <div className="cal-grid-frame">
+              <div className="cal-grid-inner">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                  <div key={d} className="cal-weekday">
+                    {d}
+                  </div>
+                ))}
+
+                {calendarCells.map(({ date, inCurrentMonth }, idx) => {
+                  const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                  const stat = dayStats.get(key) || { holidays: 0, leaves: 0, visa: 0 };
+                  const total = stat.holidays + stat.leaves + stat.visa;
+                  const isToday =
+                    date.getFullYear() === new Date().getFullYear() &&
+                    date.getMonth() === new Date().getMonth() &&
+                    date.getDate() === new Date().getDate();
+                  const isSelected = selectedDateKey === key;
+
+                  const dotTitle = [
+                    stat.holidays ? `${stat.holidays} holiday${stat.holidays !== 1 ? "s" : ""}` : null,
+                    stat.leaves ? `${stat.leaves} leave` : null,
+                    stat.visa ? `${stat.visa} visa` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
+
+                  return (
+                    <div
+                      key={`${key}-${idx}`}
+                      className={[
+                        "cal-cell",
+                        !inCurrentMonth ? "cal-cell--muted" : "",
+                        inCurrentMonth ? "cal-cell--interactive cursor-pointer" : "cursor-default",
+                        isSelected && inCurrentMonth ? "cal-cell--selected" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      title={inCurrentMonth && total > 0 ? dotTitle : undefined}
+                      onClick={() => {
+                        if (inCurrentMonth) setSelectedDate(new Date(date.getFullYear(), date.getMonth(), date.getDate()));
+                      }}
+                      role={inCurrentMonth ? "button" : undefined}
+                      tabIndex={inCurrentMonth ? 0 : undefined}
+                      onKeyDown={(e) => {
+                        if (!inCurrentMonth) return;
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedDate(new Date(date.getFullYear(), date.getMonth(), date.getDate()));
+                        }
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <span
+                          className={[
+                            "cal-day-num",
+                            isToday ? "cal-day-num--today" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {date.getDate()}
+                        </span>
+                        {inCurrentMonth && total > 0 && (
+                          <span className="cal-more tabular-nums opacity-80" title={dotTitle}>
+                            {total}
+                          </span>
+                        )}
+                      </div>
+
+                      {inCurrentMonth && total > 0 && (
+                        <div className="cal-dots">
+                          {stat.holidays > 0 && (
+                            <span
+                              className="cal-dot cal-dot--holiday"
+                              title={stat.holidays > 1 ? `${stat.holidays} holidays` : "Holiday"}
+                            />
+                          )}
+                          {stat.leaves > 0 && (
+                            <span
+                              className="cal-dot cal-dot--leave"
+                              title={stat.leaves > 1 ? `${stat.leaves} leave records` : "Leave"}
+                            />
+                          )}
+                          {stat.visa > 0 && (
+                            <span
+                              className="cal-dot cal-dot--visa"
+                              title={stat.visa > 1 ? `${stat.visa} visa dates` : "Visa"}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="cal-panel cal-day-panel wem-surface">
+          <div className="cal-panel-hd">
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#94a3b8]" style={MONO}>
+                Selected day
+              </p>
+              <p className="mt-1 truncate text-[15px] font-extrabold leading-tight tracking-tight text-[#0a0a0a]">{selectedDateLabel}</p>
+              <p className="cal-panel-hd-sub mt-0.5">Events for this date</p>
+            </div>
+            <span className="wem-badge-mono mt-1 shrink-0 self-start sm:mt-0 sm:self-center" style={MONO}>
+              <CircleDot className="mr-1 inline h-3 w-3 opacity-70" />
+              Agenda
+            </span>
+          </div>
+
+          <div className="cal-agenda-body">
+            {detailsForSelectedDate.holidays.length === 0 &&
+            detailsForSelectedDate.leaves.length === 0 &&
+            detailsForSelectedDate.visa.length === 0 ? (
+              <div className="flex flex-col items-center justify-center px-4 py-12">
+                <div className="adm-ae-icon">
+                  <CalendarDays className="h-5 w-5" />
+                </div>
+                <div className="adm-ae-t mt-3 text-center">Quiet day</div>
+                <div className="adm-ae-s text-center">No holidays, leave, or visa milestones. Pick another date on the grid.</div>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {detailsForSelectedDate.holidays.map((h) => (
+                  <div key={h.id} className="cal-detail-row cal-detail-row--holiday">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--dash-blue)]" style={MONO}>
+                      Holiday
+                    </p>
+                    <p className="mt-1 text-[14px] font-bold text-[#0a0a0a]">{h.name}</p>
+                    {h.description && <p className="mt-1 text-[12px] leading-snug text-[#64748b]">{h.description}</p>}
+                  </div>
+                ))}
+                {detailsForSelectedDate.leaves.map((l) => (
+                  <div key={l.id} className="cal-detail-row cal-detail-row--leave">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[#64748b]" style={MONO}>
+                      Approved leave
+                    </p>
+                    <p className="mt-1 text-[14px] font-bold text-[#0a0a0a]">{l.worker_name}</p>
+                    <p className="mt-1 text-[12px] text-[#475569]">
+                      {l.leave_type}
+                      <span className="text-[11px] text-[#94a3b8]" style={MONO}>
+                        {" "}
+                        · {l.days} day{l.days > 1 ? "s" : ""}
+                      </span>
+                    </p>
+                  </div>
+                ))}
+                {detailsForSelectedDate.visa.map((v) => (
+                  <div key={v.id} className="cal-detail-row cal-detail-row--visa">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[#b45309]" style={MONO}>
+                      Visa expiry
+                    </p>
+                    <p className="mt-1 text-[14px] font-bold text-[#0a0a0a]">{v.worker_name}</p>
+                    <p className="mt-1 text-[12px] text-[#92400e]">
+                      {v.days_left <= 0 ? "Expired — action required" : `${v.days_left} days remaining`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {showAddHoliday && (
-        <div className="fixed inset-0 z-50 bg-black/35 flex items-center justify-center p-4">
-          <div className="data-card w-full max-w-md" style={{ padding: 18 }}>
-            <h3 className="text-lg font-semibold text-gray-900">Add Holiday</h3>
-            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            className="w-full max-w-md border border-[rgba(0,0,0,0.1)] bg-white p-5 shadow-lg"
+            role="dialog"
+            aria-labelledby="cal-add-holiday-title"
+          >
+            <h3 id="cal-add-holiday-title" className="text-base font-extrabold tracking-tight text-[#0a0a0a]">
+              Add holiday
+            </h3>
+            <p className="mt-1 text-[11px] text-[#64748b]" style={MONO}>
+              Visible to everyone on the calendar.
+            </p>
+            <div className="mt-4 grid gap-3">
               <input
-                className="w-full rounded-xl border border-gray-300 bg-white text-sm text-gray-900 outline-none focus:border-blue-400"
-                style={{ height: 38, padding: "0 12px" }}
+                className="h-9 w-full border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[13px] text-[#0a0a0a] outline-none focus:border-[var(--dash-blue)]"
                 placeholder="Holiday name"
                 value={holidayName}
                 onChange={(e) => setHolidayName(e.target.value)}
               />
               <input
                 type="date"
-                className="w-full rounded-xl border border-gray-300 bg-white text-sm text-gray-900 outline-none focus:border-blue-400"
-                style={{ height: 38, padding: "0 12px" }}
+                className="h-9 w-full border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[13px] text-[#0a0a0a] outline-none focus:border-[var(--dash-blue)]"
                 value={holidayDate}
                 onChange={(e) => setHolidayDate(e.target.value)}
               />
               <textarea
-                className="w-full rounded-xl border border-gray-300 bg-white text-sm text-gray-900 outline-none focus:border-blue-400"
-                style={{ minHeight: 72, padding: "8px 12px" }}
+                className="min-h-[72px] w-full resize-y border border-[rgba(0,0,0,0.12)] bg-white p-3 text-[13px] text-[#0a0a0a] outline-none focus:border-[var(--dash-blue)]"
                 placeholder="Description (optional)"
                 value={holidayDescription}
                 onChange={(e) => setHolidayDescription(e.target.value)}
               />
             </div>
-            <div className="flex justify-end" style={{ gap: 8, marginTop: 12 }}>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
               <button
-                className="rounded-xl border border-gray-300 bg-white text-sm text-gray-700 hover:bg-gray-50"
-                style={{ height: 36, padding: "0 12px" }}
+                type="button"
+                className="h-9 border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[#f8fafc]"
+                style={MONO}
                 onClick={() => setShowAddHoliday(false)}
               >
                 Cancel
               </button>
               <button
-                className="rounded-xl bg-brand-600 text-sm text-white hover:bg-brand-700"
-                style={{ height: 36, padding: "0 14px" }}
+                type="button"
+                className="h-9 border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-4 text-[9px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0] disabled:opacity-50"
+                style={MONO}
                 onClick={submitHoliday}
                 disabled={savingHoliday}
               >
-                {savingHoliday ? "Saving..." : "Save"}
+                {savingHoliday ? "Saving…" : "Save"}
               </button>
             </div>
           </div>

@@ -30,6 +30,15 @@ from app.checklist_schemas import (
 
 router = APIRouter(tags=["checklist"])
 
+CHECKLIST_REVIEW_ROLES = frozenset(
+    {"platform_owner", "super_admin", "tenant_admin", "compliance_manager", "hr_officer"}
+)
+
+
+def _require_checklist_review_role(user: TokenUser) -> None:
+    if user.role not in CHECKLIST_REVIEW_ROLES:
+        raise HTTPException(status_code=403, detail="Not allowed to verify or reject checklist files")
+
 
 def _utc_iso(dt: datetime | None) -> str | None:
     if dt is None:
@@ -242,6 +251,7 @@ def verify_checklist_item(
     user: TokenUser = Depends(get_current_user),
     organisation_id: str | None = Query(None),
 ):
+    _require_checklist_review_role(user)
     org_id = effective_organisation_id(user, organisation_id)
     _, st = _state_for_worker_item(db, worker_id, org_id, item_id)
     db.refresh(st, ["documents"])
@@ -262,6 +272,7 @@ def reject_checklist_item(
     organisation_id: str | None = Query(None),
     reason: str = Form("Please re-upload with corrections"),
 ):
+    _require_checklist_review_role(user)
     org_id = effective_organisation_id(user, organisation_id)
     _, st = _state_for_worker_item(db, worker_id, org_id, item_id)
     db.refresh(st, ["documents"])
@@ -281,6 +292,7 @@ def mark_checklist_na(
     user: TokenUser = Depends(get_current_user),
     organisation_id: str | None = Query(None),
 ):
+    _require_checklist_review_role(user)
     org_id = effective_organisation_id(user, organisation_id)
     _, st = _state_for_worker_item(db, worker_id, org_id, item_id)
     st.status = ItemStatus.not_applicable.value

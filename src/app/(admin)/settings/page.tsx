@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { Loader2, UserPlus, Users, UserCheck, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
-import { UserPlus, Users, UserCheck, ShieldCheck } from "lucide-react";
+import "../dashboard/dashboard-marketing.css";
+import "../workers/workers-page.css";
 
 interface UserItem {
   id: string;
@@ -18,6 +20,8 @@ interface WorkerItem {
   id: string;
   name: string;
 }
+
+const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
 
 export default function SettingsPage() {
   const { token, user } = useAuth();
@@ -38,6 +42,7 @@ export default function SettingsPage() {
     if (!token) return;
     try {
       setLoading(true);
+      setError("");
       const [u, w] = await Promise.all([
         api.get<UserItem[]>("/auth/users", token),
         api.get<WorkerItem[]>("/workers", token),
@@ -60,13 +65,18 @@ export default function SettingsPage() {
     if (!token || !fullName || !email || !password) return;
     try {
       setSaving(true);
-      await api.post("/auth/users", {
-        full_name: fullName,
-        email,
-        password,
-        role: isTenantAdmin ? "hr_officer" : role,
-        worker_id: role === "employee" ? workerId || null : null,
-      }, token);
+      setError("");
+      await api.post(
+        "/auth/users",
+        {
+          full_name: fullName,
+          email,
+          password,
+          role: isTenantAdmin ? "hr_officer" : role,
+          worker_id: role === "employee" ? workerId || null : null,
+        },
+        token
+      );
       setFullName("");
       setEmail("");
       setPassword("");
@@ -83,6 +93,7 @@ export default function SettingsPage() {
   const toggleActive = async (u: UserItem) => {
     if (!token) return;
     try {
+      setError("");
       await api.patch(`/auth/users/${u.id}`, { is_active: !u.is_active }, token);
       await load();
     } catch (e: unknown) {
@@ -90,145 +101,266 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) return <p className="text-sm text-[var(--muted-foreground)]">Loading settings...</p>;
+  const todayStr = useMemo(
+    () =>
+      new Date().toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }),
+    []
+  );
 
   const totalUsers = users.length;
   const activeUsers = users.filter((u) => u.is_active).length;
   const hrUsers = users.filter((u) => u.role === "hr_officer").length;
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div>
-        <h1 className="admin-page-title">Settings</h1>
-        <p className="admin-page-subtitle" style={{ marginTop: 6 }}>
-          {isTenantAdmin
-            ? "HR management for your tenant organisation."
-            : "User management for HR and employee access."}
+  if (!token) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
+          Sign in to manage settings.
         </p>
       </div>
+    );
+  }
 
+  if (loading) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
+          Loading settings…
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="protexi-dash-marketing flex flex-col gap-0">
       {error && (
-        <div
-          className="rounded-xl border border-red-200 bg-red-50 text-red-700"
-          style={{ padding: "10px 12px", fontSize: 13 }}
-        >
+        <div className="mb-3 border border-red-200 bg-red-50 text-red-700" style={{ padding: "10px 12px", fontSize: 12, ...MONO }}>
           {error}
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 12 }}>
-        <StatCard icon={<Users size={15} />} label="Total Users" value={totalUsers} />
-        <StatCard icon={<UserCheck size={15} />} label="Active Users" value={activeUsers} />
-        <StatCard icon={<ShieldCheck size={15} />} label="HR Users" value={hrUsers} />
-      </div>
-
-      <div className="data-card" style={{ padding: 14 }}>
-        <div className="flex items-center gap-2">
-          <UserPlus size={15} className="text-[#1a5296]" />
-          <h3 className="text-sm font-semibold text-gray-900">
-            {isTenantAdmin ? "Add HR User" : "Create User"}
-          </h3>
+      <div className="adm-ph">
+        <div className="min-w-0">
+          <div className="adm-ph-ey">Administration</div>
+          <h1 className="adm-ph-title">
+            Settings <em className="dash-title-em">& access</em>
+          </h1>
+          <div className="adm-ph-date">{todayStr}</div>
+          <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-[#64748b]">
+            {isTenantAdmin
+              ? "HR user management for your tenant organisation."
+              : "Create internal users, assign roles, and control portal access."}
+          </p>
         </div>
-        <p className="text-xs text-[var(--muted-foreground)]" style={{ marginTop: 4 }}>
-          {isTenantAdmin
-            ? "Tenant admins can only create HR users in their own organisation."
-            : "Create internal users and assign portal access roles."}
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10, marginTop: 10 }}>
-          <input className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900" style={{ height: 38, padding: "0 12px" }} placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          <input className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900" style={{ height: 38, padding: "0 12px" }} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900" style={{ height: 38, padding: "0 12px" }} placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          {isTenantAdmin ? (
-            <input
-              className="rounded-xl border border-gray-300 bg-gray-100 text-sm text-gray-700"
-              style={{ height: 38, padding: "0 12px" }}
-              value="HR Officer"
-              disabled
-            />
-          ) : (
-            <select className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900" style={{ height: 38, padding: "0 12px" }} value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="hr_officer">HR Officer</option>
-              <option value="employee">Employee</option>
-              <option value="compliance_manager">Compliance Manager</option>
-              <option value="payroll_officer">Payroll Officer</option>
-              <option value="inspector">Inspector</option>
-            </select>
-          )}
-          {role === "employee" && (
-            <select className="rounded-xl border border-gray-300 bg-white text-sm text-gray-900 md:col-span-2" style={{ height: 38, padding: "0 12px" }} value={workerId} onChange={(e) => setWorkerId(e.target.value)}>
-              <option value="">Select linked worker</option>
-              {workers.map((w) => (
-                <option key={w.id} value={w.id}>{w.name}</option>
-              ))}
-            </select>
-          )}
-        </div>
-        <button
-          onClick={createUser}
-          className="rounded-xl bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-60 transition-all"
-          style={{ height: 36, padding: "0 14px", marginTop: 10 }}
-          disabled={saving}
+        <span
+          className="adm-ph-badge inline-flex items-center gap-2 border border-[rgba(26,79,160,0.25)] bg-[rgba(26,79,160,0.06)] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-[#0f2d5e]"
+          style={MONO}
         >
-          {saving ? "Creating..." : "Create User"}
-        </button>
+          <ShieldCheck className="h-3.5 w-3.5" />
+          {(user?.role ?? "admin").replaceAll("_", " ")}
+        </span>
       </div>
 
-      <div className="data-card" style={{ padding: 14 }}>
-        <h3 className="text-sm font-semibold text-gray-900">
-          {isTenantAdmin ? "HR Users" : "Existing Users"}
-        </h3>
-        <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
-          {users.map((u) => (
-            <div key={u.id} className="rounded-xl border border-gray-200 bg-gray-50" style={{ padding: "10px 12px" }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{u.full_name}</p>
-                  <p className="text-xs text-gray-600" style={{ marginTop: 2 }}>
-                    {u.email}
-                  </p>
-                  <div style={{ marginTop: 6 }}>
+      <div className="adm-stat-row grid grid-cols-1 sm:grid-cols-3" style={{ gap: 2, background: "rgba(0,0,0,0.07)", marginBottom: 16 }}>
+        <div className="adm-sc adm-sc-b bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-b">
+              <Users className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">Accounts</span>
+          </div>
+          <div className="adm-sc-num">{totalUsers}</div>
+          <div className="adm-sc-lbl">Total users</div>
+          <div className="adm-sc-sub">Provisioned</div>
+        </div>
+        <div className="adm-sc adm-sc-p bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-p">
+              <UserCheck className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">Live</span>
+          </div>
+          <div className="adm-sc-num">{activeUsers}</div>
+          <div className="adm-sc-lbl">Active</div>
+          <div className="adm-sc-sub">Can sign in</div>
+        </div>
+        <div className="adm-sc adm-sc-a bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-a">
+              <ShieldCheck className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">HR</span>
+          </div>
+          <div className="adm-sc-num">{hrUsers}</div>
+          <div className="adm-sc-lbl">HR officers</div>
+          <div className="adm-sc-sub">Role count</div>
+        </div>
+      </div>
+
+      <div className="wem-surface">
+        <div className="wem-toolbar">
+          <span className="flex min-w-0 items-center gap-2 text-[11px] font-extrabold text-[#0a0a0a]">
+            <UserPlus className="h-4 w-4 shrink-0 text-[var(--dash-blue)]" />
+            {isTenantAdmin ? "Add HR user" : "Create user"}
+          </span>
+        </div>
+        <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+          <p className="text-[12px] leading-relaxed text-[#64748b]" style={{ marginBottom: 12 }}>
+            {isTenantAdmin
+              ? "Tenant admins can only create HR users in their own organisation."
+              : "Create internal users and assign portal access roles. Employees can be linked to a worker record."}
+          </p>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <label className="grid gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={MONO}>
+                Full name
+              </span>
+              <input
+                className="h-9 w-full border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[13px] text-[#0a0a0a] outline-none focus:border-[var(--dash-blue)]"
+                placeholder="Full name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={MONO}>
+                Email
+              </span>
+              <input
+                className="h-9 w-full border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[13px] text-[#0a0a0a] outline-none focus:border-[var(--dash-blue)]"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={MONO}>
+                Password
+              </span>
+              <input
+                className="h-9 w-full border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[13px] text-[#0a0a0a] outline-none focus:border-[var(--dash-blue)]"
+                placeholder="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={MONO}>
+                Role
+              </span>
+              {isTenantAdmin ? (
+                <input
+                  className="h-9 w-full border border-[rgba(0,0,0,0.08)] bg-[var(--dash-card)] px-3 text-[13px] text-[#64748b]"
+                  value="HR Officer"
+                  disabled
+                  readOnly
+                />
+              ) : (
+                <select
+                  className="h-9 w-full border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[13px] text-[#0a0a0a] outline-none focus:border-[var(--dash-blue)]"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                >
+                  <option value="hr_officer">HR Officer</option>
+                  <option value="employee">Employee</option>
+                  <option value="compliance_manager">Compliance Manager</option>
+                  <option value="payroll_officer">Payroll Officer</option>
+                  <option value="inspector">Inspector</option>
+                </select>
+              )}
+            </label>
+            {role === "employee" && (
+              <label className="grid gap-1 md:col-span-2">
+                <span className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={MONO}>
+                  Linked worker
+                </span>
+                <select
+                  className="h-9 w-full border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[13px] text-[#0a0a0a] outline-none focus:border-[var(--dash-blue)]"
+                  value={workerId}
+                  onChange={(e) => setWorkerId(e.target.value)}
+                >
+                  <option value="">Select linked worker</option>
+                  {workers.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={createUser}
+            disabled={saving}
+            className="mt-4 inline-flex h-9 items-center gap-2 border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-4 text-[9px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0] disabled:opacity-50"
+            style={MONO}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            {saving ? "Creating…" : "Create user"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 wem-surface">
+        <div className="wem-toolbar">
+          <span className="text-[11px] font-extrabold text-[#0a0a0a]">{isTenantAdmin ? "HR users" : "Existing users"}</span>
+          <span className="wem-badge-mono" style={MONO}>
+            {users.length} account{users.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+          {users.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="adm-ae-icon">
+                <Users className="h-5 w-5" />
+              </div>
+              <div className="adm-ae-t mt-3">No users yet</div>
+              <div className="adm-ae-s">Create the first account using the form above.</div>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              {users.map((u) => (
+                <div
+                  key={u.id}
+                  className="flex flex-col gap-3 border border-[rgba(0,0,0,0.08)] bg-[#f8fafc] p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-semibold text-[#0a0a0a]">{u.full_name}</p>
+                    <p className="truncate text-[12px] text-[#64748b]" style={MONO}>
+                      {u.email}
+                    </p>
                     <span
-                      className="rounded-full"
-                      style={{
-                        padding: "2px 8px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        background: u.role === "hr_officer" ? "#e0ecff" : "#eef2ff",
-                        color: u.role === "hr_officer" ? "#1e40af" : "#4338ca",
-                      }}
+                      className="mt-2 inline-flex border border-[rgba(26,79,160,0.2)] bg-[rgba(26,79,160,0.06)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e]"
+                      style={MONO}
                     >
                       {u.role.replaceAll("_", " ")}
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleActive(u)}
+                    className={`h-8 shrink-0 border px-3 text-[9px] font-bold uppercase tracking-[0.07em] transition-colors ${
+                      u.is_active
+                        ? "border-[rgba(22,163,74,0.35)] bg-[#f0fdf4] text-[#166534] hover:bg-[rgba(22,163,74,0.12)]"
+                        : "border-[rgba(220,38,38,0.35)] bg-[rgba(254,242,242,0.85)] text-[#991b1b] hover:bg-[rgba(254,242,242,1)]"
+                    }`}
+                    style={MONO}
+                  >
+                    {u.is_active ? "Active" : "Inactive"}
+                  </button>
                 </div>
-                <button
-                  onClick={() => toggleActive(u)}
-                  className={`rounded-lg text-xs font-semibold ${u.is_active ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}
-                  style={{ padding: "6px 10px" }}
-                >
-                  {u.is_active ? "Active" : "Inactive"}
-                </button>
-              </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
-  return (
-    <div className="bg-white rounded-2xl border border-[var(--border)]" style={{ padding: 14 }}>
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-          {label}
-        </p>
-        <span className="text-[#1a5296]">{icon}</span>
-      </div>
-      <p className="admin-value-number text-[#0f1f3a]" style={{ marginTop: 8 }}>
-        {value}
-      </p>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import "./dashboard-marketing.css";
@@ -13,6 +13,8 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronRight,
+  ChevronUp,
+  MessageSquare,
   UserPlus,
   CreditCard,
   CalendarRange,
@@ -71,6 +73,29 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function chatInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  if (parts.length === 1 && parts[0].length >= 2) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0]?.[0] ?? "?").toUpperCase();
+}
+
+/** One line: date + time (en-GB), non-breaking between parts so layout doesn’t split them */
+function formatChatTimestamp(iso: string): string {
+  const d = new Date(iso);
+  const dateStr = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const timeStr = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${dateStr}\u00A0·\u00A0${timeStr}`;
+}
+
+/** HR + tenant admins — extra line under the date */
+const DASH_HEADER_LEAD_ROLES = new Set([
+  "super_admin",
+  "tenant_admin",
+  "compliance_manager",
+  "hr_officer",
+]);
+
 export default function DashboardPage() {
   const { token, user } = useAuth();
   const router = useRouter();
@@ -81,9 +106,35 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dashFeatures, setDashFeatures] = useState<DashboardFeatureKey[]>(DEFAULT_DASHBOARD_FEATURES);
-  const canPostAdminChat = ["super_admin", "tenant_admin", "compliance_manager"].includes(user?.role ?? "");
+  const canPostAdminChat = ["super_admin", "tenant_admin", "compliance_manager", "hr_officer"].includes(
+    user?.role ?? ""
+  );
+  const chatListRef = useRef<HTMLDivElement>(null);
+  const chatDidInitialScroll = useRef(false);
 
   const showFeat = (key: DashboardFeatureKey) => dashFeatures.includes(key);
+
+  useEffect(() => {
+    const el = chatListRef.current;
+    if (!el || chatMessages.length === 0) return;
+
+    const scrollToEnd = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+
+    if (!chatDidInitialScroll.current) {
+      chatDidInitialScroll.current = true;
+      requestAnimationFrame(() => requestAnimationFrame(scrollToEnd));
+      return;
+    }
+
+    const last = chatMessages[chatMessages.length - 1];
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    const ownMessage = last.created_by_user_id === user?.id;
+    if (nearBottom || ownMessage) {
+      scrollToEnd();
+    }
+  }, [chatMessages, user?.id]);
 
   useEffect(() => {
     const load = async () => {
@@ -242,6 +293,9 @@ export default function DashboardPage() {
             Compliance <em className="dash-title-em">overview</em>
           </h1>
           <div className="adm-ph-date">{today}</div>
+          {user?.role && DASH_HEADER_LEAD_ROLES.has(user.role) ? (
+            <p className="adm-ph-lead">Compliance Overview</p>
+          ) : null}
         </div>
 
         <div className="dash-ph-right">
@@ -255,57 +309,86 @@ export default function DashboardPage() {
           </div>
 
           {showFeat("admin_chat") ? (
-          <div className="dash-admin-note">
+          <div className="dash-admin-note dash-admin-note--chat">
             <div className="dash-admin-note-top">
               <div className="dash-admin-note-head">
                 <div className="dash-admin-note-title">Admin chat</div>
-                <div className="dash-admin-note-meta">Shared with dashboard users in your organisation</div>
               </div>
             </div>
 
-            <div className="dash-admin-chat-list">
-              {chatMessages.length === 0 ? (
-                <div className="dash-admin-chat-empty">No messages yet.</div>
-              ) : (
-                chatMessages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`dash-admin-chat-item ${m.created_by_user_id === user?.id ? "mine" : ""}`}
-                  >
-                    <div className="dash-admin-chat-meta">
-                      <span className="dash-admin-chat-author">{m.created_by_name}</span>
-                      <span className="dash-admin-chat-time">
-                        {new Date(m.created_at).toLocaleString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                    <div className="dash-admin-chat-msg">{m.message}</div>
+            <div className="dash-admin-chat-scroll-wrap">
+              <div className="dash-admin-chat-scroll-hint">
+                <ChevronUp className="dash-admin-chat-scroll-hint-icon" aria-hidden />
+                <span>Older messages above</span>
+              </div>
+              <div
+                ref={chatListRef}
+                className="dash-admin-chat-list"
+                tabIndex={0}
+                role="region"
+                aria-label="Admin chat messages. Scroll up for older messages."
+              >
+                {chatMessages.length === 0 ? (
+                  <div className="dash-admin-chat-empty">
+                    <MessageSquare className="dash-admin-chat-empty-icon" aria-hidden />
+                    <span>No messages yet</span>
+                    <span className="dash-admin-chat-empty-hint">Start the conversation below</span>
                   </div>
-                ))
-              )}
+                ) : (
+                  chatMessages.map((m) => {
+                    const mine = m.created_by_user_id === user?.id;
+                    return (
+                      <div
+                        key={m.id}
+                        className={`dash-admin-chat-row ${mine ? "dash-admin-chat-row--mine" : "dash-admin-chat-row--theirs"}`}
+                      >
+                        <div className="dash-admin-chat-cluster">
+                          {!mine ? (
+                            <div className="dash-admin-chat-avatar" aria-hidden title={m.created_by_name}>
+                              {chatInitials(m.created_by_name)}
+                            </div>
+                          ) : null}
+                          <div className={`dash-admin-chat-bubble ${mine ? "dash-admin-chat-bubble--mine" : ""}`}>
+                            <div className="dash-admin-chat-bubble-top">
+                              <span className="dash-admin-chat-author">{mine ? "You" : m.created_by_name}</span>
+                              <span className="dash-admin-chat-time">{formatChatTimestamp(m.created_at)}</span>
+                            </div>
+                            <div className="dash-admin-chat-msg">{m.message}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
             {canPostAdminChat && (
               <div className="dash-admin-chat-compose">
-                <textarea
-                  className="dash-admin-note-textarea"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Type a message for the admin chat..."
-                  maxLength={2000}
-                />
-                <button
-                  type="button"
-                  className="dash-admin-note-save"
-                  onClick={sendChatMessage}
-                  disabled={sendingChat || chatInput.trim().length === 0}
-                >
-                  {sendingChat ? "Sending..." : "Send"}
-                </button>
+                <div className="dash-admin-chat-compose-row">
+                  <textarea
+                    className="dash-admin-chat-textarea"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Type a message…"
+                    maxLength={2000}
+                    rows={2}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!sendingChat && chatInput.trim().length > 0) void sendChatMessage();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="dash-admin-chat-send-btn"
+                    onClick={sendChatMessage}
+                    disabled={sendingChat || chatInput.trim().length === 0}
+                  >
+                    {sendingChat ? "Sending…" : "Send"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

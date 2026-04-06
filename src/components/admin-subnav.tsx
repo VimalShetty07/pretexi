@@ -3,17 +3,10 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Download, Plus, Upload } from "lucide-react";
+import { Download, PanelsTopLeft, Plus, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
 import { DASHBOARD_FEATURE_PREF_ROLES } from "@/lib/dashboard-features";
-
-const DASH_TABS: { label: string; href: string; match?: (p: string) => boolean }[] = [
-  { label: "Overview", href: "/dashboard", match: (p) => p === "/dashboard" },
-  { label: "Analytics", href: "/reports", match: (p) => p === "/reports" || p.startsWith("/reports/") },
-  { label: "Compliance", href: "/risk", match: (p) => p === "/risk" || p.startsWith("/risk/") },
-  { label: "Activity", href: "/calendar", match: (p) => p === "/calendar" || p.startsWith("/calendar/") },
-];
 
 const DASH_LAYOUT_TAB: { label: string; href: string; match: (p: string) => boolean } = {
   label: "Layout",
@@ -21,12 +14,9 @@ const DASH_LAYOUT_TAB: { label: string; href: string; match: (p: string) => bool
   match: (p) => p === "/dashboard/customize",
 };
 
-function dashboardHubTabs(includeLayout: boolean) {
-  const tabs = [...DASH_TABS];
-  if (includeLayout) {
-    tabs.splice(1, 0, DASH_LAYOUT_TAB);
-  }
-  return tabs;
+function dashboardHubTabs() {
+  // Keep dashboard hub nav minimal: always show Layout.
+  return [DASH_LAYOUT_TAB];
 }
 
 const WORKER_TABS = [
@@ -82,23 +72,34 @@ function WorkersSubnavInner() {
 export function AdminSubnav() {
   const pathname = usePathname() ?? "";
   const { user } = useAuth();
-  const canCustomizeDash = user
-    ? (DASHBOARD_FEATURE_PREF_ROLES as readonly string[]).includes(user.role)
-    : false;
+  void user;
+  void DASHBOARD_FEATURE_PREF_ROLES;
 
   if (pathname.startsWith("/dashboard") || pathname.startsWith("/reports") || pathname.startsWith("/risk") || pathname.startsWith("/calendar")) {
-    const hubTabs = dashboardHubTabs(canCustomizeDash);
+    const hubTabs = dashboardHubTabs();
     return (
       <div className="adm-subnav">
         {hubTabs.map((tab) => {
           const active = tab.match?.(pathname) ?? pathname === tab.href;
+          const isLayout = tab.label === "Layout";
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className={cn("adm-sn-tab no-underline", active && "act")}
+              className={cn(
+                "adm-sn-tab no-underline",
+                isLayout && "adm-sn-layout inline-flex items-center gap-1.5",
+                active && !isLayout && "act"
+              )}
             >
-              {tab.label}
+              {isLayout ? (
+                <>
+                  <PanelsTopLeft className="adm-sn-layout-icon h-3.5 w-3.5" />
+                  <span>{tab.label}</span>
+                </>
+              ) : (
+                tab.label
+              )}
             </Link>
           );
         })}

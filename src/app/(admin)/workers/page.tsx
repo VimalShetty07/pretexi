@@ -497,15 +497,34 @@ function WorkersPageInner() {
           <span className="wem-badge-mono">
             {loading ? "…" : `${filteredWorkers.length} results`}
           </span>
-          <div className="flex items-center gap-[2px] border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] p-[3px]">
+          <div className="wlp-view-toggle" role="group" aria-label="Employee view mode">
             <button type="button" onClick={() => setViewMode("grid")} aria-label="Grid view"
-              className={`flex h-7 w-7 items-center justify-center transition-colors ${viewMode === "grid" ? "bg-white text-[#1a4fa0]" : "text-[#94a3b8] hover:text-[#0f2d5e]"}`}>
+              className={`wlp-view-btn ${viewMode === "grid" ? "act" : ""}`}>
               <LayoutGrid className="h-[13px] w-[13px]" />
+              <span>Grid</span>
             </button>
             <button type="button" onClick={() => setViewMode("list")} aria-label="List view"
-              className={`flex h-7 w-7 items-center justify-center transition-colors ${viewMode === "list" ? "bg-white text-[#1a4fa0]" : "text-[#94a3b8] hover:text-[#0f2d5e]"}`}>
+              className={`wlp-view-btn ${viewMode === "list" ? "act" : ""}`}>
               <List className="h-[13px] w-[13px]" />
+              <span>List</span>
             </button>
+          </div>
+          <div className="wlp-filter-group">
+            {[
+              { key: "all", label: "All" },
+              { key: "active", label: "Active" },
+              { key: "sponsored", label: "Sponsored" },
+              { key: "on_leave", label: "On leave" },
+            ].map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => router.push(`/workers?tab=${f.key}`)}
+                className={`wlp-filter-chip ${tab === f.key ? "act" : ""}`}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
           {canEditTableColumns && (
             <div className="relative">
@@ -563,21 +582,6 @@ function WorkersPageInner() {
                   token={token ?? ""}
                 />
               ))}
-              {canManage && page === 1 && (
-                <button type="button" className="wlp-add-card" onClick={() => router.push("/workers/new")}>
-                  <div className="flex h-11 w-11 items-center justify-center bg-[rgba(26,79,160,0.08)] text-[#1a4fa0]">
-                    <UserPlus className="h-[20px] w-[20px]" />
-                  </div>
-                  <div className="text-center">
-                    <div className="wem-badge-mono inline-block">Add Employee</div>
-                    <div className="mt-1 text-[11px] text-[#94a3b8]">Onboard a new worker</div>
-                  </div>
-                  <span className="inline-flex items-center gap-1.5 bg-[#0f2d5e] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.06em] text-white"
-                    style={{ fontFamily: "var(--dash-mono)" }}>
-                    <Plus className="h-3 w-3" /> New
-                  </span>
-                </button>
-              )}
             </div>
             {totalPages > 1 && (
               <div className="flex flex-wrap items-center justify-center gap-3 border-t border-[rgba(0,0,0,0.07)] bg-[#f5f5f0] py-3.5">

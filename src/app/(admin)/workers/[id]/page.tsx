@@ -424,53 +424,56 @@ function WorkerDetailInner() {
       {/* Back link */}
       <Link
         href="/workers"
-        className="mb-3 inline-flex items-center gap-1.5 border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-3 py-1.5 font-bold text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]"
+        className="mb-1 inline-flex w-fit max-w-full items-center gap-1.5 self-start border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-3 py-1.5 font-bold text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]"
         style={{ fontFamily: "var(--dash-mono)", fontSize: 10, letterSpacing: "0.07em", textTransform: "uppercase" }}
       >
         <ArrowLeft className="h-3 w-3" /> Back to Employees
       </Link>
 
       {/* ── Marketing page header ───────────────────────── */}
-      <div className="adm-ph" style={{ alignItems: "center" }}>
-        <div className="flex min-w-0 items-center gap-4">
-          {/* Avatar */}
-          <div
-            className="relative flex shrink-0 items-center justify-center overflow-hidden"
-            style={{ width: 52, height: 52, background: "rgba(26,79,160,0.08)", color: "#1a4fa0", fontSize: 18, fontWeight: 800, letterSpacing: "-0.03em", border: "1px solid rgba(0,0,0,0.08)" }}
-          >
-            {profilePhotoUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={profilePhotoUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            ) : (
-              <span className="relative z-[1]">{initials}</span>
-            )}
-            {canUploadProfilePhoto && (
-              <button
-                type="button"
-                disabled={profilePhotoUploading}
-                onClick={() => profilePhotoInputRef.current?.click()}
-                className="absolute bottom-0 right-0 z-[2] flex h-6 w-6 items-center justify-center bg-[#0f2d5e] text-white transition hover:bg-[#1a4fa0] disabled:opacity-50"
-                title="Upload photo"
-              >
-                <Camera className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-          <div>
-            <div className="adm-ph-ey">Employee record</div>
-            <h1 className="adm-ph-title">{worker.name}</h1>
-            <div className="adm-ph-date">
-              {worker.job_title}{worker.department ? ` · ${worker.department}` : ""}{worker.email ? ` · ${worker.email}` : ""}
+      <div className="adm-ph relative" style={{ alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
+        <div className="flex w-fit min-w-[320px] max-w-full flex-col items-center px-2 py-0 text-center">
+            {/* Avatar */}
+            <div
+              className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#DCE7FF] bg-[#F3F8FF] text-[28px] font-extrabold text-[#1a4fa0]"
+            >
+              {profilePhotoUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={profilePhotoUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              ) : (
+                <span className="relative z-[1]">{initials}</span>
+              )}
+              {canUploadProfilePhoto && (
+                <button
+                  type="button"
+                  disabled={profilePhotoUploading}
+                  onClick={() => profilePhotoInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 z-[2] flex h-7 w-7 items-center justify-center rounded-md border border-[#0f2d5e] bg-[#0f2d5e] text-white transition hover:bg-[#1a4fa0] disabled:opacity-50"
+                  title="Upload photo"
+                >
+                  <Camera className="h-3 w-3" />
+                </button>
+              )}
             </div>
-          </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-[26px] font-extrabold leading-none tracking-[-0.02em] text-[#0f2d5e]">
+                {worker.name}
+              </h1>
+              <div className="mt-2 flex flex-col gap-0.5 text-[12px] leading-[1.25] text-[#64748b]">
+                <span className="truncate">{worker.email || "—"}</span>
+                {worker.phone ? <span className="truncate">{worker.phone}</span> : null}
+              </div>
+              <div className="mt-2">
+                <span
+                  className={`inline-flex items-center border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] ${isActive ? "border-[rgba(22,163,74,0.3)] bg-[#f0fdf4] text-[#166534]" : "border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] text-[#0f2d5e]"}`}
+                  style={{ fontFamily: "var(--dash-mono)" }}
+                >
+                  {isActive ? "Active" : worker.status || "—"}
+                </span>
+              </div>
+            </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`inline-flex items-center border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] ${isActive ? "border-[rgba(22,163,74,0.3)] bg-[#f0fdf4] text-[#166534]" : "border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] text-[#0f2d5e]"}`}
-            style={{ fontFamily: "var(--dash-mono)" }}
-          >
-            {isActive ? "Active" : worker.status || "—"}
-          </span>
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2 md:w-auto">
           {visaDays != null && (
             <span
               className="inline-flex items-center border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#0f2d5e]"
@@ -483,7 +486,7 @@ function WorkerDetailInner() {
       </div>
 
       {/* ── Main tab nav ────────────────────────────────── */}
-      <div className="wem-surface" style={{ marginBottom: 14 }}>
+      <div className="wem-surface" style={{ marginBottom: 10 }}>
         <div className="wem-toolbar flex-wrap gap-1">
           {mainTabs.map(({ id, label, icon: Icon }) => (
             <button
@@ -511,7 +514,7 @@ function WorkerDetailInner() {
       </div>
 
       {/* ── Tab content ─────────────────────────────────── */}
-      <div>
+      <div className="worker-tab-content">
           {mainTab === "overview" && (
             <EmployeeDashboard
               worker={worker}
@@ -533,7 +536,6 @@ function WorkerDetailInner() {
           {mainTab === "details" && (
             <div className="flex flex-col gap-6">
               <header className="border-b border-[rgba(0,0,0,0.07)] pb-4">
-                <p className="adm-ph-ey">Employee record</p>
                 <h2 className="text-[20px] font-extrabold tracking-tight text-[#0a0a0a]">Details</h2>
                 <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-[#94a3b8]">
                   Full field list grouped by area. Use the tabs above for checklist, files, and references.
@@ -1096,10 +1098,43 @@ function WorkerDetailInner() {
           )}
 
           {mainTab === "records" && (
-            <div className="space-y-0">
-              {/* Sub-tab nav in a flat wem-surface toolbar */}
-              <div className="wem-surface" style={{ marginBottom: 14 }}>
-                <div className="wem-toolbar flex-wrap gap-1">
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-[#E5EAF4] bg-white p-5 shadow-sm md:p-6">
+                <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-start">
+                  <div className="min-w-0">
+                    <h3 className="text-[20px] font-extrabold tracking-tight text-[#0a0a0a]">Documents, files, contract and right to work</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTab("checklist")}
+                    className="inline-flex h-9 items-center gap-1.5 justify-self-start md:justify-self-end border border-[rgba(0,0,0,0.1)] bg-[#0f2d5e] px-4 text-[10px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0]"
+                    style={{ fontFamily: "var(--dash-mono)" }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add / upload
+                  </button>
+                </div>
+
+                <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <div className="min-h-[82px] rounded-xl border border-[#E8EEFF] bg-white px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>Checklist items</p>
+                    <p className="mt-1 text-xl font-extrabold text-[#0F172A]">{checklist.length}</p>
+                  </div>
+                  <div className="min-h-[82px] rounded-xl border border-[#E8EEFF] bg-white px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>Uploaded files</p>
+                    <p className="mt-1 text-xl font-extrabold text-[#0F172A]">{allFiles.length}</p>
+                  </div>
+                  <div className="min-h-[82px] rounded-xl border border-[#E8EEFF] bg-white px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>RTW category</p>
+                    <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#0F2D5E]">{worker.right_to_work_category || "—"}</p>
+                  </div>
+                  <div className="min-h-[82px] rounded-xl border border-[#E8EEFF] bg-white px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>Visa expiry</p>
+                    <p className="mt-1 text-sm font-semibold text-[#0F2D5E]">{formatDetailDate(worker.visa_expiry)}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#E8EEFF] bg-[#f8fafc] p-2">
                   {(
                     [
                       { id: "documents" as const, label: "Documents", icon: FileText },
@@ -1112,27 +1147,22 @@ function WorkerDetailInner() {
                       key={id}
                       type="button"
                       onClick={() => setRecordsSub(id)}
-                      className={`inline-flex items-center gap-1.5 border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.07em] transition-colors ${recordsSub === id ? "border-[rgba(26,79,160,0.4)] bg-[rgba(26,79,160,0.08)] text-[#1a4fa0]" : "border-transparent text-[#94a3b8] hover:text-[#0f2d5e]"}`}
+                      className={`inline-flex h-9 items-center gap-2 border px-3 text-[10px] font-bold uppercase tracking-[0.07em] transition-colors ${
+                        recordsSub === id
+                          ? "border-[rgba(26,79,160,0.4)] bg-white text-[#1a4fa0]"
+                          : "border-transparent text-[#64748B] hover:border-[rgba(0,0,0,0.1)] hover:bg-white"
+                      }`}
                       style={{ fontFamily: "var(--dash-mono)" }}
                     >
                       <Icon className="h-3.5 w-3.5" />
                       {label}
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() => setTab("checklist")}
-                    className="ml-auto inline-flex items-center gap-1.5 border border-[rgba(0,0,0,0.1)] bg-[#0f2d5e] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0]"
-                    style={{ fontFamily: "var(--dash-mono)" }}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add / upload
-                  </button>
                 </div>
               </div>
 
               {recordsSub === "documents" && (
-                <div className="border border-[rgba(0,0,0,0.07)] bg-white">
+                <div className="overflow-hidden rounded-2xl border border-[#E5EAF4] bg-white shadow-sm">
                   {checklist.length === 0 ? (
                     <p className="px-4 py-10 text-center text-sm text-[#94a3b8]">No compliance items yet.</p>
                   ) : (
@@ -1151,16 +1181,16 @@ function WorkerDetailInner() {
               )}
 
               {recordsSub === "files" && (
-                <div className="border border-[rgba(0,0,0,0.07)] bg-white">
+                <div className="overflow-hidden rounded-2xl border border-[#E5EAF4] bg-white shadow-sm">
                   {allFiles.length === 0 ? (
                     <p className="px-4 py-10 text-center text-sm text-[#94a3b8]">No uploaded files yet. Use Checklist to upload.</p>
                   ) : (
                     allFiles.map((f, i) => (
                       <div
                         key={`${f.name}-${i}`}
-                        className={`flex items-center justify-between gap-4 px-5 py-3.5 ${i < allFiles.length - 1 ? "border-b border-[rgba(0,0,0,0.06)]" : ""}`}
+                        className={`flex items-center justify-between gap-4 px-5 py-3.5 ${i < allFiles.length - 1 ? "border-b border-[#EEF3FA]" : ""}`}
                       >
-                        <div className="min-w-0 flex items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-[#f0fdf4] text-[#16a34a]">
                             <CheckCircle2 className="h-4 w-4" />
                           </div>
@@ -1179,24 +1209,24 @@ function WorkerDetailInner() {
               )}
 
               {recordsSub === "contract" && (
-                <div className="border border-[rgba(0,0,0,0.07)] bg-white px-6 py-14 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center bg-[rgba(26,79,160,0.06)] text-[#1a4fa0]">
+                <div className="rounded-2xl border border-dashed border-[rgba(0,0,0,0.16)] bg-white px-6 py-14 text-center shadow-sm">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center bg-[rgba(26,79,160,0.06)] text-[#1D4ED8]">
                     <FileSignature className="h-6 w-6" />
                   </div>
-                  <p className="mt-4 text-[13px] font-bold text-[#0f2d5e]">Contract &amp; terms</p>
-                  <p className="mt-1 text-[11px] text-[#94a3b8]">Link employment contracts here when available in Protexi.</p>
+                  <p className="mt-4 text-sm font-bold text-[#0f2d5e]">Contract &amp; terms</p>
+                  <p className="mt-1 text-xs text-[#94a3b8]">Link employment contracts here when available in Protexi.</p>
                 </div>
               )}
 
               {recordsSub === "right_to_work" && (
-                <div className="border border-[rgba(0,0,0,0.07)] bg-white">
-                  <div className="border-b border-[rgba(0,0,0,0.06)] px-5 py-4 flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center bg-[rgba(26,79,160,0.08)] text-[#1a4fa0]">
+                <div className="overflow-hidden rounded-2xl border border-[#E5EAF4] bg-white shadow-sm">
+                  <div className="flex items-center gap-3 border-b border-[#EEF3FA] bg-[#f8fafc] px-5 py-4">
+                    <div className="flex h-9 w-9 items-center justify-center bg-[rgba(26,79,160,0.08)] text-[#1a4fa0]">
                       <ShieldCheck className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-[13px] font-bold text-[#0a0a0a]">Right to Work</p>
-                      <p className="text-[11px] text-[#94a3b8]">Immigration status and RTW check record</p>
+                      <p className="text-sm font-bold text-[#0a0a0a]">Right to Work</p>
+                      <p className="text-xs text-[#94a3b8]">Immigration status and RTW check record</p>
                     </div>
                   </div>
                   <div>
@@ -1212,8 +1242,8 @@ function WorkerDetailInner() {
           )}
 
           {mainTab === "bgverify" && (
-            <div className="border border-[rgba(0,0,0,0.07)] bg-white">
-              <div className="flex items-center gap-3 border-b border-[rgba(0,0,0,0.07)] px-5 py-4">
+            <div className="rounded-2xl border border-[#E5EAF4] bg-white shadow-sm">
+              <div className="flex items-center gap-3 border-b border-[#EEF3FA] px-5 py-4">
                 <div className="flex h-8 w-8 items-center justify-center bg-[rgba(26,79,160,0.08)] text-[#1a4fa0]">
                   <ShieldCheck className="h-4 w-4" />
                 </div>
@@ -1322,21 +1352,19 @@ function EmployeeDashboard({
   const topChecklist = [...checklist].slice(0, 5);
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col gap-4">
       {/* KPI strip — multiple lenses */}
-      <div className="adm-stat-row" style={{ marginBottom: 16 }}>
-        <div className="grid grid-cols-2 gap-[2px] md:grid-cols-3 lg:grid-cols-6" style={{ background: "rgba(0,0,0,0.07)" }}>
-          <DashboardKpi label="Compliance" value={`${checklistPct}%`} sub={`${verifiedDocs}/${checklist.length} done`} tone="blue" />
-          <DashboardKpi label="In review" value={String(inReviewDocs)} sub="Awaiting verification" tone="amber" />
-          <DashboardKpi label="Rejected" value={String(rejectedDocs)} sub="Need re-upload" tone="rose" />
-          <DashboardKpi label="Risk" value={worker.risk_level} sub="Posture" tone="slate" accentColor={riskTone.text} />
-          <DashboardKpi label="Visa" value={visaDays == null ? "—" : `${visaDays}d`} sub="Days left" tone="teal" />
-          <DashboardKpi label="References" value={String(bgRefs.length)} sub="BG verify" tone="indigo" />
-        </div>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+        <DashboardKpi label="Compliance" value={`${checklistPct}%`} sub={`${verifiedDocs}/${checklist.length} done`} tone="blue" />
+        <DashboardKpi label="In review" value={String(inReviewDocs)} sub="Awaiting verification" tone="amber" />
+        <DashboardKpi label="Rejected" value={String(rejectedDocs)} sub="Need re-upload" tone="rose" />
+        <DashboardKpi label="Risk" value={worker.risk_level} sub="Posture" tone="slate" accentColor={riskTone.text} />
+        <DashboardKpi label="Visa" value={visaDays == null ? "—" : `${visaDays}d`} sub="Days left" tone="teal" />
+        <DashboardKpi label="References" value={String(bgRefs.length)} sub="BG verify" tone="indigo" />
       </div>
 
       {/* Perspective grid */}
-      <div className="grid grid-cols-1 gap-[2px] xl:grid-cols-2" style={{ background: "rgba(0,0,0,0.07)" }}>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <AspectCard
           title="Profile & contact"
           subtitle="Who to reach and how"
@@ -1497,7 +1525,7 @@ function DashboardKpi({
   // tone kept for API compat — not used visually
   void tone;
   return (
-    <div className="bg-white px-5 py-4">
+    <div className="border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3">
       <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>{label}</p>
       <p className="mt-1 truncate text-[22px] font-extrabold tracking-tight text-[#0f2d5e]" style={accentColor ? { color: accentColor } : undefined}>
         {value}
@@ -1525,7 +1553,7 @@ function AspectCard({
   // barClass kept for API compatibility but not rendered visually
   void barClass;
   return (
-    <section className="border border-[rgba(0,0,0,0.07)] bg-white">
+    <section className="overflow-hidden border border-[rgba(0,0,0,0.08)] bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(0,0,0,0.07)] px-5 py-4">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center bg-[rgba(26,79,160,0.08)] text-[#1a4fa0]">

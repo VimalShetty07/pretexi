@@ -509,6 +509,20 @@
   background: var(--nav-active-bg);
 }
 
+/* Explicit layout tab style so global subnav defaults don't override it */
+.protexi-adm-shell .adm-sn-tab.adm-sn-layout,
+.protexi-adm-shell .adm-sn-tab.adm-sn-layout:hover,
+.protexi-adm-shell .adm-sn-tab.adm-sn-layout:focus-visible {
+  background: #fafafa;
+  color: #0f2d5e;
+  border: 1px solid var(--nav-border);
+  font-weight: 700;
+}
+
+.protexi-adm-shell .adm-sn-tab.adm-sn-layout .adm-sn-layout-icon {
+  color: #0f2d5e;
+}
+
 .protexi-adm-shell .adm-sn-right {
   margin-left: auto;
   display: flex;

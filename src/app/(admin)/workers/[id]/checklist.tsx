@@ -5,6 +5,7 @@ import { Download, Upload, CheckCircle2, XCircle, Loader2, MinusCircle } from "l
 import { useAuth } from "@/components/auth-provider";
 
 const API_PROXY_URL = "/api";
+const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
 
 interface DocFile {
   id: string;
@@ -182,142 +183,129 @@ export default function DocumentChecklist({
   };
 
   return (
-    <div className="data-card" style={{ padding: 14 }}>
+    <div className="wem-surface">
       <input ref={fileInputRef} type="file" className="hidden" onChange={onFileChange} />
-      <h3 className="text-sm font-semibold text-gray-900">Document Checklist</h3>
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 text-red-700" style={{ marginTop: 8, padding: "8px 10px", fontSize: 12 }}>
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700" style={{ marginTop: 8, padding: "8px 10px", fontSize: 12 }}>
-          {success}
-        </div>
-      )}
 
-      {items.length === 0 && (
-        <div
-          className="rounded-lg border border-amber-200 bg-amber-50 text-amber-950"
-          style={{ marginTop: 10, padding: "10px 12px", fontSize: 12, lineHeight: 1.5 }}
-        >
-          <p className="font-semibold">No documents configured for this client</p>
-          <p className="mt-1 text-amber-900/90">
-            Add required document types under <strong>Organisation</strong> (tenant admins) or{" "}
-            <strong>Super admin → Clients → [client]</strong> (platform). Each client can have a different checklist.
-          </p>
-        </div>
-      )}
+      <div className="wem-toolbar">
+        <h3 className="text-[11px] font-extrabold text-[#0a0a0a]">Document Checklist</h3>
+      </div>
 
-      <div style={{ marginTop: 10, display: "grid", gap: 12, maxHeight: 560, overflow: "auto" }}>
-        {groupedItems.map(([categoryKey, group]) => (
-          <div key={categoryKey || "__default"} style={{ display: "grid", gap: 8 }}>
-            {categoryKey ? (
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#2563EB]">{categoryKey}</p>
-            ) : null}
-            {group.map((it) => (
-              <div key={it.id} className="rounded-xl border border-[#E8EEFF] bg-[#F8FAFF]" style={{ padding: "10px 12px" }}>
-                <div className="flex items-start justify-between" style={{ gap: 8 }}>
-                  <div>
-                    <p className="text-xs text-gray-500">#{it.item_number}</p>
-                    <p className="text-sm font-semibold text-gray-900">{it.description}</p>
-                    {it.rejection_reason && (
-                      <p className="text-xs text-red-600" style={{ marginTop: 4 }}>
-                        {it.rejection_reason}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={`rounded-full border text-xs font-semibold ${STATUS_STYLE[it.status]}`}
-                    style={{ padding: "3px 8px" }}
-                  >
-                    {STATUS_LABEL[it.status]}
-                  </span>
-                </div>
-
-                {it.documents.length > 0 && (
-                  <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
-                    {it.documents.map((d) => (
-                      <div
-                        key={d.id}
-                        className="flex items-center justify-between rounded-lg bg-white border border-gray-200"
-                        style={{ padding: "6px 8px" }}
-                      >
-                        <p className="text-xs text-gray-700 truncate">{d.file_name}</p>
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-[#2563EB] hover:underline"
-                          onClick={() => download(it.id, d.id, d.file_name)}
-                        >
-                          <Download style={{ width: 12, height: 12, display: "inline", marginRight: 4 }} />
-                          Download
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap" style={{ gap: 8, marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-gradient-to-br from-[#1D4ED8] to-[#3B82F6] text-xs font-semibold text-white shadow-sm"
-                    style={{ padding: "6px 9px" }}
-                    onClick={() => triggerUpload(it.id)}
-                  >
-                    {uploading === it.id ? (
-                      <Loader2 className="inline animate-spin" style={{ width: 12, height: 12 }} />
-                    ) : (
-                      <Upload className="inline" style={{ width: 12, height: 12 }} />
-                    )}{" "}
-                    {it.documents.length > 0 ? "Re-upload" : "Upload"}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-emerald-600 text-white text-xs disabled:opacity-50"
-                    style={{ padding: "6px 9px" }}
-                    onClick={() => callAction(it.id, "verify")}
-                    disabled={it.documents.length === 0}
-                  >
-                    {acting === it.id + "verify" ? (
-                      <Loader2 className="inline animate-spin" style={{ width: 12, height: 12 }} />
-                    ) : (
-                      <CheckCircle2 className="inline" style={{ width: 12, height: 12 }} />
-                    )}{" "}
-                    Verify
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-red-600 text-white text-xs disabled:opacity-50"
-                    style={{ padding: "6px 9px" }}
-                    onClick={() => callAction(it.id, "reject")}
-                    disabled={it.documents.length === 0}
-                  >
-                    {acting === it.id + "reject" ? (
-                      <Loader2 className="inline animate-spin" style={{ width: 12, height: 12 }} />
-                    ) : (
-                      <XCircle className="inline" style={{ width: 12, height: 12 }} />
-                    )}{" "}
-                    Reject
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg border border-gray-300 bg-white text-gray-800 text-xs disabled:opacity-50"
-                    style={{ padding: "6px 9px" }}
-                    onClick={() => callAction(it.id, "mark-na")}
-                    disabled={it.status === "verified" || it.status === "not_applicable"}
-                  >
-                    {acting === it.id + "mark-na" ? (
-                      <Loader2 className="inline animate-spin" style={{ width: 12, height: 12 }} />
-                    ) : (
-                      <MinusCircle className="inline" style={{ width: 12, height: 12 }} />
-                    )}{" "}
-                    N/A
-                  </button>
-                </div>
-              </div>
-            ))}
+      <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+        {error && (
+          <div className="mb-3 border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700" style={MONO}>
+            {error}
           </div>
-        ))}
+        )}
+        {success && (
+          <div className="mb-3 border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700" style={MONO}>
+            {success}
+          </div>
+        )}
+
+        {items.length === 0 && (
+          <div className="border border-amber-200 bg-amber-50 px-3 py-3 text-[12px] text-amber-950">
+            <p className="font-semibold">No documents configured for this client</p>
+            <p className="mt-1 text-amber-900/90">
+              Add required document types under <strong>Organisation</strong> (tenant admins) or{" "}
+              <strong>Super admin → Clients → [client]</strong> (platform).
+            </p>
+          </div>
+        )}
+
+        <div className="mt-2 grid gap-3">
+          {groupedItems.map(([categoryKey, group]) => (
+            <div key={categoryKey || "__default"} className="grid gap-2">
+              {categoryKey ? (
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#1a4fa0]" style={MONO}>
+                  {categoryKey}
+                </p>
+              ) : null}
+              {group.map((it) => (
+                <div key={it.id} className="border border-[#E5EAF4] bg-white">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#EEF3FA] px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#94a3b8]" style={MONO}>
+                        #{it.item_number}
+                      </p>
+                    <p className="mt-1 text-[15px] font-semibold leading-snug text-[#0f2d5e]">
+                        {it.description}
+                      </p>
+                      {it.rejection_reason && (
+                        <p className="mt-1 text-[11px] text-red-600">{it.rejection_reason}</p>
+                      )}
+                    </div>
+                    <span className={`border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.06em] ${STATUS_STYLE[it.status]}`} style={MONO}>
+                      {STATUS_LABEL[it.status]}
+                    </span>
+                  </div>
+
+                  {it.documents.length > 0 && (
+                    <div className="border-b border-[#EEF3FA] px-4 py-2">
+                      <div className="grid gap-1.5">
+                        {it.documents.map((d) => (
+                          <div key={d.id} className="flex items-center justify-between border border-[#E8EEFF] bg-[#f8fafc] px-2.5 py-2">
+                            <p className="truncate text-[12px] font-medium text-[#0f2d5e]">{d.file_name}</p>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.06em] text-[#1a4fa0] hover:underline"
+                              style={MONO}
+                              onClick={() => download(it.id, d.id, d.file_name)}
+                            >
+                              <Download className="h-3 w-3" />
+                              Download
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+                    <button
+                      type="button"
+                      className="inline-flex h-8 items-center gap-1.5 border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-3 text-[9px] font-semibold uppercase tracking-[0.06em] text-white hover:bg-[#1a4fa0]"
+                      style={MONO}
+                      onClick={() => triggerUpload(it.id)}
+                    >
+                      {uploading === it.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                      {it.documents.length > 0 ? "Re-upload" : "Upload"}
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 items-center gap-1.5 border border-emerald-300 bg-emerald-50 px-3 text-[9px] font-semibold uppercase tracking-[0.06em] text-emerald-700 disabled:opacity-50"
+                      style={MONO}
+                      onClick={() => callAction(it.id, "verify")}
+                      disabled={it.documents.length === 0}
+                    >
+                      {acting === it.id + "verify" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                      Verify
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 items-center gap-1.5 border border-red-300 bg-red-50 px-3 text-[9px] font-semibold uppercase tracking-[0.06em] text-red-700 disabled:opacity-50"
+                      style={MONO}
+                      onClick={() => callAction(it.id, "reject")}
+                      disabled={it.documents.length === 0}
+                    >
+                      {acting === it.id + "reject" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 items-center gap-1.5 border border-gray-300 bg-white px-3 text-[9px] font-semibold uppercase tracking-[0.06em] text-gray-700 disabled:opacity-50"
+                      style={MONO}
+                      onClick={() => callAction(it.id, "mark-na")}
+                      disabled={it.status === "verified" || it.status === "not_applicable"}
+                    >
+                      {acting === it.id + "mark-na" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MinusCircle className="h-3.5 w-3.5" />}
+                      N/A
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
   type ComponentType,
   type Dispatch,
   type SetStateAction,
@@ -16,6 +17,7 @@ import {
   Mail,
   ShieldCheck,
   Users,
+  UserCheck,
   ListChecks,
   Plus,
   Trash2,
@@ -26,6 +28,8 @@ import {
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
 import { ChecklistTemplateEditor } from "@/components/checklist-template-editor";
+import "../dashboard/dashboard-marketing.css";
+import "../workers/workers-page.css";
 
 interface Me {
   email: string;
@@ -75,6 +79,8 @@ interface OrgSettingsResponse {
   rtw_category_options: string[];
 }
 
+const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
+
 function OrganisationOptionListSection({
   title,
   description,
@@ -111,92 +117,106 @@ function OrganisationOptionListSection({
   token: string | null;
 }) {
   return (
-    <div className="data-card" style={{ padding: 16 }}>
-      <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-        <Icon className="h-4 w-4 text-[#1a5296]" />
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+    <div className="wem-surface h-full">
+      <div className="wem-toolbar">
+        <span className="flex min-w-0 items-center gap-2 text-[11px] font-extrabold tracking-tight text-[#0a0a0a]">
+          <Icon className="h-4 w-4 shrink-0 text-[var(--dash-blue)]" />
+          <span className="truncate">{title}</span>
+        </span>
       </div>
-      <p className="text-xs text-gray-500" style={{ marginBottom: 12 }}>
-        {description}
-      </p>
-      <div style={{ display: "grid", gap: 8 }}>
-        {options.map((label, idx) => (
-          <div key={idx} className="flex items-center gap-2">
-            <input
-              className="flex-1 rounded-xl border border-gray-300 bg-white text-sm text-gray-900"
-              style={{ height: 38, padding: "0 12px" }}
-              value={label}
-              disabled={!canEdit}
-              onChange={(e) => {
-                const v = e.target.value;
-                setOptions((prev) => prev.map((x, i) => (i === idx ? v : x)));
-              }}
-              placeholder="Label"
-              maxLength={100}
-            />
-            {canEdit && (
-              <button
-                type="button"
-                className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50"
-                title="Remove"
-                onClick={() => setOptions((prev) => prev.filter((_, i) => i !== idx))}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        ))}
+      <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+        <p className="text-[12px] leading-relaxed text-[#64748b]" style={{ marginBottom: 12 }}>
+          {description}
+        </p>
+        <div className="grid gap-2">
+          {options.map((label, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <input
+                className="h-9 flex-1 border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[13px] text-[#0a0a0a] outline-none focus:border-[var(--dash-blue)] disabled:opacity-60"
+                value={label}
+                disabled={!canEdit}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setOptions((prev) => prev.map((x, i) => (i === idx ? v : x)));
+                }}
+                placeholder="Label"
+                maxLength={100}
+              />
+              {canEdit && (
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center border border-[rgba(220,38,38,0.25)] text-[#991b1b] hover:bg-[rgba(254,242,242,0.85)]"
+                  title="Remove"
+                  onClick={() => setOptions((prev) => prev.filter((_, i) => i !== idx))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          ))}
+          {canEdit && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 border border-dashed border-[rgba(0,0,0,0.15)] bg-[var(--dash-card)] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]"
+              style={MONO}
+              onClick={() => setOptions((prev) => [...prev, ""])}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add entry
+            </button>
+          )}
+        </div>
         {canEdit && (
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-            onClick={() => setOptions((prev) => [...prev, ""])}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add entry
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="h-8 border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[#f8fafc]"
+              style={MONO}
+              onClick={() => setOptions([...resetDefaults])}
+            >
+              Reset defaults
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              className="inline-flex h-8 items-center gap-2 border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-4 text-[9px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0] disabled:opacity-50"
+              style={MONO}
+              onClick={async () => {
+                if (!token) return;
+                const cleaned = options.map((s) => s.trim()).filter(Boolean);
+                if (cleaned.length === 0) {
+                  setMsg("Add at least one label.");
+                  return;
+                }
+                setMsg("");
+                setSaving(true);
+                try {
+                  await api.patch("/organisation/settings", { [patchKey]: cleaned }, token);
+                  setMsg("Saved.");
+                  await onReload();
+                } catch (e: unknown) {
+                  setMsg(e instanceof Error ? e.message : "Save failed");
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Save
+            </button>
+            {msg ? (
+              <span className="text-[11px] text-[#64748b]" style={MONO}>
+                {msg}
+              </span>
+            ) : null}
+          </div>
+        )}
+        {!canEdit && (
+          <p className="mt-3 text-[11px] text-[#94a3b8]" style={MONO}>
+            Only organisation admins can edit this list.
+          </p>
         )}
       </div>
-      {canEdit && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            onClick={() => setOptions([...resetDefaults])}
-          >
-            Reset to defaults
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-            onClick={async () => {
-              if (!token) return;
-              const cleaned = options.map((s) => s.trim()).filter(Boolean);
-              if (cleaned.length === 0) {
-                setMsg("Add at least one label.");
-                return;
-              }
-              setMsg("");
-              setSaving(true);
-              try {
-                await api.patch("/organisation/settings", { [patchKey]: cleaned }, token);
-                setMsg("Saved.");
-                await onReload();
-              } catch (e: unknown) {
-                setMsg(e instanceof Error ? e.message : "Save failed");
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            Save
-          </button>
-          {msg ? <span className="text-xs text-gray-600">{msg}</span> : null}
-        </div>
-      )}
-      {!canEdit && <p className="mt-2 text-xs text-gray-500">Only organisation admins can edit this list.</p>}
     </div>
   );
 }
@@ -258,15 +278,46 @@ export default function OrganisationPage() {
     load();
   }, [token, loadOrgSettings]);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading organisation...</p>;
-  if (error || !me || !ov) return <p className="text-sm text-red-600">{error || "Organisation unavailable"}</p>;
+  const todayStr = useMemo(
+    () =>
+      new Date().toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }),
+    []
+  );
+
+  if (loading) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
+          Loading organisation…
+        </p>
+      </div>
+    );
+  }
+
+  if (error || !me || !ov) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#dc2626]" style={MONO}>
+          {error || "Organisation unavailable"}
+        </p>
+      </div>
+    );
+  }
 
   const activeRate = ov.total_employees > 0 ? Math.round((ov.active_employees / ov.total_employees) * 100) : 0;
   const cosUtilisation = ov.cos_allocated > 0 ? Math.round((ov.cos_used / ov.cos_allocated) * 100) : 0;
   const sponsored = ov.sponsored ?? 0;
   const nonSponsored = ov.non_sponsored ?? Math.max(ov.total_employees - sponsored, 0);
   const expiring90 = ov.visa_breakdown
-    ? ov.visa_breakdown.expired + ov.visa_breakdown.expiring_30 + ov.visa_breakdown.expiring_60 + ov.visa_breakdown.expiring_90
+    ? ov.visa_breakdown.expired +
+      ov.visa_breakdown.expiring_30 +
+      ov.visa_breakdown.expiring_60 +
+      ov.visa_breakdown.expiring_90
     : 0;
   const orgCode = (me.organisation_slug || me.organisation_id.slice(0, 8)).toUpperCase();
   const orgDisplay = me.organisation_name || `Protexi Tenant ${orgCode}`;
@@ -284,64 +335,136 @@ export default function OrganisationPage() {
     user?.role === "super_admin";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div>
-        <h1 className="admin-page-title">Organisation</h1>
-        <p className="admin-page-subtitle" style={{ marginTop: 6 }}>
-          Organisation health, sponsorship capacity, and admin context.
-        </p>
+    <div className="protexi-dash-marketing flex flex-col gap-0">
+      <div className="adm-ph">
+        <div className="min-w-0">
+          <div className="adm-ph-ey">Tenant</div>
+          <h1 className="adm-ph-title">
+            Organisation <em className="dash-title-em">profile</em>
+          </h1>
+          <div className="adm-ph-date">{todayStr}</div>
+          <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-[#64748b]">
+            Health, sponsorship capacity, and the dropdown lists your HR team uses across employee records.
+          </p>
+        </div>
+        <div className="adm-ph-badge inline-flex items-center gap-2 border border-[rgba(22,163,74,0.3)] bg-[#f0fdf4] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-[#166534]" style={MONO}>
+          <ShieldCheck className="h-3.5 w-3.5" />
+          Active tenant
+        </div>
       </div>
 
-      <div className="data-card" style={{ padding: 16 }}>
-        <div className="flex items-center justify-between flex-wrap" style={{ gap: 10 }}>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Organisation Profile</p>
-            <h2 className="text-lg font-semibold text-gray-900" style={{ marginTop: 2 }}>{orgDisplay}</h2>
+      <div className="adm-stat-row grid grid-cols-2 md:grid-cols-4" style={{ gap: 2, background: "rgba(0,0,0,0.07)", marginBottom: 16 }}>
+        <div className="adm-sc adm-sc-b bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-b">
+              <Users className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">Headcount</span>
           </div>
-          <span
-            className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
-            style={{ padding: "5px 10px", fontSize: 12, gap: 6 }}
-          >
-            <ShieldCheck style={{ width: 13, height: 13 }} />
-            Active
+          <div className="adm-sc-num">{ov.total_employees}</div>
+          <div className="adm-sc-lbl">Total employees</div>
+          <div className="adm-sc-sub">On record</div>
+        </div>
+        <div className="adm-sc adm-sc-p bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-p">
+              <UserCheck className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">{activeRate}%</span>
+          </div>
+          <div className="adm-sc-num">{ov.active_employees}</div>
+          <div className="adm-sc-lbl">Active</div>
+          <div className="adm-sc-sub">Currently active status</div>
+        </div>
+        <div className="adm-sc adm-sc-a bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-a">
+              <BriefcaseBusiness className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">CoS</span>
+          </div>
+          <div className="adm-sc-num">{sponsored}</div>
+          <div className="adm-sc-lbl">Sponsored</div>
+          <div className="adm-sc-sub">{nonSponsored} non-sponsored</div>
+        </div>
+        <div className="adm-sc adm-sc-r bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-r">
+              {canViewCos ? <BriefcaseBusiness className="h-[17px] w-[17px]" /> : <AlertTriangle className="h-[17px] w-[17px]" />}
+            </div>
+            <span className="adm-sc-pill adm-pill-n">{canViewCos ? "Pool" : "Risk"}</span>
+          </div>
+          <div className="adm-sc-num">{canViewCos ? ov.cos_available : expiring90}</div>
+          <div className="adm-sc-lbl">{canViewCos ? "CoS available" : "Visa · 90 days"}</div>
+          <div className="adm-sc-sub">{canViewCos ? `${ov.cos_used} / ${ov.cos_allocated} used` : "Attention window"}</div>
+        </div>
+      </div>
+
+      <div className="wem-surface">
+        <div className="wem-toolbar">
+          <span className="flex items-center gap-2 text-[11px] font-extrabold text-[#0a0a0a]">
+            <Building2 className="h-4 w-4 text-[var(--dash-blue)]" />
+            Organisation profile
+          </span>
+          <span className="wem-badge-mono truncate" style={MONO}>
+            {orgRef}
           </span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10, marginTop: 12 }}>
-          <Info icon={Building2} label="Organisation Ref" value={orgRef} />
-          <Info icon={Mail} label="Admin Email" value={me.email} />
+        <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+          <h2 className="text-lg font-extrabold tracking-tight text-[#0a0a0a]">{orgDisplay}</h2>
+          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+            <Info icon={Building2} label="Organisation ref" value={orgRef} />
+            <Info icon={Mail} label="Admin email" value={me.email} />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 12 }}>
-        <div className="data-card" style={{ padding: 16 }}>
-          <h3 className="text-sm font-semibold text-gray-900">Workforce & Sponsorship</h3>
-          <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
-            <StatRow icon={Users} label="Total Employees" value={String(ov.total_employees)} />
-            <StatRow icon={Users} label="Active Employees" value={String(ov.active_employees)} />
-            <StatRow icon={Users} label="Sponsored Workers" value={String(sponsored)} />
-            <StatRow icon={Users} label="Non-Sponsored Workers" value={String(nonSponsored)} />
-            <ProgressRow label="Active Rate" value={activeRate} color="emerald" />
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="wem-surface">
+          <div className="wem-toolbar">
+            <span className="text-[11px] font-extrabold text-[#0a0a0a]">Workforce & sponsorship</span>
+            <span className="wem-badge-mono" style={MONO}>
+              {ov.total_employees} people
+            </span>
+          </div>
+          <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+            <div className="grid gap-0">
+              <StatRow icon={Users} label="Total employees" value={String(ov.total_employees)} />
+              <StatRow icon={Users} label="Active employees" value={String(ov.active_employees)} />
+              <StatRow icon={Users} label="Sponsored workers" value={String(sponsored)} />
+              <StatRow icon={Users} label="Non-sponsored workers" value={String(nonSponsored)} />
+              <ProgressRow label="Active rate" value={activeRate} />
+            </div>
           </div>
         </div>
 
         {canViewCos ? (
-          <div className="data-card" style={{ padding: 16 }}>
-            <h3 className="text-sm font-semibold text-gray-900">CoS Capacity & Compliance</h3>
-            <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
-              <StatRow icon={BriefcaseBusiness} label="CoS Allocated" value={String(ov.cos_allocated)} />
-              <StatRow icon={BriefcaseBusiness} label="CoS Used" value={String(ov.cos_used)} />
-              <StatRow icon={BriefcaseBusiness} label="CoS Available" value={String(ov.cos_available)} />
-              <ProgressRow label="CoS Utilisation" value={cosUtilisation} color="blue" />
-              <StatRow icon={AlertTriangle} label="Visa Risk (next 90 days)" value={String(expiring90)} />
+          <div className="wem-surface">
+            <div className="wem-toolbar">
+              <span className="text-[11px] font-extrabold text-[#0a0a0a]">CoS capacity & compliance</span>
+              <span className="wem-badge-mono" style={MONO}>
+                {cosUtilisation}% used
+              </span>
+            </div>
+            <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+              <div className="grid gap-0">
+                <StatRow icon={BriefcaseBusiness} label="CoS allocated" value={String(ov.cos_allocated)} />
+                <StatRow icon={BriefcaseBusiness} label="CoS used" value={String(ov.cos_used)} />
+                <StatRow icon={BriefcaseBusiness} label="CoS available" value={String(ov.cos_available)} />
+                <ProgressRow label="CoS utilisation" value={cosUtilisation} />
+                <StatRow icon={AlertTriangle} label="Visa risk (next 90 days)" value={String(expiring90)} />
+              </div>
             </div>
           </div>
         ) : (
-          <div className="data-card" style={{ padding: 16 }}>
-            <h3 className="text-sm font-semibold text-gray-900">Compliance Overview</h3>
-            <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
-              <StatRow icon={AlertTriangle} label="Visa Risk (next 90 days)" value={String(expiring90)} />
-              <p className="text-xs text-gray-500" style={{ marginTop: 6 }}>
-                CoS capacity details are hidden for HR role.
+          <div className="wem-surface">
+            <div className="wem-toolbar">
+              <span className="text-[11px] font-extrabold text-[#0a0a0a]">Compliance overview</span>
+            </div>
+            <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+              <StatRow icon={AlertTriangle} label="Visa risk (next 90 days)" value={String(expiring90)} />
+              <p className="mt-3 text-[11px] leading-relaxed text-[#64748b]" style={MONO}>
+                CoS capacity details are hidden for the HR officer role.
               </p>
             </div>
           </div>
@@ -349,112 +472,122 @@ export default function OrganisationPage() {
       </div>
 
       {token && me.organisation_id && (
-        <ChecklistTemplateEditor
-          token={token}
-          organisationId={me.organisation_id}
-          canEdit={!!canEditChecklistTemplate}
-        />
+        <div className="mt-4">
+          <ChecklistTemplateEditor token={token} organisationId={me.organisation_id} canEdit={!!canEditChecklistTemplate} />
+        </div>
       )}
 
-      <div className="data-card" style={{ padding: 16 }}>
-        <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-          <ListChecks className="h-4 w-4 text-[#1a5296]" />
-          <h3 className="text-sm font-semibold text-gray-900">Employee employment statuses</h3>
+      <div className="mt-4 wem-surface">
+        <div className="wem-toolbar">
+          <span className="flex items-center gap-2 text-[11px] font-extrabold text-[#0a0a0a]">
+            <ListChecks className="h-4 w-4 text-[var(--dash-blue)]" />
+            Employment statuses
+          </span>
         </div>
-        <p className="text-xs text-gray-500" style={{ marginBottom: 12 }}>
-          These labels appear in the <strong>Employment status</strong> dropdown for every employee. Defaults are Active,
-          Inactive, and Finished — add your own (e.g. &quot;On leave&quot;, &quot;Probation&quot;) so HR uses the same set
-          across the organisation.
-        </p>
-        <div style={{ display: "grid", gap: 8 }}>
-          {employmentStatusOptions.map((label, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <input
-                className="flex-1 rounded-xl border border-gray-300 bg-white text-sm text-gray-900"
-                style={{ height: 38, padding: "0 12px" }}
-                value={label}
-                disabled={!canEditEmploymentStatuses}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setEmploymentStatusOptions((prev) => prev.map((x, i) => (i === idx ? v : x)));
-                }}
-                placeholder="Status label"
-                maxLength={100}
-              />
-              {canEditEmploymentStatuses && (
-                <button
-                  type="button"
-                  className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50"
-                  title="Remove"
-                  onClick={() => setEmploymentStatusOptions((prev) => prev.filter((_, i) => i !== idx))}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          ))}
+        <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+          <p className="text-[12px] leading-relaxed text-[#64748b]" style={{ marginBottom: 12 }}>
+            These labels appear in the <strong className="text-[#475569]">Employment status</strong> dropdown for every
+            employee. Defaults are Active, Inactive, and Finished — add your own (e.g. &quot;On leave&quot;,
+            &quot;Probation&quot;) so HR uses the same set across the organisation.
+          </p>
+          <div className="grid gap-2">
+            {employmentStatusOptions.map((label, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  className="h-9 flex-1 border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[13px] text-[#0a0a0a] outline-none focus:border-[var(--dash-blue)] disabled:opacity-60"
+                  value={label}
+                  disabled={!canEditEmploymentStatuses}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setEmploymentStatusOptions((prev) => prev.map((x, i) => (i === idx ? v : x)));
+                  }}
+                  placeholder="Status label"
+                  maxLength={100}
+                />
+                {canEditEmploymentStatuses && (
+                  <button
+                    type="button"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center border border-[rgba(220,38,38,0.25)] text-[#991b1b] hover:bg-[rgba(254,242,242,0.85)]"
+                    title="Remove"
+                    onClick={() => setEmploymentStatusOptions((prev) => prev.filter((_, i) => i !== idx))}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {canEditEmploymentStatuses && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 border border-dashed border-[rgba(0,0,0,0.15)] bg-[var(--dash-card)] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]"
+                style={MONO}
+                onClick={() => setEmploymentStatusOptions((prev) => [...prev, ""])}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add status
+              </button>
+            )}
+          </div>
           {canEditEmploymentStatuses && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-              onClick={() => setEmploymentStatusOptions((prev) => [...prev, ""])}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add status
-            </button>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="h-8 border border-[rgba(0,0,0,0.12)] bg-white px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[#f8fafc]"
+                style={MONO}
+                onClick={() => setEmploymentStatusOptions([...DEFAULT_EMPLOYMENT_STATUSES])}
+              >
+                Reset defaults
+              </button>
+              <button
+                type="button"
+                disabled={statusSaving}
+                className="inline-flex h-8 items-center gap-2 border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-4 text-[9px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0] disabled:opacity-50"
+                style={MONO}
+                onClick={async () => {
+                  if (!token) return;
+                  const cleaned = employmentStatusOptions.map((s) => s.trim()).filter(Boolean);
+                  if (cleaned.length === 0) {
+                    setStatusMsg("Add at least one status label.");
+                    return;
+                  }
+                  setStatusMsg("");
+                  setStatusSaving(true);
+                  try {
+                    await api.patch("/organisation/settings", { employment_status_options: cleaned }, token);
+                    setStatusMsg("Saved.");
+                    await loadOrgSettings();
+                  } catch (e: unknown) {
+                    setStatusMsg(e instanceof Error ? e.message : "Save failed");
+                  } finally {
+                    setStatusSaving(false);
+                  }
+                }}
+              >
+                {statusSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Save statuses
+              </button>
+              {statusMsg ? (
+                <span className="text-[11px] text-[#64748b]" style={MONO}>
+                  {statusMsg}
+                </span>
+              ) : null}
+            </div>
+          )}
+          {!canEditEmploymentStatuses && (
+            <p className="mt-3 text-[11px] text-[#94a3b8]" style={MONO}>
+              Only organisation admins can edit this list.
+            </p>
           )}
         </div>
-        {canEditEmploymentStatuses && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-              onClick={() => setEmploymentStatusOptions([...DEFAULT_EMPLOYMENT_STATUSES])}
-            >
-              Reset to defaults
-            </button>
-            <button
-              type="button"
-              disabled={statusSaving}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-              onClick={async () => {
-                if (!token) return;
-                const cleaned = employmentStatusOptions.map((s) => s.trim()).filter(Boolean);
-                if (cleaned.length === 0) {
-                  setStatusMsg("Add at least one status label.");
-                  return;
-                }
-                setStatusMsg("");
-                setStatusSaving(true);
-                try {
-                  await api.patch("/organisation/settings", { employment_status_options: cleaned }, token);
-                  setStatusMsg("Saved.");
-                  await loadOrgSettings();
-                } catch (e: unknown) {
-                  setStatusMsg(e instanceof Error ? e.message : "Save failed");
-                } finally {
-                  setStatusSaving(false);
-                }
-              }}
-            >
-              {statusSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Save statuses
-            </button>
-            {statusMsg ? <span className="text-xs text-gray-600">{statusMsg}</span> : null}
-          </div>
-        )}
-        {!canEditEmploymentStatuses && (
-          <p className="mt-2 text-xs text-gray-500">Only organisation admins can edit this list.</p>
-        )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <OrganisationOptionListSection
           title="Departments"
           description={
             <>
-              Labels for the <strong>Department</strong> dropdown on each employee. Adjust them here so HR picks from a
-              consistent list.
+              Labels for the <strong className="text-[#475569]">Department</strong> dropdown on each employee. Adjust them
+              here so HR picks from a consistent list.
             </>
           }
           icon={Building2}
@@ -474,7 +607,8 @@ export default function OrganisationPage() {
           title="Work locations"
           description={
             <>
-              Options for <strong>Work location</strong> on employee records (sites, hubs, or &quot;Remote&quot;).
+              Options for <strong className="text-[#475569]">Work location</strong> on employee records (sites, hubs, or
+              &quot;Remote&quot;).
             </>
           }
           icon={MapPin}
@@ -494,8 +628,8 @@ export default function OrganisationPage() {
           title="Onboarding stages"
           description={
             <>
-              HR-facing <strong>Onboarding stage</strong> labels (separate from the internal workflow stage). Align these
-              with your recruitment process.
+              HR-facing <strong className="text-[#475569]">Onboarding stage</strong> labels (separate from the internal
+              workflow stage). Align these with your recruitment process.
             </>
           }
           icon={ClipboardList}
@@ -513,44 +647,50 @@ export default function OrganisationPage() {
         />
       </div>
 
-      <OrganisationOptionListSection
-        title="Right to work categories (master field)"
-        description={
-          <>
-            Defines the <strong>Right to work category</strong> dropdown on every employee record. Align labels with your
-            HR / compliance policy; this is the canonical list workers must select from.
-          </>
-        }
-        icon={ShieldCheck}
-        options={rtwCategoryOptions}
-        setOptions={setRtwCategoryOptions}
-        canEdit={canEditEmploymentStatuses}
-        saving={rtwSaving}
-        setSaving={setRtwSaving}
-        msg={rtwMsg}
-        setMsg={setRtwMsg}
-        onReload={loadOrgSettings}
-        resetDefaults={DEFAULT_RTW_CATEGORIES}
-        patchKey="rtw_category_options"
-        token={token}
-      />
+      <div className="mt-4">
+        <OrganisationOptionListSection
+          title="Right to work categories (master field)"
+          description={
+            <>
+              Defines the <strong className="text-[#475569]">Right to work category</strong> dropdown on every employee
+              record. Align labels with your HR / compliance policy; this is the canonical list workers must select from.
+            </>
+          }
+          icon={ShieldCheck}
+          options={rtwCategoryOptions}
+          setOptions={setRtwCategoryOptions}
+          canEdit={canEditEmploymentStatuses}
+          saving={rtwSaving}
+          setSaving={setRtwSaving}
+          msg={rtwMsg}
+          setMsg={setRtwMsg}
+          onReload={loadOrgSettings}
+          resetDefaults={DEFAULT_RTW_CATEGORIES}
+          patchKey="rtw_category_options"
+          token={token}
+        />
+      </div>
 
-      <div className="data-card" style={{ padding: 16 }}>
-        <h3 className="text-sm font-semibold text-gray-900">Admin Account Context</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10, marginTop: 10 }}>
-          <Info icon={Building2} label="Admin Name" value={me.full_name} />
-          <Info icon={Mail} label="Email" value={me.email} />
-          <Info icon={Building2} label="Organisation Ref" value={orgRef} />
-          {canViewCos ? (
-            <Info icon={BriefcaseBusiness} label="Current CoS Used" value={String(ov.cos_used)} />
-          ) : (
-            <Info icon={AlertTriangle} label="Visa Risk (next 90 days)" value={String(expiring90)} />
-          )}
+      <div className="mt-4 wem-surface">
+        <div className="wem-toolbar">
+          <span className="text-[11px] font-extrabold text-[#0a0a0a]">Admin account context</span>
         </div>
-        <p className="text-xs text-gray-500" style={{ marginTop: 10 }}>
-          Company name and licence details are managed via your sponsor workflow; employment status labels and dropdown
-          lists (departments, locations, onboarding stages, right to work categories) are editable above.
-        </p>
+        <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <Info icon={Building2} label="Admin name" value={me.full_name} />
+            <Info icon={Mail} label="Email" value={me.email} />
+            <Info icon={Building2} label="Organisation ref" value={orgRef} />
+            {canViewCos ? (
+              <Info icon={BriefcaseBusiness} label="Current CoS used" value={String(ov.cos_used)} />
+            ) : (
+              <Info icon={AlertTriangle} label="Visa risk (next 90 days)" value={String(expiring90)} />
+            )}
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-[#64748b]" style={MONO}>
+            Company name and licence details are managed via your sponsor workflow; employment status labels and dropdown
+            lists (departments, locations, onboarding stages, right to work categories) are editable above.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -558,41 +698,41 @@ export default function OrganisationPage() {
 
 function Info({ icon: Icon, label, value }: { icon: typeof Building2; label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50" style={{ padding: "10px 12px" }}>
-      <div className="flex items-center" style={{ gap: 6 }}>
-        <Icon style={{ width: 12, height: 12, color: "#64748b" }} />
-        <p className="text-xs text-gray-500">{label}</p>
+    <div className="border border-[rgba(0,0,0,0.08)] bg-[#f8fafc] px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-[#94a3b8]" />
+        <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[#64748b]" style={MONO}>
+          {label}
+        </p>
       </div>
-      <p className="text-sm font-semibold text-gray-900" style={{ marginTop: 2 }}>{value}</p>
+      <p className="mt-1 text-[13px] font-semibold text-[#0a0a0a]">{value}</p>
     </div>
   );
 }
 
 function StatRow({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between" style={{ padding: "4px 0", borderBottom: "1px solid #e6edf6" }}>
-      <div className="flex items-center" style={{ gap: 8 }}>
-        <Icon style={{ width: 14, height: 14, color: "#64748b" }} />
-        <p className="text-sm text-gray-600">{label}</p>
+    <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] py-2.5 last:border-b-0">
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-[#94a3b8]" />
+        <p className="text-[13px] text-[#475569]">{label}</p>
       </div>
-      <p className="text-sm font-semibold text-gray-900">{value}</p>
+      <p className="text-[13px] font-bold tabular-nums text-[#0a0a0a]">{value}</p>
     </div>
   );
 }
 
-function ProgressRow({ label, value, color }: { label: string; value: number; color: "emerald" | "blue" }) {
-  const barClass = color === "emerald" ? "bg-emerald-500" : "bg-blue-500";
-  const textClass = color === "emerald" ? "text-emerald-700" : "text-blue-700";
+function ProgressRow({ label, value }: { label: string; value: number }) {
+  const w = Math.max(0, Math.min(100, value));
   return (
-    <div style={{ paddingTop: 4 }}>
-      <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
-        <p className="text-sm text-gray-600">{label}</p>
-        <p className={`text-sm font-semibold ${textClass}`}>{value}%</p>
+    <div className="border-b border-[rgba(0,0,0,0.06)] py-2.5 last:border-b-0">
+      <div className="mb-1.5 flex items-center justify-between">
+        <p className="text-[13px] text-[#475569]">{label}</p>
+        <p className="text-[13px] font-bold tabular-nums text-[var(--dash-blue)]">{value}%</p>
       </div>
-      <div className="rounded-full bg-gray-100 overflow-hidden" style={{ height: 6 }}>
-        <div className={`${barClass}`} style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: "100%" }} />
+      <div className="h-1.5 overflow-hidden bg-[rgba(0,0,0,0.06)]">
+        <div className="h-full bg-[var(--dash-blue)] transition-[width] duration-300" style={{ width: `${w}%` }} />
       </div>
     </div>
   );
 }
-

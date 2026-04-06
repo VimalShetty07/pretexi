@@ -29,6 +29,36 @@
   padding: 10px 16px;
 }
 
+/* Marketing-style filter chips in workers toolbar */
+.protexi-adm-shell .wlp-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.protexi-adm-shell .wlp-filter-chip {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #f0f0eb;
+  color: #0f2d5e;
+  padding: 5px 10px;
+  font-family: var(--dash-mono, "SF Mono", "Fira Code", Consolas, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.13s, border-color 0.13s, color 0.13s;
+}
+.protexi-adm-shell .wlp-filter-chip:hover {
+  background: rgba(26, 79, 160, 0.08);
+  border-color: rgba(26, 79, 160, 0.28);
+}
+.protexi-adm-shell .wlp-filter-chip.act {
+  background: #0f2d5e;
+  border-color: #0f2d5e;
+  color: #fff;
+}
+
 /* Toolbar search bar */
 .protexi-adm-shell .wlp-tb-search {
   display: flex;
@@ -55,6 +85,43 @@
 }
 .protexi-adm-shell .wlp-tb-search input::placeholder { color: #94a3b8; }
 
+/* Standard segmented control for grid/list view */
+.protexi-adm-shell .wlp-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  padding: 3px;
+}
+
+.protexi-adm-shell .wlp-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font-family: var(--dash-mono, "SF Mono", "Fira Code", Consolas, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.13s ease;
+}
+.protexi-adm-shell .wlp-view-btn:hover {
+  color: #0f2d5e;
+  background: #f8fafc;
+}
+.protexi-adm-shell .wlp-view-btn.act {
+  background: #1a4fa0;
+  color: #ffffff;
+  border-color: #1a4fa0;
+}
+
 /* ── Mono badge (results count, columns button, pagination) ─ */
 .protexi-adm-shell .wem-badge-mono {
   font-family: var(--dash-mono, "SF Mono", "Fira Code", Consolas, monospace);
@@ -78,8 +145,9 @@
 .protexi-adm-shell .wem-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0;
+  gap: 14px;
   background: transparent;
+  padding: 14px;
 }
 @media (max-width: 1100px) {
   .protexi-adm-shell .wem-grid { grid-template-columns: repeat(2, 1fr); }
@@ -91,9 +159,8 @@
 /* ── Employee card ───────────────────────────────────────── */
 .protexi-adm-shell .wem-card {
   background: #fff;
-  border-right: 1px solid rgba(0, 0, 0, 0.07);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
-  border-radius: 0;
+  border: 1px solid rgba(15, 45, 94, 0.1);
+  border-radius: 14px;
   cursor: pointer;
   text-align: left;
   width: 100%;
@@ -101,11 +168,8 @@
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  transition: background 0.15s;
-}
-/* 3rd-column cards don't need a right border (already clipped by wem-surface) */
-.protexi-adm-shell .wem-grid > *:nth-child(3n) {
-  border-right: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  box-shadow: 0 2px 10px rgba(15, 45, 94, 0.04);
 }
 .protexi-adm-shell .wem-card::before {
   content: "";
@@ -113,13 +177,17 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
+  height: 3px;
   background: var(--dash-blue, #1a4fa0);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.22s ease;
 }
-.protexi-adm-shell .wem-card:hover { background: rgba(26, 79, 160, 0.025); }
+.protexi-adm-shell .wem-card:hover {
+  border-color: rgba(26, 79, 160, 0.28);
+  box-shadow: 0 10px 22px rgba(15, 45, 94, 0.12);
+  transform: translateY(-1px);
+}
 .protexi-adm-shell .wem-card:hover::before { transform: scaleX(1); }
 
 /* Card top row */
@@ -127,13 +195,13 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 16px 16px 12px;
+  padding: 16px 16px 10px;
 }
 
 /* Avatar */
 .protexi-adm-shell .wem-avatar {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   flex-shrink: 0;
   background: rgba(26, 79, 160, 0.08);
   color: #1a4fa0;
@@ -143,7 +211,7 @@
   font-size: 14px;
   font-weight: 800;
   letter-spacing: -0.03em;
-  border-radius: 0;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.07);
   position: relative; /* so the abs-positioned img is clipped inside */
@@ -188,7 +256,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 3px 7px;
-  border-radius: 0;
+  border-radius: 999px;
   flex-shrink: 0;
   white-space: nowrap;
   align-self: flex-start;
@@ -211,8 +279,8 @@
 
 /* Detail rows */
 .protexi-adm-shell .wem-details {
-  padding: 0 16px 10px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 0 16px 12px;
+  border-top: 1px dashed rgba(15, 45, 94, 0.12);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -252,8 +320,8 @@
 
 /* Progress strip */
 .protexi-adm-shell .wem-prog-wrap {
-  padding: 7px 16px 9px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 9px 16px 11px;
+  border-top: 1px dashed rgba(15, 45, 94, 0.12);
 }
 .protexi-adm-shell .wem-prog-top {
   display: flex;
@@ -274,22 +342,22 @@
   font-weight: 800;
 }
 .protexi-adm-shell .wem-prog-track {
-  height: 3px;
+  height: 5px;
   background: rgba(0, 0, 0, 0.07);
-  border-radius: 0;
+  border-radius: 999px;
   overflow: hidden;
 }
 .protexi-adm-shell .wem-prog-fill {
   height: 100%;
-  border-radius: 0;
+  border-radius: 999px;
   transition: width 0.5s ease;
 }
 
 /* Card footer */
 .protexi-adm-shell .wem-footer {
-  padding: 7px 12px 7px 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-  background: #f5f5f0;
+  padding: 10px 12px 10px 16px;
+  border-top: 1px solid rgba(15, 45, 94, 0.08);
+  background: #f8fafc;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -312,20 +380,20 @@
 .protexi-adm-shell .wem-action-btn {
   width: 26px;
   height: 26px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(15, 45, 94, 0.14);
   background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #94a3b8;
+  color: #64748b;
   flex-shrink: 0;
   transition: border-color 0.13s, color 0.13s, background 0.13s;
 }
 .protexi-adm-shell .wem-action-btn:hover {
-  border-color: rgba(26, 79, 160, 0.3);
+  border-color: rgba(26, 79, 160, 0.4);
   color: #1a4fa0;
-  background: rgba(26, 79, 160, 0.05);
+  background: rgba(26, 79, 160, 0.08);
 }
 
 /* Employment status inline select */
@@ -424,4 +492,230 @@
   border-radius: 0;
   border: none;
   box-shadow: none;
+}
+
+/* ── Add employee (/workers/new) — marketing form stack ──── */
+.protexi-adm-shell .protexi-dash-marketing .wem-new-form {
+  max-width: 860px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.07);
+  margin-bottom: 16px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-section {
+  background: #fff;
+  border: none;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-section-h {
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  font-family: var(--dash-mono, "SF Mono", "Fira Code", Consolas, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dash-navy, #0f2d5e);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-section-body {
+  padding: 20px 20px 22px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+@media (min-width: 768px) {
+  .protexi-adm-shell .protexi-dash-marketing .wem-new-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-label {
+  font-family: var(--dash-mono, "SF Mono", "Fira Code", Consolas, monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-navy, #0f2d5e);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-inp {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 0;
+  background: #fff;
+  font-size: 13px;
+  color: var(--dash-black, #0a0a0a);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-inp:focus {
+  border-color: rgba(26, 79, 160, 0.45);
+  box-shadow: 0 0 0 2px rgba(26, 79, 160, 0.1);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-inp::placeholder {
+  color: #94a3b8;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fff;
+  color: var(--dash-navy, #0f2d5e);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-back:hover {
+  background: rgba(26, 79, 160, 0.08);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-btn-ghost {
+  height: 40px;
+  padding: 0 20px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  font-family: var(--dash-mono, "SF Mono", "Fira Code", Consolas, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--dash-navy, #0f2d5e);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-btn-ghost:hover {
+  background: rgba(26, 79, 160, 0.06);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 22px;
+  gap: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #0f2d5e;
+  font-family: var(--dash-mono, "SF Mono", "Fira Code", Consolas, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-btn-primary:hover:not(:disabled) {
+  background: #1a4fa0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-new-err {
+  margin-bottom: 16px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #991b1b;
+  font-family: var(--dash-mono, "SF Mono", "Fira Code", Consolas, monospace);
+}
+
+/* ── Workers grid view — employee cards match marketing dashboard tiles ─ */
+.protexi-adm-shell .protexi-dash-marketing .wem-grid {
+  gap: 2px;
+  padding: 2px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-card {
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  transform: none;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-card::before {
+  height: 3px;
+  background: var(--dash-blue, #1a4fa0);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-card:hover {
+  transform: none;
+  box-shadow: none;
+  background: rgba(26, 79, 160, 0.08);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-card:hover::before {
+  transform: scaleX(1);
+}
+
+/* Worker details page: only content below the top tab row */
+.protexi-adm-shell .protexi-dash-marketing .worker-tab-content {
+  margin-top: 2px;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-avatar {
+  border-radius: 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-details {
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-prog-wrap {
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-prog-track {
+  height: 4px;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-prog-fill {
+  border-radius: 0;
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--dash-card, #f0f0eb);
+}
+
+.protexi-adm-shell .protexi-dash-marketing .wem-st-active,
+.protexi-adm-shell .protexi-dash-marketing .wem-st-inactive,
+.protexi-adm-shell .protexi-dash-marketing .wem-st-warn {
+  border-radius: 0;
 }

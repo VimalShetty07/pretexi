@@ -44,6 +44,20 @@ class Settings(BaseSettings):
     # Multi-tenant / billing
     APP_BASE_URL: str | None = None
     FRONTEND_BASE_URL: str | None = None
+    # Public app URL for invite links (defaults to local Next.js if unset)
+    # e.g. https://app.protexi.com or http://127.0.0.1:3000
+
+    # Tenant invite emails — off until you set True and configure SMTP.
+    ENABLE_TENANT_INVITE_EMAIL: bool = False
+
+    # Transactional email (tenant admin invites). If SMTP_HOST is unset, emails are skipped (logged).
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM: str | None = None  # e.g. "Protexi <noreply@yourdomain.com>"
+    SMTP_USE_TLS: bool = True  # STARTTLS on 587
+    SMTP_USE_SSL: bool = False  # SMTPS on 465 (set SMTP_USE_TLS False when True)
     API_BASE_URL: str | None = None
     PAYMENT_PROVIDER: str = "manual"
     STRIPE_SECRET_KEY: str | None = None

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ShieldAlert, ShieldCheck, TrendingUp, Users, type LucideIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, ShieldAlert, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
-import { AdminDataTable } from "@/components/admin-data-table";
+import "../dashboard/dashboard-marketing.css";
+import "../workers/workers-page.css";
 
 interface Worker {
   id: string;
@@ -15,8 +17,11 @@ interface Worker {
   visa_expiry: string | null;
 }
 
+const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
+
 export default function RiskPage() {
   const { token } = useAuth();
+  const router = useRouter();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -26,6 +31,7 @@ export default function RiskPage() {
       if (!token) return;
       try {
         setLoading(true);
+        setError("");
         const data = await api.get<Worker[]>("/workers", token);
         setWorkers(data);
       } catch (e: unknown) {
@@ -50,136 +56,274 @@ export default function RiskPage() {
   const flaggedSorted = [...flagged].sort((a, b) => riskRank(a.risk_level) - riskRank(b.risk_level));
   const highPriorityShare = workers.length > 0 ? Math.round((flagged.length / workers.length) * 100) : 0;
 
-  if (loading) return <p className="text-sm text-gray-500">Loading risk monitor...</p>;
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div>
-        <h1 className="admin-page-title">Risk Monitor</h1>
-        <p className="admin-page-subtitle" style={{ marginTop: 6 }}>
-          Worker risk intelligence from status, visa timeline, and compliance posture.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 xl:grid-cols-5" style={{ gap: 12 }}>
-        <RiskCard icon={AlertTriangle} label="Critical" value={stats.critical} tone="red" />
-        <RiskCard icon={ShieldAlert} label="High" value={stats.high} tone="amber" />
-        <RiskCard icon={TrendingUp} label="Medium" value={stats.medium} tone="purple" />
-        <RiskCard icon={ShieldCheck} label="Low" value={stats.low} tone="emerald" />
-        <RiskCard icon={Users} label="High/Critical %" value={`${highPriorityShare}%`} tone="blue" />
-      </div>
-
-      <AdminDataTable
-        headers={["Employee", "Role & Department", "Risk", "Visa Expiry", "Priority"]}
-        colSpan={5}
-        loading={false}
-        isEmpty={flaggedSorted.length === 0}
-        loadingContent=""
-        emptyContent={<p className="text-[var(--muted-foreground)]" style={{ fontSize: 14 }}>No high-priority risks right now.</p>}
-      >
-        {flaggedSorted.map((w) => {
-          const risk = normalizeRisk(w.risk_level);
-          const visaText = w.visa_expiry
-            ? new Date(w.visa_expiry).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-            : "Not set";
-          const p = priorityConfig(risk);
-
-          return (
-            <tr key={w.id} className="border-b border-[var(--border)] last:border-b-0 hover:bg-brand-50/50 transition-colors">
-              <td style={{ padding: "14px 16px" }}>
-                <div className="flex items-center" style={{ gap: 10 }}>
-                  <div
-                    className="flex items-center justify-center rounded-full bg-brand-100 text-brand-600 font-bold shrink-0"
-                    style={{ width: 34, height: 34, fontSize: 12 }}
-                  >
-                    {w.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-brand-900">{w.name}</p>
-                    <p className="text-xs text-[var(--muted-foreground)]" style={{ marginTop: 1 }}>
-                      Worker ID: {w.id.slice(0, 8)}
-                    </p>
-                  </div>
-                </div>
-              </td>
-
-              <td style={{ padding: "14px 16px" }}>
-                <p className="text-sm text-brand-900">{w.job_title}</p>
-                <p className="text-xs text-[var(--muted-foreground)]" style={{ marginTop: 1 }}>{w.department || "—"}</p>
-              </td>
-
-              <td style={{ padding: "14px 16px" }}>
-                <span
-                  className="inline-flex items-center rounded-full font-medium"
-                  style={{ padding: "3px 10px", fontSize: 12, background: p.softBg, color: p.text }}
-                >
-                  {risk}
-                </span>
-              </td>
-
-              <td style={{ padding: "14px 16px" }} className="text-brand-800">
-                {visaText}
-              </td>
-
-              <td style={{ padding: "14px 16px" }}>
-                <span
-                  className="inline-flex items-center rounded-full font-semibold"
-                  style={{ padding: "3px 10px", fontSize: 12, background: p.bg, color: "#fff" }}
-                >
-                  {p.priority}
-                </span>
-              </td>
-            </tr>
-          );
-        })}
-      </AdminDataTable>
-
-      <div className="data-card" style={{ padding: 14 }}>
-        <div className="flex items-center" style={{ gap: 8 }}>
-          <ShieldAlert style={{ width: 16, height: 16, color: "#1d4ed8" }} />
-          <p className="text-sm font-semibold text-brand-900">Risk Summary</p>
-        </div>
-        <p className="text-sm text-[var(--muted-foreground)]" style={{ marginTop: 8 }}>
-          {flagged.length === 0
-            ? "No critical or high-risk workers are currently flagged. Keep monitoring visa timelines and compliance reviews."
-            : `${flagged.length} workers are currently in high or critical bands (${highPriorityShare}% of workforce). Prioritize document checks and visa actions for this group.`}
-        </p>
-      </div>
-    </div>
+  const todayStr = useMemo(
+    () =>
+      new Date().toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }),
+    []
   );
-}
 
-function RiskCard({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: number | string;
-  tone: "red" | "amber" | "purple" | "emerald" | "blue";
-}) {
-  const tones = {
-    red: { bg: "linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%)", border: "#fecaca", text: "#b91c1c", icon: "#dc2626" },
-    amber: { bg: "linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%)", border: "#fde68a", text: "#b45309", icon: "#d97706" },
-    purple: { bg: "linear-gradient(135deg,#f3e8ff 0%,#ede9fe 100%)", border: "#ddd6fe", text: "#5b21b6", icon: "#7c3aed" },
-    emerald: { bg: "linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%)", border: "#a7f3d0", text: "#047857", icon: "#059669" },
-    blue: { bg: "linear-gradient(135deg,#e9f2ff 0%,#dbeafe 100%)", border: "#bfdbfe", text: "#1e3a8a", icon: "#2563eb" },
-  }[tone];
+  if (!token) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
+          Sign in to view risk monitoring.
+        </p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
+          Loading risk monitor…
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#dc2626]" style={MONO}>
+          {error}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="rounded-2xl border" style={{ background: tones.bg, borderColor: tones.border, padding: "12px 12px" }}>
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: tones.text }}>
-          {label}
-        </p>
-        <Icon style={{ width: 14, height: 14, color: tones.icon }} />
+    <div className="protexi-dash-marketing flex flex-col gap-0">
+      <div className="adm-ph">
+        <div className="min-w-0">
+          <div className="adm-ph-ey">Compliance</div>
+          <h1 className="adm-ph-title">
+            Risk <em className="dash-title-em">monitor</em>
+          </h1>
+          <div className="adm-ph-date">{todayStr}</div>
+          <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-[#64748b]">
+            Worker risk from status, visa timeline, and compliance posture. High and critical cases are listed below for
+            action.
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <span className="adm-ph-badge inline-flex items-center gap-2 border border-[rgba(26,79,160,0.25)] bg-[rgba(26,79,160,0.06)] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-[#0f2d5e]" style={MONO}>
+            <Users className="h-3.5 w-3.5" />
+            {workers.length} workers scored
+          </span>
+          {flagged.length > 0 ? (
+            <span className="inline-flex items-center gap-2 border border-red-200 bg-red-50 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-red-800" style={MONO}>
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {highPriorityShare}% high / critical
+            </span>
+          ) : (
+            <span
+              className="inline-flex items-center border border-[rgba(22,163,74,0.3)] bg-[#f0fdf4] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-[#166534]"
+              style={MONO}
+            >
+              No priority queue
+            </span>
+          )}
+        </div>
       </div>
-      <p className="admin-value-number" style={{ marginTop: 6, fontSize: 30, color: tones.text }}>
-        {value}
-      </p>
+
+      <div
+        className="adm-stat-row grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+        style={{ gap: 2, background: "rgba(0,0,0,0.07)", marginBottom: 16 }}
+      >
+        <div className="adm-sc adm-sc-r bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-r">
+              <AlertTriangle className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">P1</span>
+          </div>
+          <div className="adm-sc-num">{stats.critical}</div>
+          <div className="adm-sc-lbl">Critical</div>
+          <div className="adm-sc-sub">Immediate review</div>
+        </div>
+        <div className="adm-sc adm-sc-a bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-a">
+              <ShieldAlert className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">P2</span>
+          </div>
+          <div className="adm-sc-num">{stats.high}</div>
+          <div className="adm-sc-lbl">High</div>
+          <div className="adm-sc-sub">Escalate this week</div>
+        </div>
+        <div className="adm-sc adm-sc-p bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-p">
+              <TrendingUp className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">P3</span>
+          </div>
+          <div className="adm-sc-num">{stats.medium}</div>
+          <div className="adm-sc-lbl">Medium</div>
+          <div className="adm-sc-sub">Monitor</div>
+        </div>
+        <div className="adm-sc adm-sc-b bg-white px-4 py-4 text-left">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-b">
+              <ShieldCheck className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">OK</span>
+          </div>
+          <div className="adm-sc-num">{stats.low}</div>
+          <div className="adm-sc-lbl">Low</div>
+          <div className="adm-sc-sub">Within tolerance</div>
+        </div>
+        <div className="adm-sc adm-sc-b bg-white px-4 py-4 text-left sm:col-span-3 lg:col-span-1">
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-b">
+              <Users className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">Share</span>
+          </div>
+          <div className="adm-sc-num">{highPriorityShare}%</div>
+          <div className="adm-sc-lbl">High + critical</div>
+          <div className="adm-sc-sub">Of workforce</div>
+        </div>
+      </div>
+
+      <div className="wem-surface">
+        <div className="wem-toolbar">
+          <span className="text-[11px] font-extrabold text-[#0a0a0a]">Priority queue</span>
+          <span className="wem-badge-mono" style={MONO}>
+            {flaggedSorted.length} high / critical
+          </span>
+        </div>
+
+        {flaggedSorted.length === 0 ? (
+          <div className="flex flex-col items-center justify-center border-t border-[rgba(0,0,0,0.07)] bg-white py-16">
+            <div className="adm-ae-icon">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div className="adm-ae-t mt-3">No high-priority risks</div>
+            <div className="adm-ae-s">Critical and high bands are clear. Keep monitoring visa timelines and compliance reviews.</div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto border-t border-[rgba(0,0,0,0.07)] bg-white">
+            <table className="wlp-table">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Role & department</th>
+                  <th>Risk</th>
+                  <th>Visa expiry</th>
+                  <th>Priority</th>
+                </tr>
+              </thead>
+              <tbody>
+                {flaggedSorted.map((w) => {
+                  const risk = normalizeRisk(w.risk_level);
+                  const visaText = w.visa_expiry
+                    ? new Date(w.visa_expiry).toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "Not set";
+                  const p = priorityConfig(risk);
+                  const initials = w.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase();
+
+                  const riskCls =
+                    risk === "Critical"
+                      ? "border-[rgba(220,38,38,0.35)] bg-[rgba(254,242,242,0.85)] text-[#991b1b]"
+                      : "border-[rgba(217,119,6,0.35)] bg-[rgba(255,251,235,0.9)] text-[#b45309]";
+
+                  const priCls =
+                    risk === "Critical"
+                      ? "border-[rgba(220,38,38,0.45)] bg-[#991b1b] text-white"
+                      : "border-[rgba(217,119,6,0.45)] bg-[#b45309] text-white";
+
+                  return (
+                    <tr
+                      key={w.id}
+                      className="cursor-pointer"
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`Open ${w.name}`}
+                      onClick={() => router.push(`/workers/${w.id}?tab=records`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          router.push(`/workers/${w.id}?tab=records`);
+                        }
+                      }}
+                    >
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-[rgba(0,0,0,0.08)] bg-[rgba(26,79,160,0.08)] text-[11px] font-extrabold text-[#1a4fa0]">
+                            {initials}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-[#0a0a0a]">{w.name}</p>
+                            <p className="truncate text-[11px] uppercase tracking-[0.05em] text-[#94a3b8]" style={MONO}>
+                              {w.id.slice(0, 8)}…
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <p className="text-[13px] font-medium text-[#0a0a0a]">{w.job_title}</p>
+                        <p className="text-[11px] text-[#64748b]" style={MONO}>
+                          {w.department || "—"}
+                        </p>
+                      </td>
+                      <td>
+                        <span
+                          className={`inline-flex border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.07em] ${riskCls}`}
+                          style={MONO}
+                        >
+                          {risk}
+                        </span>
+                      </td>
+                      <td className="text-[13px] text-[#0f2d5e]">{visaText}</td>
+                      <td>
+                        <span
+                          className={`inline-flex border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.07em] ${priCls}`}
+                          style={MONO}
+                        >
+                          {p.priority}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 wem-surface">
+        <div className="wem-toolbar">
+          <span className="flex items-center gap-2 text-[11px] font-extrabold text-[#0a0a0a]">
+            <ShieldAlert className="h-4 w-4 text-[var(--dash-blue)]" />
+            Risk summary
+          </span>
+        </div>
+        <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+          <p className="text-[13px] leading-relaxed text-[#475569]">
+            {flagged.length === 0
+              ? "No critical or high-risk workers are currently flagged. Keep monitoring visa timelines and compliance reviews."
+              : `${flagged.length} workers are in high or critical bands (${highPriorityShare}% of workforce). Prioritize document checks and visa actions for this group.`}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -201,14 +345,8 @@ function riskRank(riskLevel: string) {
 }
 
 function priorityConfig(risk: string) {
-  if (risk === "Critical") {
-    return { priority: "Immediate", bg: "#dc2626", softBg: "#fef2f2", text: "#b91c1c" };
-  }
-  if (risk === "High") {
-    return { priority: "High", bg: "#d97706", softBg: "#fffbeb", text: "#b45309" };
-  }
-  if (risk === "Medium") {
-    return { priority: "Monitor", bg: "#7c3aed", softBg: "#f3e8ff", text: "#5b21b6" };
-  }
-  return { priority: "Low", bg: "#059669", softBg: "#ecfdf5", text: "#047857" };
+  if (risk === "Critical") return { priority: "Immediate" };
+  if (risk === "High") return { priority: "High" };
+  if (risk === "Medium") return { priority: "Monitor" };
+  return { priority: "Low" };
 }

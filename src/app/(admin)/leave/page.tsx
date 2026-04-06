@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
 import {
@@ -11,6 +11,8 @@ import {
   Loader2,
   Ban,
 } from "lucide-react";
+import "../dashboard/dashboard-marketing.css";
+import "../workers/workers-page.css";
 
 interface LeaveItem {
   id: string;
@@ -40,11 +42,27 @@ const LEAVE_TYPE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: typeof Clock }> = {
-  pending: { label: "Pending", color: "text-amber-700", bg: "bg-amber-50", icon: Clock },
-  approved: { label: "Approved", color: "text-emerald-700", bg: "bg-emerald-50", icon: CheckCircle2 },
-  rejected: { label: "Rejected", color: "text-red-700", bg: "bg-red-50", icon: XCircle },
-  cancelled: { label: "Cancelled", color: "text-gray-600", bg: "bg-gray-100", icon: Ban },
+const STATUS_CONFIG: Record<string, { label: string; toneCls: string; icon: typeof Clock }> = {
+  pending: {
+    label: "Pending",
+    toneCls: "border-[rgba(217,119,6,0.35)] bg-[rgba(255,251,235,0.9)] text-[#b45309]",
+    icon: Clock,
+  },
+  approved: {
+    label: "Approved",
+    toneCls: "border-[rgba(22,163,74,0.3)] bg-[#f0fdf4] text-[#166534]",
+    icon: CheckCircle2,
+  },
+  rejected: {
+    label: "Rejected",
+    toneCls: "border-[rgba(220,38,38,0.35)] bg-[rgba(254,242,242,0.85)] text-[#991b1b]",
+    icon: XCircle,
+  },
+  cancelled: {
+    label: "Cancelled",
+    toneCls: "border-[rgba(0,0,0,0.12)] bg-[#f8fafc] text-[#64748b]",
+    icon: Ban,
+  },
 };
 
 function fmt(iso: string | null): string {
@@ -54,9 +72,11 @@ function fmt(iso: string | null): string {
 
 const API_URL = "/api";
 
+const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
+
 export default function LeaveManagementPage() {
   const { token } = useAuth();
-  const [leaves, setLeaves] = useState<LeaveItem[]>([]);
+  const [allLeaves, setAllLeaves] = useState<LeaveItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -68,20 +88,34 @@ export default function LeaveManagementPage() {
   const fetchLeaves = useCallback(async () => {
     try {
       setLoading(true);
-      const qs = statusFilter ? `?status_filter=${statusFilter}` : "";
-      const data = await api.get<LeaveItem[]>(`/leave/all${qs}`, token ?? undefined);
-      setLeaves(data);
+      const data = await api.get<LeaveItem[]>(`/leave/all`, token ?? undefined);
+      setAllLeaves(data);
       setError("");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load leave requests");
     } finally {
       setLoading(false);
     }
-  }, [token, statusFilter]);
+  }, [token]);
 
   useEffect(() => {
     fetchLeaves();
   }, [fetchLeaves]);
+
+  const leaves = useMemo(() => {
+    if (!statusFilter) return allLeaves;
+    return allLeaves.filter((l) => l.status === statusFilter);
+  }, [allLeaves, statusFilter]);
+
+  const counts = useMemo(() => {
+    return {
+      pending: allLeaves.filter((l) => l.status === "pending").length,
+      approved: allLeaves.filter((l) => l.status === "approved").length,
+      rejected: allLeaves.filter((l) => l.status === "rejected").length,
+      cancelled: allLeaves.filter((l) => l.status === "cancelled").length,
+      total: allLeaves.length,
+    };
+  }, [allLeaves]);
 
   const authHeaders = (): Record<string, string> => {
     const h: Record<string, string> = {};
@@ -136,223 +170,312 @@ export default function LeaveManagementPage() {
     }
   };
 
-  const pending = leaves.filter((l) => l.status === "pending").length;
+  const today = new Date().toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const filterKeys = ["", "pending", "approved", "rejected", "cancelled"] as const;
+
+  if (loading && allLeaves.length === 0 && !error) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
+          Loading leave requests…
+        </p>
+      </div>
+    );
+  }
+
+  if (error && allLeaves.length === 0) {
+    return (
+      <div className="protexi-dash-marketing">
+        <p className="text-[12px] text-[#dc2626]" style={MONO}>
+          {error}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div>
+    <div className="protexi-dash-marketing flex flex-col gap-0">
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 text-red-700" style={{ padding: "10px 12px", fontSize: 13, marginBottom: 12 }}>
+        <div
+          className="mb-3 border border-red-200 bg-red-50 text-red-700"
+          style={{ padding: "10px 12px", fontSize: 12, ...MONO }}
+        >
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700" style={{ padding: "10px 12px", fontSize: 13, marginBottom: 12 }}>
+        <div
+          className="mb-3 border border-emerald-200 bg-emerald-50 text-emerald-700"
+          style={{ padding: "10px 12px", fontSize: 12, ...MONO }}
+        >
           {success}
         </div>
       )}
-      <div className="flex items-center justify-between flex-wrap" style={{ gap: 12, marginBottom: 24 }}>
-        <div>
-          <h1 className="admin-page-title">Leave Management</h1>
-          <p className="admin-page-subtitle" style={{ marginTop: 4 }}>
-            Review and manage employee leave requests.
+
+      <div className="adm-ph">
+        <div className="min-w-0">
+          <div className="adm-ph-ey">Workforce</div>
+          <h1 className="adm-ph-title">
+            Leave <em className="dash-title-em">management</em>
+          </h1>
+          <div className="adm-ph-date">{today}</div>
+          <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-[#64748b]">
+            Review and approve employee leave. Filter by status or jump to pending from the summary tiles.
           </p>
         </div>
-        {pending > 0 && statusFilter !== "pending" && (
-          <button
-            type="button"
-            onClick={() => setStatusFilter("pending")}
-            className="inline-flex items-center rounded-xl bg-amber-50 border border-amber-200 text-sm font-medium text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer"
-            style={{ height: 36, padding: "0 14px", gap: 6 }}
+        {counts.pending > 0 ? (
+          <div className="adm-ph-badge adm-ph-badge-warn inline-flex items-center gap-2 border-amber-200 bg-amber-50 text-amber-800">
+            <Clock className="h-3.5 w-3.5" />
+            {counts.pending} pending review
+          </div>
+        ) : (
+          <div
+            className="inline-flex items-center border border-[rgba(22,163,74,0.3)] bg-[#f0fdf4] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-[#166534]"
+            style={MONO}
           >
-            <Clock style={{ width: 14, height: 14 }} />
-            {pending} pending
-          </button>
+            No pending requests
+          </div>
         )}
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center" style={{ gap: 8, marginBottom: 20 }}>
-        {["", "pending", "approved", "rejected", "cancelled"].map((val) => {
-          const active = statusFilter === val;
-          const label = val === "" ? "All" : (STATUS_CONFIG[val]?.label ?? val);
-          return (
-            <button
-              key={val}
-              type="button"
-              onClick={() => setStatusFilter(val)}
-              className={`rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                active
-                  ? "bg-brand-600 text-white"
-                  : "bg-white border border-[var(--border)] text-brand-800 hover:bg-brand-50"
-              }`}
-              style={{ height: 32, padding: "0 14px" }}
-            >
-              {label}
-            </button>
-          );
-        })}
+      <div className="adm-stat-row grid grid-cols-2 md:grid-cols-4" style={{ gap: 2, background: "rgba(0,0,0,0.07)", marginBottom: 16 }}>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("pending")}
+          className={`adm-sc adm-sc-a bg-white px-4 py-4 text-left transition-colors ${statusFilter === "pending" ? "ring-2 ring-[var(--dash-blue)] ring-offset-2" : ""}`}
+        >
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-a">
+              <Clock className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">Queue</span>
+          </div>
+          <div className="adm-sc-num">{counts.pending}</div>
+          <div className="adm-sc-lbl">Pending</div>
+          <div className="adm-sc-sub">Awaiting decision</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("approved")}
+          className={`adm-sc adm-sc-b bg-white px-4 py-4 text-left transition-colors ${statusFilter === "approved" ? "ring-2 ring-[var(--dash-blue)] ring-offset-2" : ""}`}
+        >
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-b">
+              <CheckCircle2 className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">OK</span>
+          </div>
+          <div className="adm-sc-num">{counts.approved}</div>
+          <div className="adm-sc-lbl">Approved</div>
+          <div className="adm-sc-sub">Booked leave</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("rejected")}
+          className={`adm-sc adm-sc-r bg-white px-4 py-4 text-left transition-colors ${statusFilter === "rejected" ? "ring-2 ring-[var(--dash-blue)] ring-offset-2" : ""}`}
+        >
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-r">
+              <XCircle className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">Declined</span>
+          </div>
+          <div className="adm-sc-num">{counts.rejected}</div>
+          <div className="adm-sc-lbl">Rejected</div>
+          <div className="adm-sc-sub">Not authorised</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("cancelled")}
+          className={`adm-sc adm-sc-p bg-white px-4 py-4 text-left transition-colors ${statusFilter === "cancelled" ? "ring-2 ring-[var(--dash-blue)] ring-offset-2" : ""}`}
+        >
+          <div className="adm-sc-top">
+            <div className="adm-sc-icon adm-si-p">
+              <Ban className="h-[17px] w-[17px]" />
+            </div>
+            <span className="adm-sc-pill adm-pill-n">Void</span>
+          </div>
+          <div className="adm-sc-num">{counts.cancelled}</div>
+          <div className="adm-sc-lbl">Cancelled</div>
+          <div className="adm-sc-sub">Withdrawn by employee</div>
+        </button>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-[var(--border)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full admin-uniform-table" style={{ fontSize: 13 }}>
-            <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--muted)]">
-                {["Employee", "Type", "Dates", "Days", "Reason", "Status", "Actions"].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left font-semibold text-[var(--muted-foreground)] uppercase"
-                    style={{ padding: "12px 16px", fontSize: 11, letterSpacing: "0.05em" }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+      <div className="wem-surface">
+        <div className="wem-toolbar">
+          <span className="wem-badge-mono" style={MONO}>
+            {statusFilter === "" ? `${counts.total} requests` : `${leaves.length} shown · ${counts.total} total`}
+          </span>
+          <div className="wlp-filter-group flex-wrap">
+            {filterKeys.map((val) => {
+              const active = statusFilter === val;
+              const label = val === "" ? "All" : (STATUS_CONFIG[val]?.label ?? val);
+              return (
+                <button
+                  key={val || "all"}
+                  type="button"
+                  onClick={() => setStatusFilter(val)}
+                  className={`wlp-filter-chip ${active ? "act" : ""}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center bg-white py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-[#94a3b8]" />
+            <p className="mt-3 text-[12px] text-[#94a3b8]" style={MONO}>
+              Refreshing…
+            </p>
+          </div>
+        ) : leaves.length === 0 ? (
+          <div className="flex flex-col items-center justify-center bg-white py-16">
+            <div className="adm-ae-icon">
+              <CalendarDays className="h-5 w-5" />
+            </div>
+            <div className="adm-ae-t mt-3">No leave requests</div>
+            <div className="adm-ae-s">
+              {statusFilter ? `No ${STATUS_CONFIG[statusFilter]?.label.toLowerCase() ?? statusFilter} requests in this view.` : "No leave requests on record yet."}
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto bg-white">
+            <table className="wlp-table">
+              <thead>
                 <tr>
-                  <td colSpan={7} className="text-center text-[var(--muted-foreground)]" style={{ padding: 40 }}>
-                    <Loader2 className="animate-spin mx-auto" style={{ width: 20, height: 20 }} />
-                  </td>
+                  <th>Employee</th>
+                  <th>Type</th>
+                  <th>Dates</th>
+                  <th>Days</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ) : leaves.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center" style={{ padding: 40 }}>
-                    <CalendarDays className="mx-auto text-[var(--muted-foreground)]" style={{ width: 32, height: 32, marginBottom: 8 }} />
-                    <p className="text-sm text-[var(--muted-foreground)]">No leave requests found.</p>
-                  </td>
-                </tr>
-              ) : (
-                leaves.map((l) => {
+              </thead>
+              <tbody>
+                {leaves.map((l) => {
                   const cfg = STATUS_CONFIG[l.status] ?? STATUS_CONFIG.pending;
                   const isLoading = actionLoading === l.id;
+                  const initials = l.worker_name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase();
                   return (
-                    <tr
-                      key={l.id}
-                      className="border-b border-[var(--border)] last:border-b-0 hover:bg-brand-50/50 transition-colors"
-                    >
-                      <td style={{ padding: "14px 16px" }}>
-                        <div className="flex items-center" style={{ gap: 10 }}>
-                          <div
-                            className="flex items-center justify-center rounded-full bg-brand-100 text-brand-600 font-bold shrink-0"
-                            style={{ width: 34, height: 34, fontSize: 11 }}
-                          >
-                            {l.worker_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                          </div>
+                    <tr key={l.id}>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-[rgba(0,0,0,0.08)] bg-[rgba(26,79,160,0.08)] text-[11px] font-extrabold text-[#1a4fa0]">
+                            {initials}
+                          </span>
                           <div className="min-w-0">
-                            <p className="font-semibold text-brand-900 truncate" style={{ fontSize: 13 }}>
-                              {l.worker_name}
-                            </p>
-                            <p className="text-[var(--muted-foreground)] truncate" style={{ fontSize: 11 }}>
+                            <p className="truncate font-semibold text-[#0a0a0a]">{l.worker_name}</p>
+                            <p className="truncate text-[11px] uppercase tracking-[0.05em] text-[#94a3b8]" style={MONO}>
                               {l.worker_job_title}
                             </p>
                           </div>
                         </div>
                       </td>
-
-                      <td className="text-brand-800" style={{ padding: "14px 16px" }}>
-                        {LEAVE_TYPE_LABELS[l.leave_type] ?? l.leave_type}
-                      </td>
-
-                      <td style={{ padding: "14px 16px" }}>
-                        <div className="text-brand-800" style={{ fontSize: 13 }}>
-                          {fmt(l.start_date)}
-                        </div>
-                        <div className="text-[var(--muted-foreground)]" style={{ fontSize: 11 }}>
+                      <td className="text-[#0f2d5e]">{LEAVE_TYPE_LABELS[l.leave_type] ?? l.leave_type}</td>
+                      <td>
+                        <div className="text-[#0a0a0a]">{fmt(l.start_date)}</div>
+                        <div className="text-[11px] text-[#94a3b8]" style={MONO}>
                           to {fmt(l.end_date)}
                         </div>
                       </td>
-
-                      <td className="text-brand-800 font-medium" style={{ padding: "14px 16px" }}>
-                        {l.days}
-                      </td>
-
-                      <td style={{ padding: "14px 16px" }}>
-                        <p className="text-brand-800 truncate" style={{ maxWidth: 180 }} title={l.reason ?? ""}>
+                      <td className="font-semibold text-[#0f2d5e]">{l.days}</td>
+                      <td>
+                        <p className="max-w-[180px] truncate text-[#0a0a0a]" title={l.reason ?? ""}>
                           {l.reason || "—"}
                         </p>
                         {l.rejection_reason && (
-                          <p className="text-red-600 truncate" style={{ fontSize: 11, maxWidth: 180, marginTop: 2 }} title={l.rejection_reason}>
+                          <p
+                            className="mt-1 max-w-[180px] truncate text-[11px] text-[#991b1b]"
+                            title={l.rejection_reason}
+                          >
                             Rejected: {l.rejection_reason}
                           </p>
                         )}
                       </td>
-
-                      <td style={{ padding: "14px 16px" }}>
+                      <td>
                         <span
-                          className={`inline-flex items-center rounded-full font-medium ${cfg.color} ${cfg.bg}`}
-                          style={{ padding: "3px 10px", gap: 4, fontSize: 12 }}
+                          className={`inline-flex items-center gap-1 border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.07em] ${cfg.toneCls}`}
+                          style={MONO}
                         >
-                          <cfg.icon style={{ width: 12, height: 12 }} />
+                          <cfg.icon className="h-3 w-3" />
                           {cfg.label}
                         </span>
                         {l.reviewed_by && (
-                          <p className="text-[var(--muted-foreground)]" style={{ fontSize: 10, marginTop: 2 }}>
+                          <p className="mt-1 text-[10px] text-[#94a3b8]" style={MONO}>
                             by {l.reviewed_by}
                           </p>
                         )}
                       </td>
-
-                      <td style={{ padding: "14px 16px" }}>
+                      <td>
                         {l.status === "pending" && (
-                          <div className="flex items-center" style={{ gap: 6 }}>
-                            <button
-                              type="button"
-                              onClick={() => handleApprove(l.id)}
-                              disabled={isLoading}
-                              className="inline-flex items-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
-                              style={{ padding: "5px 10px", gap: 4, fontSize: 12 }}
-                            >
-                              {isLoading ? (
-                                <Loader2 className="animate-spin" style={{ width: 12, height: 12 }} />
-                              ) : (
-                                <CheckCircle2 style={{ width: 12, height: 12 }} />
-                              )}
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRejectId(rejectId === l.id ? null : l.id)}
-                              disabled={isLoading}
-                              className="inline-flex items-center rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer"
-                              style={{ padding: "5px 10px", gap: 4, fontSize: 12 }}
-                            >
-                              <XCircle style={{ width: 12, height: 12 }} />
-                              Reject
-                            </button>
-                          </div>
-                        )}
-
-                        {rejectId === l.id && (
-                          <div className="flex" style={{ gap: 6, marginTop: 8 }}>
-                            <input
-                              type="text"
-                              value={rejectReason}
-                              onChange={(e) => setRejectReason(e.target.value)}
-                              placeholder="Reason..."
-                              className="flex-1 rounded-lg border border-[var(--border)] bg-white text-sm outline-none focus:border-brand-400"
-                              style={{ height: 32, padding: "0 10px", fontSize: 12 }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleReject(l.id)}
-                              className="rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
-                              style={{ padding: "0 12px", fontSize: 12, height: 32 }}
-                            >
-                              Confirm
-                            </button>
+                          <div className="flex flex-col gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleApprove(l.id)}
+                                disabled={isLoading}
+                                className="inline-flex h-8 items-center gap-1.5 border border-[rgba(22,163,74,0.35)] bg-[#f0fdf4] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#166534] hover:bg-[rgba(22,163,74,0.12)] disabled:opacity-50"
+                                style={MONO}
+                              >
+                                {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRejectId(rejectId === l.id ? null : l.id)}
+                                disabled={isLoading}
+                                className="inline-flex h-8 items-center gap-1.5 border border-[rgba(220,38,38,0.35)] bg-[rgba(254,242,242,0.85)] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#991b1b] hover:bg-[rgba(254,242,242,1)] disabled:opacity-50"
+                                style={MONO}
+                              >
+                                <XCircle className="h-3 w-3" />
+                                Reject
+                              </button>
+                            </div>
+                            {rejectId === l.id && (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={rejectReason}
+                                  onChange={(e) => setRejectReason(e.target.value)}
+                                  placeholder="Reason…"
+                                  className="h-8 min-w-[140px] flex-1 border border-[rgba(0,0,0,0.12)] bg-white px-2 text-[11px] outline-none focus:border-[var(--dash-blue)]"
+                                  style={MONO}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleReject(l.id)}
+                                  className="inline-flex h-8 items-center border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0]"
+                                  style={MONO}
+                                >
+                                  Confirm
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
