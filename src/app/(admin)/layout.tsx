@@ -3,6 +3,7 @@
 import "../protexi-admin-shell.css";
 import { AdminTopbar } from "@/components/admin-topbar";
 import { AdminSubnav } from "@/components/admin-subnav";
+import { CommandPalette } from "@/components/command-palette";
 import { useAuth } from "@/components/auth-provider";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="protexi-adm-shell flex min-h-dvh flex-col bg-[#f5f5f0]">
+      <CommandPalette role={user.role} />
       <AdminTopbar userRole={user.role} />
       <AdminSubnav />
       <main className="adm-page flex-1">{children}</main>

@@ -7,6 +7,8 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "Protexi API"
     DEBUG: bool = True
+    AUTO_CREATE_SCHEMA: bool = False
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     # Database
     DATABASE_URL: str
@@ -64,6 +66,10 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str | None = None
     STRIPE_PRICE_STARTER_MONTHLY: str | None = None
     STRIPE_PRICE_GROWTH_MONTHLY: str | None = None
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
 
 @lru_cache()

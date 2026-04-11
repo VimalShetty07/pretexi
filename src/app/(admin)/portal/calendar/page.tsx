@@ -6,7 +6,6 @@ import { api } from "@/lib/api";
 import {
   ChevronLeft,
   ChevronRight,
-  Loader2,
   CalendarDays,
   Flag,
   User,
@@ -122,13 +121,13 @@ export default function PortalCalendarPage() {
     []
   );
 
-  function getEventsForDate(day: number): CalendarEvent[] {
+  const getEventsForDate = useCallback((day: number): CalendarEvent[] => {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const result: CalendarEvent[] = [];
     for (const h of holidays) { if (h.date === dateStr) result.push(h); }
     for (const l of leaves) { if (isDateInRange(dateStr, l.start_date, l.end_date)) result.push(l); }
     return result;
-  }
+  }, [year, month, holidays, leaves]);
 
   const stats = useMemo(() => {
     let busyDays = 0;
@@ -145,7 +144,7 @@ export default function PortalCalendarPage() {
       busyDays,
       workingDays,
     };
-  }, [holidays, leaves, year, month, daysInMonth]);
+  }, [holidays, leaves, year, month, daysInMonth, getEventsForDate]);
 
   const selectedEvents = selectedDate
     ? getEventsForDate(parseInt(selectedDate.split("-")[2] ?? "0", 10))

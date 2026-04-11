@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { getRtwUiProfile } from "@/lib/rtw-profile";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
@@ -11,6 +12,7 @@ import "../workers-page.css";
 interface FormData {
   name: string;
   first_name: string;
+  second_name: string;
   last_name: string;
   job_title: string;
   email: string;
@@ -62,11 +64,16 @@ interface FormData {
   brp_issue_date: string;
   dbs_check_date: string;
   employment_status: string;
+  salary_pay_type: string;
+  hr_onboarding_stage: string;
+  termination_date: string;
+  sex: string;
 }
 
 const INITIAL: FormData = {
   name: "",
   first_name: "",
+  second_name: "",
   last_name: "",
   job_title: "",
   email: "",
@@ -118,10 +125,32 @@ const INITIAL: FormData = {
   brp_issue_date: "",
   dbs_check_date: "",
   employment_status: "Active",
+  salary_pay_type: "annual",
+  hr_onboarding_stage: "",
+  termination_date: "",
+  sex: "",
 };
 
 const GENDERS = ["Male", "Female", "Non-binary", "Prefer not to say"];
+const SEX_OPTIONS = ["", "Female", "Male", "Non-binary", "Prefer not to say"];
 const EMPLOYEE_TYPES = ["migrant", "settled", "british", "irish"];
+
+const DEFAULT_DEPARTMENT_OPTIONS = ["Operations", "People", "Finance", "Engineering", "Care"];
+const DEFAULT_WORK_LOCATION_OPTIONS = ["London HQ", "Manchester Office", "Remote", "Hybrid — UK"];
+const DEFAULT_ONBOARDING_STAGE_OPTIONS = [
+  "Recruitment",
+  "CoS assignment",
+  "Pre-start",
+  "Active sponsorship",
+];
+
+const SALARY_PAY_OPTIONS: { value: string; label: string }[] = [
+  { value: "hourly", label: "Hourly rate" },
+  { value: "daily", label: "Daily rate" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "annual", label: "Annual" },
+];
 
 const ROUTES = ["Skilled Worker", "Global Business Mobility", "Scale-up", "Health and Care", "Other"];
 const STAGES = [
@@ -149,6 +178,9 @@ export default function NewWorkerPage() {
   const { token } = useAuth();
   const [form, setForm] = useState<FormData>(INITIAL);
   const [employmentOptions, setEmploymentOptions] = useState<string[]>(["Active", "Inactive", "Finished"]);
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>(DEFAULT_DEPARTMENT_OPTIONS);
+  const [workLocationOptions, setWorkLocationOptions] = useState<string[]>(DEFAULT_WORK_LOCATION_OPTIONS);
+  const [onboardingStageOptions, setOnboardingStageOptions] = useState<string[]>(DEFAULT_ONBOARDING_STAGE_OPTIONS);
   const RTW_CATEGORY_OPTIONS_FALLBACK = [
     "British Citizen",
     "Irish Citizen",
@@ -160,6 +192,8 @@ export default function NewWorkerPage() {
   const [rtwCategoryOptions, setRtwCategoryOptions] = useState<string[]>(RTW_CATEGORY_OPTIONS_FALLBACK);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const rtwUi = useMemo(() => getRtwUiProfile(form.right_to_work_category || null), [form.right_to_work_category]);
 
   const todayLabel = useMemo(
     () =>
@@ -176,12 +210,18 @@ export default function NewWorkerPage() {
     if (!token) return;
     (async () => {
       try {
-        const s = await api.get<{ employment_status_options: string[]; rtw_category_options: string[] }>(
-          "/organisation/settings",
-          token
-        );
+        const s = await api.get<{
+          employment_status_options: string[];
+          rtw_category_options: string[];
+          department_options: string[];
+          work_location_options: string[];
+          onboarding_stage_options: string[];
+        }>("/organisation/settings", token);
         if (s.employment_status_options?.length) setEmploymentOptions(s.employment_status_options);
         if (s.rtw_category_options?.length) setRtwCategoryOptions(s.rtw_category_options);
+        if (s.department_options?.length) setDepartmentOptions(s.department_options);
+        if (s.work_location_options?.length) setWorkLocationOptions(s.work_location_options);
+        if (s.onboarding_stage_options?.length) setOnboardingStageOptions(s.onboarding_stage_options);
       } catch {
         /* defaults */
       }
@@ -212,7 +252,9 @@ export default function NewWorkerPage() {
     setError("");
     setSaving(true);
     try {
-      const fullName = form.name.trim() || `${form.first_name.trim()} ${form.last_name.trim()}`.trim();
+      const fullName =
+        form.name.trim() ||
+        [form.first_name.trim(), form.second_name.trim(), form.last_name.trim()].filter(Boolean).join(" ").trim();
       const payload: Record<string, unknown> = {
         name: fullName,
         job_title: form.job_title.trim(),
@@ -224,12 +266,14 @@ export default function NewWorkerPage() {
         dbs_required: form.dbs_required,
         atas_required: form.atas_required,
         employment_status: form.employment_status || "Active",
+        salary_pay_type: form.salary_pay_type || "annual",
       };
 
       const optStr = (k: string, v: string) => { if (v.trim()) payload[k] = v.trim(); };
       const optDate = (k: string, v: string) => { if (v) payload[k] = new Date(v).toISOString(); };
 
       optStr("first_name", form.first_name);
+      optStr("second_name", form.second_name);
       optStr("last_name", form.last_name);
       optStr("email", form.email);
       optStr("phone", form.phone);
@@ -257,6 +301,8 @@ export default function NewWorkerPage() {
       optStr("work_address", form.work_address);
       optStr("sponsorship_number", form.sponsorship_number);
       optStr("right_to_work_category", form.right_to_work_category);
+      optStr("hr_onboarding_stage", form.hr_onboarding_stage);
+      optStr("sex", form.sex);
       optStr("bank_account_number", form.bank_account_number);
       optStr("sort_code", form.sort_code);
       optStr("brp_reference", form.brp_reference);
@@ -273,6 +319,7 @@ export default function NewWorkerPage() {
       optDate("cos_assigned_date", form.cos_assigned_date);
       optDate("brp_issue_date", form.brp_issue_date);
       optDate("dbs_check_date", form.dbs_check_date);
+      optDate("termination_date", form.termination_date);
 
       await api.post("/workers", payload, token ?? undefined);
       router.push("/workers");
@@ -316,6 +363,9 @@ export default function NewWorkerPage() {
             <Field label="First Name" required>
               <input type="text" value={form.first_name} onChange={set("first_name")} placeholder="e.g. Sarah" className="wem-new-inp" />
             </Field>
+            <Field label="Second / middle name">
+              <input type="text" value={form.second_name} onChange={set("second_name")} placeholder="Optional" className="wem-new-inp" />
+            </Field>
             <Field label="Last Name" required>
               <input type="text" value={form.last_name} onChange={set("last_name")} placeholder="e.g. Johnson" className="wem-new-inp" />
             </Field>
@@ -335,6 +385,15 @@ export default function NewWorkerPage() {
               <select value={form.gender} onChange={set("gender")} className="wem-new-inp cursor-pointer">
                 <option value="">Select...</option>
                 {GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </Field>
+            <Field label="Sex (HR record)">
+              <select value={form.sex} onChange={set("sex")} className="wem-new-inp cursor-pointer">
+                {SEX_OPTIONS.map((s) => (
+                  <option key={s || "—"} value={s}>
+                    {s || "—"}
+                  </option>
+                ))}
               </select>
             </Field>
             <Field label="Nationality">
@@ -425,7 +484,7 @@ export default function NewWorkerPage() {
             <Field label="Job Title" required>
               <input type="text" value={form.job_title} onChange={set("job_title")} placeholder="e.g. Live in Carer" className="wem-new-inp" />
             </Field>
-            <Field label="Employment status">
+            <Field label="Status">
               <select
                 value={form.employment_status}
                 onChange={set("employment_status")}
@@ -439,7 +498,14 @@ export default function NewWorkerPage() {
               </select>
             </Field>
             <Field label="Department">
-              <input type="text" value={form.department} onChange={set("department")} placeholder="e.g. Care" className="wem-new-inp" />
+              <select value={form.department} onChange={set("department")} className="wem-new-inp cursor-pointer">
+                <option value="">—</option>
+                {departmentOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="SOC Code">
               <input type="text" value={form.soc_code} onChange={set("soc_code")} placeholder="e.g. 6145" className="wem-new-inp" />
@@ -447,11 +513,40 @@ export default function NewWorkerPage() {
             <Field label="Salary (£)">
               <input type="number" value={form.salary} onChange={set("salary")} placeholder="e.g. 25000" className="wem-new-inp" />
             </Field>
-            <Field label="Work Location">
-              <input type="text" value={form.work_location} onChange={set("work_location")} placeholder="e.g. London" className="wem-new-inp" />
+            <Field label="Salary basis">
+              <select value={form.salary_pay_type} onChange={set("salary_pay_type")} className="wem-new-inp cursor-pointer">
+                {SALARY_PAY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Work location">
+              <select value={form.work_location} onChange={set("work_location")} className="wem-new-inp cursor-pointer">
+                <option value="">—</option>
+                {workLocationOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="HR onboarding stage">
+              <select value={form.hr_onboarding_stage} onChange={set("hr_onboarding_stage")} className="wem-new-inp cursor-pointer">
+                <option value="">—</option>
+                {onboardingStageOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Start Date">
               <input type="date" value={form.start_date} onChange={set("start_date")} className="wem-new-inp" />
+            </Field>
+            <Field label="End date (if applicable)">
+              <input type="date" value={form.termination_date} onChange={set("termination_date")} className="wem-new-inp" />
             </Field>
                 </div>
                 <div className="mt-4 flex flex-wrap" style={{ gap: 20 }}>
@@ -486,37 +581,61 @@ export default function NewWorkerPage() {
                 ))}
               </select>
             </Field>
-            <Field label="Type of Visa">
-              <select value={form.route} onChange={set("route")} className="wem-new-inp cursor-pointer">
-                {ROUTES.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </Field>
-            <Field label="Sponsorship Number">
-              <input type="text" value={form.sponsorship_number} onChange={set("sponsorship_number")} placeholder="e.g. C2G4Z37977N" className="wem-new-inp" />
-            </Field>
-            <Field label="Stage">
+            <Field label="Workflow stage">
               <select value={form.stage} onChange={set("stage")} className="wem-new-inp cursor-pointer">
                 {STAGES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </Field>
-            <Field label="Visa Grant Date">
-              <input type="date" value={form.visa_grant_date} onChange={set("visa_grant_date")} className="wem-new-inp" />
-            </Field>
-            <Field label="Visa Expiry Date">
-              <input type="date" value={form.visa_expiry} onChange={set("visa_expiry")} className="wem-new-inp" />
-            </Field>
-            <Field label="Date CoS Assigned">
-              <input type="date" value={form.cos_assigned_date} onChange={set("cos_assigned_date")} className="wem-new-inp" />
-            </Field>
-            <Field label="BRP Reference">
-              <input type="text" value={form.brp_reference} onChange={set("brp_reference")} placeholder="e.g. ZR1234567" className="wem-new-inp" />
-            </Field>
-            <Field label="BRP Issue Date">
-              <input type="date" value={form.brp_issue_date} onChange={set("brp_issue_date")} className="wem-new-inp" />
-            </Field>
-            <Field label="BRP Expiry Date">
-              <input type="date" value={form.brp_expiry} onChange={set("brp_expiry")} className="wem-new-inp" />
-            </Field>
+            {(rtwUi.showVisaImmigration || rtwUi.showSponsorshipCos) && (
+              <Field label="Immigration route / visa type">
+                <select value={form.route} onChange={set("route")} className="wem-new-inp cursor-pointer">
+                  {ROUTES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            {rtwUi.showSponsorshipCos && (
+              <Field label="Sponsorship number">
+                <input
+                  type="text"
+                  value={form.sponsorship_number}
+                  onChange={set("sponsorship_number")}
+                  placeholder="e.g. C2G4Z37977N"
+                  className="wem-new-inp"
+                />
+              </Field>
+            )}
+            {rtwUi.showVisaImmigration && (
+              <>
+                <Field label="Visa grant date">
+                  <input type="date" value={form.visa_grant_date} onChange={set("visa_grant_date")} className="wem-new-inp" />
+                </Field>
+                <Field label="Visa expiry date">
+                  <input type="date" value={form.visa_expiry} onChange={set("visa_expiry")} className="wem-new-inp" />
+                </Field>
+              </>
+            )}
+            {rtwUi.showSponsorshipCos && (
+              <Field label="Date CoS assigned">
+                <input type="date" value={form.cos_assigned_date} onChange={set("cos_assigned_date")} className="wem-new-inp" />
+              </Field>
+            )}
+            {rtwUi.showBrpFields && (
+              <>
+                <Field label="BRP reference">
+                  <input type="text" value={form.brp_reference} onChange={set("brp_reference")} placeholder="e.g. ZR1234567" className="wem-new-inp" />
+                </Field>
+                <Field label="BRP issue date">
+                  <input type="date" value={form.brp_issue_date} onChange={set("brp_issue_date")} className="wem-new-inp" />
+                </Field>
+                <Field label="BRP expiry date">
+                  <input type="date" value={form.brp_expiry} onChange={set("brp_expiry")} className="wem-new-inp" />
+                </Field>
+              </>
+            )}
             <Field label="DBS Check Date">
               <input type="date" value={form.dbs_check_date} onChange={set("dbs_check_date")} className="wem-new-inp" />
             </Field>

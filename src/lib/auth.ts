@@ -30,9 +30,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/super-admin":   ["platform_owner"],
   "/dashboard":     ["super_admin", "tenant_admin", "compliance_manager", "hr_officer", "payroll_officer", "inspector"],
   "/workers":       ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer", "payroll_officer", "inspector"],
+  /** HR/compliance — CoS & RTW queue (not payroll-only or inspector). */
+  "/hr":            ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer"],
   "/leave":         ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer"],
   "/calendar":      ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer", "payroll_officer"],
-  "/organisation":  ["super_admin", "tenant_admin", "compliance_manager"],
+  "/organisation":  ["super_admin", "tenant_admin", "compliance_manager", "hr_officer"],
   "/documents":     ["super_admin", "tenant_admin", "tenant_staff", "compliance_manager", "hr_officer"],
   "/reports":       ["super_admin", "tenant_admin", "compliance_manager", "hr_officer", "payroll_officer", "inspector"],
   "/risk":          ["super_admin", "tenant_admin", "compliance_manager", "hr_officer", "inspector"],

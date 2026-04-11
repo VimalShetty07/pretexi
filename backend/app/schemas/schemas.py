@@ -300,6 +300,7 @@ class WorkerCreate(BaseModel):
     is_hybrid: bool = False
     is_remote: bool = False
     start_date: datetime | None = None
+    termination_date: datetime | None = None
     visa_expiry: datetime | None = None
     passport_expiry: datetime | None = None
     brp_expiry: datetime | None = None
@@ -414,6 +415,34 @@ class WorkerUpdate(BaseModel):
     salary_pay_type: str | None = None
     hr_onboarding_stage: str | None = None
     right_to_work_category: str | None = None
+
+
+class HrCosRtwWorkerRow(BaseModel):
+    """Sponsor + RTW fields for HR-only immigration queue (not full worker detail)."""
+
+    id: str
+    name: str
+    job_title: str
+    department: str | None = None
+    stage: str
+    hr_onboarding_stage: str | None = None
+    right_to_work_category: str | None = None
+    route: str
+    sponsorship_number: str | None = None
+    cos_assigned_date: datetime | None = None
+    visa_expiry: datetime | None = None
+    last_rtw_check: datetime | None = None
+    next_rtw_check: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class HrCosRtwQueueOut(BaseModel):
+    cos_allocated: int
+    cos_used: int
+    cos_available: int
+    workers: list[HrCosRtwWorkerRow]
 
 
 class WorkerOut(BaseModel):

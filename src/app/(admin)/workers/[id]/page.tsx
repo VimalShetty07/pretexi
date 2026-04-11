@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import { getRtwUiProfile } from "@/lib/rtw-profile";
 import DocumentChecklist, { type ChecklistItem } from "./checklist";
 import "../../dashboard/dashboard-marketing.css";
 import "../workers-page.css";
@@ -177,6 +178,8 @@ function WorkerDetailInner() {
   const secondNameRef = useRef<HTMLInputElement | null>(null);
   const lastNameRef = useRef<HTMLInputElement | null>(null);
   const canUploadProfilePhoto = Boolean(user && user.role !== "employee");
+
+  const rtwUi = useMemo(() => getRtwUiProfile(worker?.right_to_work_category), [worker?.right_to_work_category]);
 
   const patchWorker = async (body: Record<string, unknown>) => {
     if (!token || !params?.id) return;
@@ -818,7 +821,7 @@ function WorkerDetailInner() {
                       <DashRow label="Onboarding (HR label)" value={worker.hr_onboarding_stage || worker.stage || "—"} />
                       <DashRow label="Workflow stage" value={worker.stage || "—"} />
                       <DashRow label="Lifecycle status" value={worker.status || "—"} />
-                      <DashRow label="HR employment status" value={worker.employment_status || "—"} />
+                      <DashRow label="Status" value={worker.employment_status || "—"} />
                       <DashRow label="Start date" value={formatDetailDate(worker.start_date)} />
                       <DashRow label="End date" value={formatDetailDate(worker.termination_date)} />
                       <DashRow
@@ -912,7 +915,7 @@ function WorkerDetailInner() {
                         <DashRow label="Lifecycle status" value={worker.status || "—"} />
                       </div>
                       <label className="text-[12px] font-semibold text-[#64748B]">
-                        HR employment status
+                        Status
                         <select
                           className="mt-1 w-full max-w-md rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
                           disabled={savingEmployment}
@@ -1048,22 +1051,28 @@ function WorkerDetailInner() {
                       {!canEditEmployment ? (
                         <DashRow label="Right to work category" value={worker.right_to_work_category || "—"} />
                       ) : null}
-                      <DashRow label="Immigration route" value={worker.route || "—"} />
-                      <DashRow label="Visa expiry" value={formatDetailDate(worker.visa_expiry)} />
-                      <DashRow
-                        label="Days to expiry"
-                        value={
-                          worker.visa_expiry
-                            ? (() => {
-                                const d = Math.ceil(
-                                  (new Date(worker.visa_expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-                                );
-                                if (d < 0) return `${Math.abs(d)} days overdue`;
-                                return `${d} days`;
-                              })()
-                            : "—"
-                        }
-                      />
+                      {(rtwUi.showVisaImmigration || rtwUi.showSponsorshipCos) && (
+                        <DashRow label="Immigration route" value={worker.route || "—"} />
+                      )}
+                      {rtwUi.showVisaImmigration ? (
+                        <>
+                          <DashRow label="Visa expiry" value={formatDetailDate(worker.visa_expiry)} />
+                          <DashRow
+                            label="Days to expiry"
+                            value={
+                              worker.visa_expiry
+                                ? (() => {
+                                    const d = Math.ceil(
+                                      (new Date(worker.visa_expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                                    );
+                                    if (d < 0) return `${Math.abs(d)} days overdue`;
+                                    return `${d} days`;
+                                  })()
+                                : "—"
+                            }
+                          />
+                        </>
+                      ) : null}
                       <DashRow label="Last RTW check" value={formatDetailDate(worker.last_rtw_check)} />
                       <DashRow label="Next RTW check" value={formatDetailDate(worker.next_rtw_check)} />
                     </div>
@@ -1130,7 +1139,9 @@ function WorkerDetailInner() {
                   </div>
                   <div className="min-h-[82px] rounded-xl border border-[#E8EEFF] bg-white px-3 py-2.5">
                     <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>Visa expiry</p>
-                    <p className="mt-1 text-sm font-semibold text-[#0F2D5E]">{formatDetailDate(worker.visa_expiry)}</p>
+                    <p className="mt-1 text-sm font-semibold text-[#0F2D5E]">
+                      {rtwUi.showVisaImmigration ? formatDetailDate(worker.visa_expiry) : "—"}
+                    </p>
                   </div>
                 </div>
 
@@ -1231,8 +1242,12 @@ function WorkerDetailInner() {
                   </div>
                   <div>
                     <DashRow label="Right to work category" value={worker.right_to_work_category || "—"} />
-                    <DashRow label="Immigration route" value={worker.route || "—"} />
-                    <DashRow label="Visa expiry" value={formatDetailDate(worker.visa_expiry)} />
+                    {(rtwUi.showVisaImmigration || rtwUi.showSponsorshipCos) && (
+                      <DashRow label="Immigration route" value={worker.route || "—"} />
+                    )}
+                    {rtwUi.showVisaImmigration ? (
+                      <DashRow label="Visa expiry" value={formatDetailDate(worker.visa_expiry)} />
+                    ) : null}
                     <DashRow label="Last RTW check" value={formatDetailDate(worker.last_rtw_check)} />
                     <DashRow label="Next RTW check" value={formatDetailDate(worker.next_rtw_check)} />
                   </div>
@@ -1334,6 +1349,8 @@ function EmployeeDashboard({
   onGoBg: () => void;
   onGoDetails: () => void;
 }) {
+  const rtwUi = useMemo(() => getRtwUiProfile(worker.right_to_work_category), [worker.right_to_work_category]);
+
   const fmtDate = (iso: string | null | undefined) =>
     iso
       ? new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
@@ -1359,7 +1376,12 @@ function EmployeeDashboard({
         <DashboardKpi label="In review" value={String(inReviewDocs)} sub="Awaiting verification" tone="amber" />
         <DashboardKpi label="Rejected" value={String(rejectedDocs)} sub="Need re-upload" tone="rose" />
         <DashboardKpi label="Risk" value={worker.risk_level} sub="Posture" tone="slate" accentColor={riskTone.text} />
-        <DashboardKpi label="Visa" value={visaDays == null ? "—" : `${visaDays}d`} sub="Days left" tone="teal" />
+        <DashboardKpi
+          label="Visa"
+          value={!rtwUi.showVisaImmigration ? "—" : visaDays == null ? "—" : `${visaDays}d`}
+          sub={!rtwUi.showVisaImmigration ? "Not applicable" : "Days left"}
+          tone="teal"
+        />
         <DashboardKpi label="References" value={String(bgRefs.length)} sub="BG verify" tone="indigo" />
       </div>
 
@@ -1390,7 +1412,7 @@ function EmployeeDashboard({
             <DashRow label="Job title" value={worker.job_title || "—"} />
             <DashRow label="Department" value={worker.department || "—"} />
             <DashRow label="Work location" value={worker.work_location || "—"} />
-            <DashRow label="HR employment status" value={worker.employment_status || "—"} />
+            <DashRow label="Status" value={worker.employment_status || "—"} />
             <DashRow label="Onboarding stage" value={worker.hr_onboarding_stage || worker.stage || "—"} />
             <DashRow label="Start date" value={fmtDate(worker.start_date)} />
             <DashRow label="Salary (reported)" value={salaryReportedDisplay} />
@@ -1400,12 +1422,18 @@ function EmployeeDashboard({
         <AspectCard title="Immigration & visa" subtitle="Sponsor compliance lens" icon={Plane} barClass="bg-[#0D9488]">
           <div className="">
             <DashRow label="Right to work category" value={worker.right_to_work_category || "—"} />
-            <DashRow label="Immigration route" value={worker.route || "—"} />
-            <DashRow label="Visa expiry" value={fmtDate(worker.visa_expiry)} />
-            <DashRow
-              label="Countdown"
-              value={visaDays == null ? "—" : visaDays < 0 ? `${Math.abs(visaDays)} days overdue` : `${visaDays} days remaining`}
-            />
+            {(rtwUi.showVisaImmigration || rtwUi.showSponsorshipCos) && (
+              <DashRow label="Immigration route" value={worker.route || "—"} />
+            )}
+            {rtwUi.showVisaImmigration ? (
+              <>
+                <DashRow label="Visa expiry" value={fmtDate(worker.visa_expiry)} />
+                <DashRow
+                  label="Countdown"
+                  value={visaDays == null ? "—" : visaDays < 0 ? `${Math.abs(visaDays)} days overdue` : `${visaDays} days remaining`}
+                />
+              </>
+            ) : null}
           </div>
         </AspectCard>
 

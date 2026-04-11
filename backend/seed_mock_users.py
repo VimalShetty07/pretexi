@@ -23,6 +23,8 @@ MOCK_PASSWORD = settings.MOCK_SEED_PASSWORD
 PLATFORM_OWNER_PASSWORD = settings.PLATFORM_OWNER_PASSWORD or settings.MOCK_SEED_PASSWORD
 
 MOCK_USERS = [
+    {"email": "vimal@vimal.com", "full_name": "Vimal Admin", "role": UserRole.SUPER_ADMIN},
+    {"email": "vimalhr@gmail.com", "full_name": "Vimal HR", "role": UserRole.HR_OFFICER},
     {"email": "admin@protexi.local", "full_name": "Mock Admin", "role": UserRole.SUPER_ADMIN},
     {"email": "hr@protexi.local", "full_name": "Mock HR Officer", "role": UserRole.HR_OFFICER},
     {"email": "employee@protexi.local", "full_name": "Mock Employee", "role": UserRole.EMPLOYEE},
@@ -50,7 +52,23 @@ def _get_or_create_org(db, name: str, licence_number: str, slug: str):
 def _ensure_user(db, organisation_id: str, email: str, full_name: str, role: UserRole, password: str):
     existing = db.query(User).filter(User.email == email).first()
     if existing:
-        print(f"  User already exists: {email}")
+        changed = False
+        if existing.organisation_id != organisation_id:
+            existing.organisation_id = organisation_id
+            changed = True
+        if existing.full_name != full_name:
+            existing.full_name = full_name
+            changed = True
+        if existing.role != role:
+            existing.role = role
+            changed = True
+        if not existing.is_active:
+            existing.is_active = True
+            changed = True
+        if changed:
+            print(f"  Updated user: {email} ({role.value})")
+        else:
+            print(f"  User already exists: {email}")
         return existing
 
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -106,7 +124,7 @@ def main():
         print(
             "Done.\n"
             f"Platform owner: {settings.PLATFORM_OWNER_EMAIL}\n"
-            "Mock users: admin@protexi.local, hr@protexi.local, employee@protexi.local"
+            "Mock users: vimal@vimal.com, vimalhr@gmail.com, admin@protexi.local, hr@protexi.local, employee@protexi.local"
         )
     finally:
         db.close()

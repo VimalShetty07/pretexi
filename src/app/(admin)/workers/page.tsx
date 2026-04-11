@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo, Suspense } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/ui/premium-states";
+import { useToast } from "@/components/ui/toast-provider";
+import { LoadingButton } from "@/components/ui/loading-button";
 import {
   Users,
   Search,
-  Plus,
   Upload,
   Download,
   FileSpreadsheet,
   X,
-  Loader2,
   Star,
   ChevronLeft,
   ChevronRight,
@@ -21,7 +23,6 @@ import {
   Phone,
   Mail,
   Eye,
-  UserPlus,
   SlidersHorizontal,
   UserCheck,
   CalendarClock,
@@ -42,7 +43,7 @@ interface Worker {
   route: string;
   work_location: string | null;
   status: string;
-  /** HR employment status (org-configurable): Active, Inactive, Finished, … */
+  /** HR status (org-configurable): Active, Inactive, Finished, … */
   employment_status?: string;
   stage: string;
   risk_level: string;
@@ -84,7 +85,7 @@ const DEFAULT_WORKER_COLUMNS: WorkerTableColumnKey[] = ["name", "job_title", "em
 const WORKER_COLUMN_OPTIONS: Array<{ key: WorkerTableColumnKey; label: string }> = [
   { key: "name", label: "Name" },
   { key: "job_title", label: "Role" },
-  { key: "employment", label: "Employment" },
+  { key: "employment", label: "Status" },
   { key: "status", label: "Sponsor" },
   { key: "email", label: "Email" },
   { key: "docs", label: "Docs" },
@@ -106,9 +107,7 @@ export default function WorkersPage() {
   return (
     <Suspense
       fallback={
-        <div className="protexi-dash-marketing worker-list-page flex justify-center py-20">
-          <Loader2 className="h-10 w-10 animate-spin text-[#1d4ed8]" />
-        </div>
+        <PageSkeleton lines={5} />
       }
     >
       <WorkersPageInner />
@@ -122,6 +121,7 @@ function WorkersPageInner() {
   const tab = searchParams.get("tab") || "all";
 
   const { token, user } = useAuth();
+  const { showToast } = useToast();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [statsWorkers, setStatsWorkers] = useState<Worker[]>([]);
   const [onLeaveIds, setOnLeaveIds] = useState<Set<string>>(new Set());
@@ -135,6 +135,7 @@ function WorkersPageInner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [tableDensity, setTableDensity] = useState<"cozy" | "compact">("cozy");
   const [visibleColumns, setVisibleColumns] = useState<WorkerTableColumnKey[]>(DEFAULT_WORKER_COLUMNS);
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
   const [savingColumns, setSavingColumns] = useState(false);
@@ -145,6 +146,23 @@ function WorkersPageInner() {
 
   const canManage = user ? STAFF_ROLES.includes(user.role) : false;
   const canEditTableColumns = user ? COLUMN_PREF_ROLES.includes(user.role) : false;
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("protexi-workers-table-density");
+      if (saved === "compact" || saved === "cozy") setTableDensity(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("protexi-workers-table-density", tableDensity);
+    } catch {
+      /* ignore */
+    }
+  }, [tableDensity]);
 
   useEffect(() => {
     try {
@@ -287,6 +305,7 @@ function WorkersPageInner() {
       fetchEmploymentStatusOptions();
       fetchWorkerTableColumns();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   useEffect(() => {
@@ -333,17 +352,6 @@ function WorkersPageInner() {
     return { active, sponsored, onLeave, docsPending };
   }, [statsWorkers, onLeaveIds, compliance]);
 
-  const tabLabel =
-    tab === "all"
-      ? "All"
-      : tab === "active"
-        ? "Active"
-        : tab === "sponsored"
-          ? "Sponsored"
-          : tab === "on_leave"
-            ? "On leave"
-            : "All";
-
   const handleDownloadTemplate = async () => {
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -383,12 +391,15 @@ function WorkersPageInner() {
       const data = await res.json();
       setBulkResult(data);
       if (data.created > 0) {
+        showToast(`Added ${data.created} employee${data.created === 1 ? "" : "s"}.`, "success");
         fetchWorkers();
         fetchStatsWorkers();
         if (canManage) fetchCompliance();
       }
     } catch (err: unknown) {
-      setBulkResult({ created: 0, errors: [err instanceof Error ? err.message : "Upload failed"] });
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      setBulkResult({ created: 0, errors: [msg] });
+      showToast(msg, "error");
     } finally {
       setBulkUploading(false);
     }
@@ -526,6 +537,16 @@ function WorkersPageInner() {
               </button>
             ))}
           </div>
+          {viewMode === "list" ? (
+            <div className="wlp-view-toggle" role="group" aria-label="Workers table density">
+              <button type="button" onClick={() => setTableDensity("cozy")} className={`wlp-view-btn ${tableDensity === "cozy" ? "act" : ""}`}>
+                Cozy
+              </button>
+              <button type="button" onClick={() => setTableDensity("compact")} className={`wlp-view-btn ${tableDensity === "compact" ? "act" : ""}`}>
+                Compact
+              </button>
+            </div>
+          ) : null}
           {canEditTableColumns && (
             <div className="relative">
               <button type="button" onClick={() => setColumnMenuOpen((v) => !v)}
@@ -549,19 +570,22 @@ function WorkersPageInner() {
         </div>
 
         {error && (
-          <div className="border-b border-[rgba(220,38,38,0.3)] bg-[rgba(254,242,242,0.8)] px-5 py-2.5 text-[12px] text-[#991b1b]">{error}</div>
+          <div className="p-4">
+            <ErrorState message={error} onRetry={() => void fetchWorkers()} />
+          </div>
         )}
 
         {/* ── Content ─────────────────────────────────────────── */}
         {loading ? (
-          <div className="flex justify-center bg-white py-20">
-            <Loader2 className="h-10 w-10 animate-spin text-[#1a4fa0]" />
+          <div className="bg-white p-5">
+            <PageSkeleton lines={4} />
           </div>
         ) : filteredWorkers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center bg-white py-16">
-            <div className="adm-ae-icon"><Users className="h-5 w-5" /></div>
-            <div className="adm-ae-t mt-3">{search || tab !== "all" ? "No employees match your filters" : "No employees found"}</div>
-            <div className="adm-ae-s">Try adjusting your search or tab filter.</div>
+          <div className="bg-white p-6">
+            <EmptyState
+              title={search || tab !== "all" ? "No employees match your filters" : "No employees found"}
+              description="Try adjusting your search or tab filter."
+            />
           </div>
         ) : viewMode === "grid" ? (
           <>
@@ -600,12 +624,12 @@ function WorkersPageInner() {
         ) : (
           <>
             <div className="overflow-x-auto bg-white">
-              <table className="wlp-table">
+              <table className={`wlp-table ${tableDensity === "compact" ? "wlp-table-compact" : ""}`}>
                 <thead>
                   <tr>
                     {visibleColumns.includes("name") && <th>Name</th>}
                     {visibleColumns.includes("job_title") && <th>Role</th>}
-                    {visibleColumns.includes("employment") && <th>Employment</th>}
+                    {visibleColumns.includes("employment") && <th>Status</th>}
                     {visibleColumns.includes("status") && <th>Sponsor</th>}
                     {visibleColumns.includes("email") && <th>Email</th>}
                     {visibleColumns.includes("docs") && <th>Docs</th>}
@@ -719,12 +743,11 @@ function WorkersPageInner() {
                 {bulkResult && bulkResult.created > 0 ? "Done" : "Cancel"}
               </button>
               {!(bulkResult && bulkResult.created > 0) && (
-                <button type="button" disabled={!bulkFile || bulkUploading} onClick={handleBulkUpload}
+                <LoadingButton type="button" disabled={!bulkFile} loading={bulkUploading} loadingLabel="Uploading..." onClick={handleBulkUpload}
                   className="inline-flex h-10 cursor-pointer items-center gap-2 bg-[#0f2d5e] px-5 font-bold text-white hover:bg-[#1a4fa0] disabled:opacity-50"
                   style={{ fontFamily: "var(--dash-mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  {bulkUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  {bulkUploading ? "Uploading..." : "Upload"}
-                </button>
+                  Upload
+                </LoadingButton>
               )}
             </div>
           </div>
@@ -756,7 +779,7 @@ function AuthImage({ src, token, alt, className }: { src: string; token: string;
   }, [src, token]);
 
   if (!blobSrc) return null;
-  return <img src={blobSrc} alt={alt} className={className} />;
+  return <Image src={blobSrc} alt={alt} width={64} height={64} className={className} unoptimized />;
 }
 
 function EmployeeHtmlCard({
@@ -845,9 +868,12 @@ function EmployeeHtmlCard({
       {/* Footer */}
       <div className="wem-footer">
         <span className="wem-added">{w.nationality || "—"} · {relativeShort(w.created_at)}</span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {canEditEmployment && (
-            <div onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <span className="text-[9px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>
+                Status
+              </span>
               <select className="wem-emp-select" value={emp} onChange={(e) => onEmploymentChange(e.target.value)}>
                 {employmentOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
               </select>

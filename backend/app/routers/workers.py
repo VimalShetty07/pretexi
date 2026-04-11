@@ -10,8 +10,8 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from app.core.database import get_db
 from app.core.security import hash_password
 from app.core.config import get_settings
-from app.routers.deps import get_current_user, require_staff
-from sqlalchemy import func as sa_func
+from app.routers.deps import get_current_user, require_staff, require_hr_cos_rtw
+from sqlalchemy import func as sa_func, or_, and_
 from app.models.models import (
     AuditLog,
     DocumentChecklist,
@@ -35,6 +35,8 @@ from app.schemas.schemas import (
     WorkerOut,
     WorkerDetailOut,
     ProfilePhotoPresignOut,
+    HrCosRtwQueueOut,
+    HrCosRtwWorkerRow,
 )
 from app.core.profile_photo_storage import (
     read_and_validate_upload,
@@ -301,6 +303,63 @@ def get_compliance_summary(
             summary[worker_id]["rejected"] += cnt
 
     return summary
+
+
+@router.get("/hr-cos-rtw-queue", response_model=HrCosRtwQueueOut)
+def hr_cos_rtw_queue(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_hr_cos_rtw),
+):
+    """HR/compliance-only: CoS position + workers on sponsorship / visa / RTW pipeline."""
+    org = db.query(Organisation).filter(Organisation.id == current_user.organisation_id).first()
+    allocated = org.cos_allocated if org else 0
+    used = org.cos_used if org else 0
+    available = max(allocated - used, 0)
+
+    q = (
+        db.query(Worker)
+        .filter(Worker.organisation_id == current_user.organisation_id)
+        .filter(
+            or_(
+                Worker.cos_assigned_date.isnot(None),
+                Worker.visa_expiry.isnot(None),
+                Worker.stage.in_(
+                    [WorkerStage.COS_ASSIGNMENT, WorkerStage.PRE_START, WorkerStage.ACTIVE_SPONSORSHIP]
+                ),
+                and_(Worker.sponsorship_number.isnot(None), Worker.sponsorship_number != ""),
+            )
+        )
+        .order_by(Worker.name.asc())
+    )
+    rows = q.all()
+
+    workers_out: list[HrCosRtwWorkerRow] = []
+    for w in rows:
+        st = w.stage.value if hasattr(w.stage, "value") else str(w.stage)
+        workers_out.append(
+            HrCosRtwWorkerRow(
+                id=w.id,
+                name=w.name,
+                job_title=w.job_title,
+                department=w.department,
+                stage=st,
+                hr_onboarding_stage=w.hr_onboarding_stage,
+                right_to_work_category=w.right_to_work_category,
+                route=w.route or "",
+                sponsorship_number=w.sponsorship_number,
+                cos_assigned_date=w.cos_assigned_date,
+                visa_expiry=w.visa_expiry,
+                last_rtw_check=w.last_rtw_check,
+                next_rtw_check=w.next_rtw_check,
+            )
+        )
+
+    return HrCosRtwQueueOut(
+        cos_allocated=allocated,
+        cos_used=used,
+        cos_available=available,
+        workers=workers_out,
+    )
 
 
 # ── Template download (must be before /{worker_id}) ──

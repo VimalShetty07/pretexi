@@ -27,6 +27,22 @@ function gbp(n: number) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n);
 }
 
+/** Calendar days from today until payment; past dates show as Paid. */
+function daysToPayLabel(paymentDateIso: string | null): string {
+  if (!paymentDateIso) return "—";
+  const pay = new Date(paymentDateIso);
+  if (Number.isNaN(pay.getTime())) return "—";
+  const startToday = new Date();
+  startToday.setHours(0, 0, 0, 0);
+  const payDay = new Date(pay);
+  payDay.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((payDay.getTime() - startToday.getTime()) / (24 * 60 * 60 * 1000));
+  if (diffDays < 0) return "Paid";
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "1 day";
+  return `${diffDays} days`;
+}
+
 const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
 
 export default function PayrollPage() {
@@ -229,6 +245,7 @@ export default function PayrollPage() {
                       <th className="!text-right">NI</th>
                       <th className="!text-right">Pension</th>
                       <th className="!text-right">Net</th>
+                      <th>Days to pay</th>
                       <th>Paid</th>
                     </tr>
                   </thead>
@@ -264,6 +281,9 @@ export default function PayrollPage() {
                         <td className="text-right tabular-nums text-[#b45309]">{gbp(r.employee_ni)}</td>
                         <td className="text-right tabular-nums text-[#64748b]">{gbp(r.pension_employee)}</td>
                         <td className="text-right tabular-nums font-bold text-[#0f2d5e]">{gbp(r.net_pay)}</td>
+                        <td className="text-[11px] text-[#0f2d5e]" style={MONO}>
+                          {daysToPayLabel(r.payment_date)}
+                        </td>
                         <td className="text-[11px] text-[#64748b]" style={MONO}>
                           {r.payment_date
                             ? new Date(r.payment_date).toLocaleDateString("en-GB", {

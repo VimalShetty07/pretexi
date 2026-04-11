@@ -1021,3 +1021,21 @@ body {
 .delay-6 { animation-delay: 0.48s; }
 
 /* Admin top bar override — defers to protexi-admin-shell.css */
+
+/* Accessibility baseline: consistent focus indicator */
+:focus-visible {
+  outline: 2px solid #2b5da8;
+  outline-offset: 2px;
+}
+
+/* Respect reduced motion user preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

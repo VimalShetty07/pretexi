@@ -3,8 +3,10 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/ui/premium-states";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { useToast } from "@/components/ui/toast-provider";
 import {
-  CalendarDays,
   CheckCircle2,
   XCircle,
   Clock,
@@ -29,6 +31,7 @@ interface LeaveItem {
   reviewed_by: string | null;
   reviewed_at: string | null;
   rejection_reason: string | null;
+  approval_comment: string | null;
   created_at: string;
 }
 
@@ -76,6 +79,7 @@ const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
 
 export default function LeaveManagementPage() {
   const { token } = useAuth();
+  const { showToast } = useToast();
   const [allLeaves, setAllLeaves] = useState<LeaveItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -84,6 +88,26 @@ export default function LeaveManagementPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [approveId, setApproveId] = useState<string | null>(null);
+  const [approveComment, setApproveComment] = useState("");
+  const [tableDensity, setTableDensity] = useState<"cozy" | "compact">("cozy");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("protexi-leave-table-density");
+      if (saved === "compact" || saved === "cozy") setTableDensity(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("protexi-leave-table-density", tableDensity);
+    } catch {
+      /* ignore */
+    }
+  }, [tableDensity]);
 
   const fetchLeaves = useCallback(async () => {
     try {
@@ -130,16 +154,22 @@ export default function LeaveManagementPage() {
     try {
       const res = await fetch(`${API_URL}/leave/${id}/approve`, {
         method: "POST",
-        headers: authHeaders(),
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ approval_comment: approveComment.trim() || null }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `Approve failed (${res.status})`);
       }
+      setApproveId(null);
+      setApproveComment("");
       await fetchLeaves();
       setSuccess("Leave request approved.");
+      showToast("Leave request approved.", "success");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Approve failed");
+      const msg = e instanceof Error ? e.message : "Approve failed";
+      setError(msg);
+      showToast(msg, "error");
     } finally {
       setActionLoading(null);
     }
@@ -163,8 +193,11 @@ export default function LeaveManagementPage() {
       setRejectReason("");
       await fetchLeaves();
       setSuccess("Leave request rejected.");
+      showToast("Leave request rejected.", "success");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Reject failed");
+      const msg = e instanceof Error ? e.message : "Reject failed";
+      setError(msg);
+      showToast(msg, "error");
     } finally {
       setActionLoading(null);
     }
@@ -180,23 +213,11 @@ export default function LeaveManagementPage() {
   const filterKeys = ["", "pending", "approved", "rejected", "cancelled"] as const;
 
   if (loading && allLeaves.length === 0 && !error) {
-    return (
-      <div className="protexi-dash-marketing">
-        <p className="text-[12px] text-[#94a3b8]" style={MONO}>
-          Loading leave requests…
-        </p>
-      </div>
-    );
+    return <PageSkeleton lines={5} />;
   }
 
   if (error && allLeaves.length === 0) {
-    return (
-      <div className="protexi-dash-marketing">
-        <p className="text-[12px] text-[#dc2626]" style={MONO}>
-          {error}
-        </p>
-      </div>
-    );
+    return <ErrorState message={error} onRetry={() => void fetchLeaves()} />;
   }
 
   return (
@@ -312,6 +333,22 @@ export default function LeaveManagementPage() {
           <span className="wem-badge-mono" style={MONO}>
             {statusFilter === "" ? `${counts.total} requests` : `${leaves.length} shown · ${counts.total} total`}
           </span>
+          <div className="wlp-view-toggle ml-auto" role="group" aria-label="Leave table density">
+            <button
+              type="button"
+              onClick={() => setTableDensity("cozy")}
+              className={`wlp-view-btn ${tableDensity === "cozy" ? "act" : ""}`}
+            >
+              Cozy
+            </button>
+            <button
+              type="button"
+              onClick={() => setTableDensity("compact")}
+              className={`wlp-view-btn ${tableDensity === "compact" ? "act" : ""}`}
+            >
+              Compact
+            </button>
+          </div>
           <div className="wlp-filter-group flex-wrap">
             {filterKeys.map((val) => {
               const active = statusFilter === val;
@@ -338,18 +375,19 @@ export default function LeaveManagementPage() {
             </p>
           </div>
         ) : leaves.length === 0 ? (
-          <div className="flex flex-col items-center justify-center bg-white py-16">
-            <div className="adm-ae-icon">
-              <CalendarDays className="h-5 w-5" />
-            </div>
-            <div className="adm-ae-t mt-3">No leave requests</div>
-            <div className="adm-ae-s">
-              {statusFilter ? `No ${STATUS_CONFIG[statusFilter]?.label.toLowerCase() ?? statusFilter} requests in this view.` : "No leave requests on record yet."}
-            </div>
+          <div className="bg-white p-6">
+            <EmptyState
+              title="No leave requests"
+              description={
+                statusFilter
+                  ? `No ${STATUS_CONFIG[statusFilter]?.label.toLowerCase() ?? statusFilter} requests in this view.`
+                  : "No leave requests on record yet."
+              }
+            />
           </div>
         ) : (
           <div className="overflow-x-auto bg-white">
-            <table className="wlp-table">
+            <table className={`wlp-table ${tableDensity === "compact" ? "wlp-table-compact" : ""}`}>
               <thead>
                 <tr>
                   <th>Employee</th>
@@ -406,6 +444,14 @@ export default function LeaveManagementPage() {
                             Rejected: {l.rejection_reason}
                           </p>
                         )}
+                        {l.approval_comment && (
+                          <p
+                            className="mt-1 max-w-[180px] truncate text-[11px] text-[#166534]"
+                            title={l.approval_comment}
+                          >
+                            Approved: {l.approval_comment}
+                          </p>
+                        )}
                       </td>
                       <td>
                         <span
@@ -427,7 +473,15 @@ export default function LeaveManagementPage() {
                             <div className="flex flex-wrap items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => handleApprove(l.id)}
+                                onClick={() => {
+                                  setRejectId(null);
+                                  if (approveId === l.id) {
+                                    setApproveId(null);
+                                  } else {
+                                    setApproveId(l.id);
+                                    setApproveComment("");
+                                  }
+                                }}
                                 disabled={isLoading}
                                 className="inline-flex h-8 items-center gap-1.5 border border-[rgba(22,163,74,0.35)] bg-[#f0fdf4] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#166534] hover:bg-[rgba(22,163,74,0.12)] disabled:opacity-50"
                                 style={MONO}
@@ -437,7 +491,10 @@ export default function LeaveManagementPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setRejectId(rejectId === l.id ? null : l.id)}
+                                onClick={() => {
+                                  setApproveId(null);
+                                  setRejectId(rejectId === l.id ? null : l.id);
+                                }}
                                 disabled={isLoading}
                                 className="inline-flex h-8 items-center gap-1.5 border border-[rgba(220,38,38,0.35)] bg-[rgba(254,242,242,0.85)] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#991b1b] hover:bg-[rgba(254,242,242,1)] disabled:opacity-50"
                                 style={MONO}
@@ -446,6 +503,28 @@ export default function LeaveManagementPage() {
                                 Reject
                               </button>
                             </div>
+                            {approveId === l.id && (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={approveComment}
+                                  onChange={(e) => setApproveComment(e.target.value)}
+                                  placeholder="Optional note for the employee…"
+                                  className="h-8 min-w-[140px] flex-1 border border-[rgba(0,0,0,0.12)] bg-white px-2 text-[11px] outline-none focus:border-[var(--dash-blue)]"
+                                  style={MONO}
+                                />
+                                <LoadingButton
+                                  type="button"
+                                  onClick={() => handleApprove(l.id)}
+                                  loading={isLoading}
+                                  loadingLabel="Saving..."
+                                  className="inline-flex h-8 items-center gap-2 border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0]"
+                                  style={MONO}
+                                >
+                                  Confirm
+                                </LoadingButton>
+                              </div>
+                            )}
                             {rejectId === l.id && (
                               <div className="flex flex-wrap items-center gap-2">
                                 <input
@@ -456,14 +535,16 @@ export default function LeaveManagementPage() {
                                   className="h-8 min-w-[140px] flex-1 border border-[rgba(0,0,0,0.12)] bg-white px-2 text-[11px] outline-none focus:border-[var(--dash-blue)]"
                                   style={MONO}
                                 />
-                                <button
+                                <LoadingButton
                                   type="button"
                                   onClick={() => handleReject(l.id)}
-                                  className="inline-flex h-8 items-center border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0]"
+                                  loading={isLoading}
+                                  loadingLabel="Saving..."
+                                  className="inline-flex h-8 items-center gap-2 border border-[rgba(0,0,0,0.12)] bg-[#0f2d5e] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-white hover:bg-[#1a4fa0]"
                                   style={MONO}
                                 >
                                   Confirm
-                                </button>
+                                </LoadingButton>
                               </div>
                             )}
                           </div>

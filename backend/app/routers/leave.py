@@ -1,7 +1,7 @@
 """Leave management endpoints — employees apply, HR/admin approve or reject."""
 
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -20,6 +20,10 @@ class LeaveApplyRequest(BaseModel):
 
 class LeaveActionRequest(BaseModel):
     rejection_reason: str | None = None
+
+
+class LeaveApproveRequest(BaseModel):
+    approval_comment: str | None = None
 
 
 # ── Employee: apply for leave ──
@@ -161,6 +165,7 @@ def approve_leave(
     leave_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
+    payload: LeaveApproveRequest | None = Body(default=None),
 ):
     leave = db.query(LeaveRequest).filter(
         LeaveRequest.id == leave_id,
@@ -172,9 +177,12 @@ def approve_leave(
     if leave.status != LeaveStatus.PENDING:
         raise HTTPException(status_code=400, detail="Only pending requests can be approved")
 
+    comment = (payload.approval_comment.strip() if payload and payload.approval_comment else None) or None
+
     leave.status = LeaveStatus.APPROVED
     leave.reviewed_by = current_user.full_name
     leave.reviewed_at = datetime.now(timezone.utc)
+    leave.approval_comment = comment
     db.commit()
 
     return {"status": "approved"}
@@ -225,5 +233,6 @@ def _leave_to_dict(leave: LeaveRequest, worker: Worker) -> dict:
         "reviewed_by": leave.reviewed_by,
         "reviewed_at": leave.reviewed_at.isoformat() if leave.reviewed_at else None,
         "rejection_reason": leave.rejection_reason,
+        "approval_comment": leave.approval_comment,
         "created_at": leave.created_at.isoformat() if leave.created_at else None,
     }

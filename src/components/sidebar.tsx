@@ -8,7 +8,7 @@ import { useAuth } from "@/components/auth-provider";
 import {
   LayoutDashboard, Users, Building2, FileText, ClipboardList,
   ShieldAlert, Settings, LogOut, PanelLeftClose, PanelLeft,
-  UserCircle, CalendarDays, CalendarRange, Wallet, type LucideIcon,
+  UserCircle, CalendarDays, CalendarRange, Wallet, Plane, type LucideIcon,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -23,6 +23,7 @@ interface NavItem { label: string; href: string; icon: LucideIcon; }
 const adminNav: NavItem[] = [
   { label: "Dashboard",   href: "/dashboard",    icon: LayoutDashboard },
   { label: "Employees",   href: "/workers",       icon: Users },
+  { label: "CoS & RTW",   href: "/hr/cos-rtw",    icon: Plane },
   { label: "Leave",       href: "/leave",         icon: CalendarDays },
   { label: "Calendar",    href: "/calendar",      icon: CalendarRange },
   { label: "Organisation",href: "/organisation",  icon: Building2 },

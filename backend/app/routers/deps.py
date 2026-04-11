@@ -62,3 +62,12 @@ require_staff = require_roles(
 require_any_admin = require_roles(UserRole.SUPER_ADMIN, UserRole.COMPLIANCE_MANAGER, UserRole.HR_OFFICER, UserRole.PAYROLL_OFFICER, UserRole.INSPECTOR)
 require_platform_owner = require_roles(UserRole.PLATFORM_OWNER)
 require_tenant_admin = require_roles(UserRole.TENANT_ADMIN, UserRole.SUPER_ADMIN)
+
+# HR / compliance — CoS & RTW queue (not payroll-only or read-only inspector)
+require_hr_cos_rtw = require_roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.TENANT_ADMIN,
+    UserRole.COMPLIANCE_MANAGER,
+    UserRole.HR_OFFICER,
+    UserRole.TENANT_STAFF,
+)

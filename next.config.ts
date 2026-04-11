@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.pexels.com",
+      },
+    ],
+  },
   async rewrites() {
     return [
       {

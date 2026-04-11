@@ -270,10 +270,11 @@ export default function MarketingLanding() {
 
       <div className="img-callout">
         <div className="img-callout-photo">
-          <img
+          <Image
             src="https://images.pexels.com/photos/3688761/pexels-photo-3688761.jpeg?auto=compress&cs=tinysrgb&w=900&h=700&fit=crop"
             alt="Diverse HR team working together"
-            loading="lazy"
+            width={900}
+            height={700}
           />
         </div>
         <div className="img-callout-text">
@@ -401,10 +402,11 @@ export default function MarketingLanding() {
           </div>
         </div>
         <div className="mid-cta-img">
-          <img
+          <Image
             src="https://images.pexels.com/photos/9034249/pexels-photo-9034249.jpeg?auto=compress&cs=tinysrgb&w=900&h=700&fit=crop"
             alt="Compliance team in office meeting"
-            loading="lazy"
+            width={900}
+            height={700}
           />
         </div>
       </div>
@@ -583,7 +585,7 @@ function ProblemCard({
 }) {
   return (
     <div className="prob-card reveal" style={delay ? { transitionDelay: delay } : undefined}>
-      <img className="prob-img" src={img} alt={alt} loading="lazy" />
+      <Image className="prob-img" src={img} alt={alt} width={600} height={300} />
       <div className="prob-body">
         <div className="prob-label">{label}</div>
         <div className="prob-title">{title}</div>
@@ -729,7 +731,7 @@ function FeatSvg({ name }: { name: string }) {
 function TeamImg({ src, cap, alt }: { src: string; cap: string; alt: string }) {
   return (
     <div className="team-strip-img">
-      <img src={src} alt={alt} loading="lazy" />
+      <Image src={src} alt={alt} width={700} height={400} />
       <div className="team-strip-cap">{cap}</div>
     </div>
   );

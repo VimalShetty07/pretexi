@@ -976,6 +976,7 @@ class LeaveRequest(Base):
     reviewed_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    approval_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)

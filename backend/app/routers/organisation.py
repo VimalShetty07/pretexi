@@ -32,6 +32,7 @@ SETTINGS_EDIT_ROLES = frozenset(
         UserRole.SUPER_ADMIN,
         UserRole.TENANT_ADMIN,
         UserRole.COMPLIANCE_MANAGER,
+        UserRole.HR_OFFICER,
     }
 )
 CHAT_POST_ROLES = frozenset(
@@ -140,7 +141,7 @@ def patch_organisation_settings(
     if current_user.role not in SETTINGS_EDIT_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only organisation admins can change these options",
+            detail="Only administrators or HR officers can change these organisation options",
         )
     org = db.query(Organisation).filter(Organisation.id == current_user.organisation_id).first()
     if not org:

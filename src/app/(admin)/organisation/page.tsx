@@ -213,7 +213,7 @@ function OrganisationOptionListSection({
         )}
         {!canEdit && (
           <p className="mt-3 text-[11px] text-[#94a3b8]" style={MONO}>
-            Only organisation admins can edit this list.
+            You need an HR or administrator role to edit company-wide dropdown lists.
           </p>
         )}
       </div>
@@ -332,7 +332,8 @@ export default function OrganisationPage() {
   const canEditEmploymentStatuses =
     user?.role === "tenant_admin" ||
     user?.role === "compliance_manager" ||
-    user?.role === "super_admin";
+    user?.role === "super_admin" ||
+    user?.role === "hr_officer";
 
   return (
     <div className="protexi-dash-marketing flex flex-col gap-0">
@@ -486,9 +487,9 @@ export default function OrganisationPage() {
         </div>
         <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
           <p className="text-[12px] leading-relaxed text-[#64748b]" style={{ marginBottom: 12 }}>
-            These labels appear in the <strong className="text-[#475569]">Employment status</strong> dropdown for every
-            employee. Defaults are Active, Inactive, and Finished — add your own (e.g. &quot;On leave&quot;,
-            &quot;Probation&quot;) so HR uses the same set across the organisation.
+            These labels power the <strong className="text-[#475569]">Status</strong> column on the Workers list and the
+            same dropdown on each employee profile. Defaults are Active, Inactive, and Finished — add your own (e.g.
+            &quot;On leave&quot;, &quot;Probation&quot;) so everyone uses one consistent set.
           </p>
           <div className="grid gap-2">
             {employmentStatusOptions.map((label, idx) => (
@@ -575,7 +576,7 @@ export default function OrganisationPage() {
           )}
           {!canEditEmploymentStatuses && (
             <p className="mt-3 text-[11px] text-[#94a3b8]" style={MONO}>
-              Only organisation admins can edit this list.
+              You need an HR or administrator role to edit company-wide dropdown lists.
             </p>
           )}
         </div>

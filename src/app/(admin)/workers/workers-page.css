@@ -477,6 +477,9 @@
   text-transform: uppercase;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   background: #f5f5f0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 .protexi-adm-shell .wlp-table td {
   padding: 11px 14px;
@@ -485,6 +488,14 @@
 }
 .protexi-adm-shell .wlp-table tr:hover td {
   background: rgba(26, 79, 160, 0.025);
+}
+
+.protexi-adm-shell .wlp-table-compact th {
+  padding: 6px 10px;
+  font-size: 9px;
+}
+.protexi-adm-shell .wlp-table-compact td {
+  padding: 7px 10px;
 }
 
 /* ── Ensure adm-card inside marketing context is flat ────── */

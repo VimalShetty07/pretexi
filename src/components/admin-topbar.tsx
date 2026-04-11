@@ -6,6 +6,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   LayoutGrid,
   Users,
+  Plane,
   FileWarning,
   CalendarDays,
   CalendarRange,
@@ -39,6 +40,7 @@ type WorkerSearchResult = {
 const adminNavFlat: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
   { label: "Employees", href: "/workers", icon: Users },
+  { label: "CoS & RTW", href: "/hr/cos-rtw", icon: Plane },
   { label: "Visa Expiry", href: "/workers/visa-expiry", icon: FileWarning },
   { label: "Leave", href: "/leave", icon: CalendarDays },
   { label: "Calendar", href: "/calendar", icon: CalendarRange },
@@ -78,6 +80,7 @@ function isActive(pathname: string | null, href: string): boolean {
   if (!pathname) return false;
   if (href === "/dashboard" || href === "/portal") return pathname === href;
   if (href === "/workers") return pathname === "/workers" || (pathname.startsWith("/workers/") && pathname !== "/workers/visa-expiry");
+  if (href === "/hr/cos-rtw") return pathname === "/hr/cos-rtw" || pathname.startsWith("/hr/");
   if (href === "/workers/visa-expiry") return pathname === "/workers/visa-expiry";
   return pathname === href || pathname.startsWith(href + "/");
 }

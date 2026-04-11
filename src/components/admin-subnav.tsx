@@ -128,6 +128,7 @@ export function AdminSubnav() {
   /* Light context strip for other admin pages */
   const title =
     pathname?.startsWith("/workers/visa-expiry") ? "Visa expiry" :
+    pathname?.startsWith("/hr") ? "CoS & RTW" :
     pathname?.startsWith("/workers") ? "Employees" :
     pathname?.startsWith("/leave") ? "Leave" :
     pathname?.startsWith("/calendar") ? "Calendar" :

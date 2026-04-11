@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/ui/premium-states";
 import {
   DEFAULT_DASHBOARD_FEATURES,
   orderDashboardFeatures,
@@ -248,18 +249,10 @@ export default function DashboardPage() {
   }, [data]);
 
   if (loading) {
-    return (
-      <div className="protexi-dash-marketing-loading" role="status" aria-live="polite">
-        Loading dashboard&hellip;
-      </div>
-    );
+    return <PageSkeleton lines={4} />;
   }
   if (error || !data) {
-    return (
-      <div className="protexi-dash-marketing-error" role="alert">
-        {error || "Dashboard unavailable"}
-      </div>
-    );
+    return <ErrorState message={error || "Dashboard unavailable"} onRetry={() => window.location.reload()} />;
   }
 
   const today = new Date().toLocaleDateString("en-GB", {
@@ -282,6 +275,13 @@ export default function DashboardPage() {
     data.total_employees > 0
       ? Math.min(100, Math.round((validVisas / Math.max(data.total_employees, 1)) * 100))
       : 100;
+
+  const onboardingSteps = [
+    { key: "workers", label: "Add your first employees", done: data.total_employees > 0, href: "/workers/new" },
+    { key: "docs", label: "Upload compliance documents", done: data.visa_breakdown.no_visa < data.total_employees, href: "/documents" },
+    { key: "leave", label: "Review leave workflow", done: data.pending_leaves >= 0, href: "/leave" },
+  ];
+  const onboardingDone = onboardingSteps.filter((s) => s.done).length;
 
   return (
     <div className="protexi-dash-marketing flex flex-col gap-0">
@@ -556,16 +556,10 @@ export default function DashboardPage() {
             </Link>
           </div>
           {topAlerts.length === 0 ? (
-            <div className="adm-alert-empty">
-              <div className="adm-ae-icon">
-                <CheckCircle2 className="h-4 w-4" />
-              </div>
-              <div className="adm-ae-t">All clear!</div>
-              <div className="adm-ae-s">No upcoming visa expiry alerts.</div>
-            </div>
+            <EmptyState title="All clear!" description="No upcoming visa expiry alerts." />
           ) : (
             <div className="px-3 pb-3">
-              {topAlerts.map((w, i) => {
+              {topAlerts.map((w) => {
                 const urgent = w.days_left <= 0;
                 const badge = urgent
                   ? "bg-red-50 text-red-700 border-red-200"
@@ -692,6 +686,28 @@ export default function DashboardPage() {
         ) : null}
       </div>
       ) : null}
+
+      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-800">Onboarding checklist</h3>
+          <span className="text-xs text-slate-500">{onboardingDone}/{onboardingSteps.length} complete</span>
+        </div>
+        <div className="space-y-2">
+          {onboardingSteps.map((step) => (
+            <button
+              key={step.key}
+              type="button"
+              onClick={() => router.push(step.href)}
+              className="flex w-full items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-left hover:bg-slate-50"
+            >
+              <span className="text-sm text-slate-700">{step.label}</span>
+              <span className={`text-xs font-semibold ${step.done ? "text-emerald-600" : "text-amber-600"}`}>
+                {step.done ? "Done" : "Pending"}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
