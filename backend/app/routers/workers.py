@@ -1,8 +1,8 @@
 import io
 import secrets
 import string
-from datetime import date, datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from datetime import date, datetime, timedelta, timezone
+from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File, status
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
 from openpyxl import Workbook, load_workbook
@@ -34,10 +34,13 @@ from app.schemas.schemas import (
     WorkerUpdate,
     WorkerOut,
     WorkerDetailOut,
+    RtwBritishIrishSignIn,
+    RtwVerificationChecklistData,
     ProfilePhotoPresignOut,
     HrCosRtwQueueOut,
     HrCosRtwWorkerRow,
 )
+from app.core.rtw_category import is_british_irish_rtw_category, is_time_limited_rtw_category
 from app.core.profile_photo_storage import (
     read_and_validate_upload,
     store_worker_profile_photo,
@@ -145,6 +148,15 @@ def _maybe_redact_worker_detail(worker: Worker, user: User) -> WorkerDetailOut:
     out = WorkerDetailOut.model_validate(worker)
     has_photo = bool(worker.profile_photo_s3_key or worker.profile_photo_data)
     age = _age_years_from_dob(worker.date_of_birth)
+    if user.role == UserRole.EMPLOYEE:
+        return out.model_copy(
+            update={
+                "has_profile_photo": has_photo,
+                "age_years": age,
+                "internal_notes": None,
+                "rtw_verification_checklist": None,
+            }
+        )
     if user.role in MANAGER_NO_PAYROLL:
         return out.model_copy(
             update={
@@ -156,6 +168,16 @@ def _maybe_redact_worker_detail(worker: Worker, user: User) -> WorkerDetailOut:
             }
         )
     return out.model_copy(update={"has_profile_photo": has_photo, "age_years": age})
+
+
+def _worker_detail_response(db: Session, worker: Worker, current_user: User) -> WorkerDetailOut:
+    out = _maybe_redact_worker_detail(worker, current_user)
+    if worker.rtw_check_signed_by_user_id:
+        signer = db.query(User).filter(User.id == worker.rtw_check_signed_by_user_id).first()
+        if signer:
+            return out.model_copy(update={"rtw_check_signed_by_name": signer.full_name})
+    return out.model_copy(update={"rtw_check_signed_by_name": None})
+
 
 settings = get_settings()
 DEFAULT_EMPLOYEE_PASSWORD = settings.DEFAULT_EMPLOYEE_PASSWORD
@@ -582,14 +604,11 @@ async def upload_worker_profile_photo(
     worker_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(get_current_user),
 ):
-    worker = db.query(Worker).filter(
-        Worker.id == worker_id,
-        Worker.organisation_id == current_user.organisation_id,
-    ).first()
-    if not worker:
-        raise HTTPException(status_code=404, detail="Worker not found")
+    worker = _worker_scope_or_403(db, worker_id, current_user)
+    if current_user.role != UserRole.EMPLOYEE or current_user.worker_id != worker_id:
+        raise HTTPException(status_code=403, detail="Only employees can upload their own profile photo")
 
     raw, mime = await read_and_validate_upload(file)
     delete_stored_object(worker.profile_photo_s3_key)
@@ -613,14 +632,11 @@ async def upload_worker_profile_photo(
 def delete_worker_profile_photo(
     worker_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(get_current_user),
 ):
-    worker = db.query(Worker).filter(
-        Worker.id == worker_id,
-        Worker.organisation_id == current_user.organisation_id,
-    ).first()
-    if not worker:
-        raise HTTPException(status_code=404, detail="Worker not found")
+    worker = _worker_scope_or_403(db, worker_id, current_user)
+    if current_user.role != UserRole.EMPLOYEE or current_user.worker_id != worker_id:
+        raise HTTPException(status_code=403, detail="Only employees can remove their own profile photo")
     delete_stored_object(worker.profile_photo_s3_key)
     worker.profile_photo_s3_key = None
     worker.profile_photo_mime = None
@@ -630,7 +646,122 @@ def delete_worker_profile_photo(
     return worker
 
 
+RTW_METHOD_VALID = frozenset({"physical", "live_video", "home_office_online", "ecs"})
+
+
+def _validate_rtw_verification_rules(data: RtwVerificationChecklistData) -> None:
+    """Apply smart required-field rules based on verification_method.
+
+    Rules:
+      • Physical (in-person)     → `identity_original_docs_seen` must be True.
+      • Home Office online check → `online_share_code` (non-empty), `online_share_code_used`
+                                    and `online_screenshot_pdf_saved` must all be True.
+    Validation only runs when the checklist is being finalised
+    (`declaration_confirmed=True`); drafts are saved as-is.
+    """
+    method = (data.verification_method or "").strip().lower() or None
+    if method and method not in RTW_METHOD_VALID:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid verification_method '{data.verification_method}'",
+        )
+    if not data.declaration_confirmed:
+        return
+    if method == "physical":
+        if not data.identity_original_docs_seen:
+            raise HTTPException(
+                status_code=400,
+                detail="Physical checks require confirming original documents have been seen",
+            )
+    elif method == "home_office_online":
+        code = (data.online_share_code or "").strip()
+        if not code:
+            raise HTTPException(
+                status_code=400,
+                detail="Home Office online checks require a share code",
+            )
+        if not data.online_share_code_used:
+            raise HTTPException(
+                status_code=400,
+                detail="Confirm the share code was used before finalising",
+            )
+        if not data.online_screenshot_pdf_saved:
+            raise HTTPException(
+                status_code=400,
+                detail="Save the screenshot / PDF evidence before finalising",
+            )
+
+
+def _parse_iso_date(raw: str | None) -> date | None:
+    if not raw or not str(raw).strip():
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).strip()[:10]).date()
+    except ValueError:
+        return None
+
+
+def _apply_rtw_followup(worker: Worker, data: RtwVerificationChecklistData) -> None:
+    """Auto-populate `next_rtw_check` for time-limited visas when checklist is finalised.
+
+    If the category is time-limited (pre-settled / sponsored / non-sponsored) and the
+    worker's visa_expiry is known, the follow-up check is scheduled for the visa expiry
+    date (the latest sensible moment to re-verify). Otherwise a conservative 6-month
+    follow-up is used. Existing values are only overwritten when the new date is later.
+    """
+    if not data.declaration_confirmed:
+        return
+    if not is_time_limited_rtw_category(worker.right_to_work_category):
+        return
+
+    signed = _parse_iso_date(data.declaration_date) or datetime.now(timezone.utc).date()
+    worker.last_rtw_check = datetime(signed.year, signed.month, signed.day, tzinfo=timezone.utc)
+
+    followup: date
+    if worker.visa_expiry is not None:
+        ve = worker.visa_expiry.date() if isinstance(worker.visa_expiry, datetime) else worker.visa_expiry
+        followup = ve
+    else:
+        followup = signed + timedelta(days=183)  # ~6 months
+    # Don't regress an already-scheduled earlier follow-up date.
+    existing = worker.next_rtw_check.date() if isinstance(worker.next_rtw_check, datetime) else worker.next_rtw_check
+    if existing is None or existing < followup:
+        worker.next_rtw_check = datetime(followup.year, followup.month, followup.day, tzinfo=timezone.utc)
+
+
 # ── Single worker CRUD (dynamic {worker_id} routes last) ──
+
+@router.post("/{worker_id}/rtw-british-irish-sign", response_model=WorkerDetailOut)
+def sign_rtw_british_irish(
+    worker_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_staff),
+    payload: RtwBritishIrishSignIn | None = Body(default=None),
+):
+    """HR sign-off for British/Irish RTW: records verifier name and time; sets RTW check date if still empty."""
+    worker = db.query(Worker).filter(
+        Worker.id == worker_id,
+        Worker.organisation_id == current_user.organisation_id,
+    ).first()
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+    if not is_british_irish_rtw_category(worker.right_to_work_category):
+        raise HTTPException(
+            status_code=400,
+            detail="RTW sign-off applies only to British / Irish citizen categories",
+        )
+    body = payload if payload is not None else RtwBritishIrishSignIn()
+    now = datetime.now(timezone.utc)
+    if body.last_rtw_check is not None:
+        worker.last_rtw_check = body.last_rtw_check
+    elif worker.last_rtw_check is None:
+        worker.last_rtw_check = now
+    worker.rtw_check_signed_at = now
+    worker.rtw_check_signed_by_user_id = current_user.id
+    db.commit()
+    db.refresh(worker)
+    return _worker_detail_response(db, worker, current_user)
+
 
 @router.get("/{worker_id}", response_model=WorkerDetailOut)
 def get_worker(
@@ -647,7 +778,7 @@ def get_worker(
     ).first()
     if not worker:
         raise HTTPException(status_code=404, detail="Worker not found")
-    return _maybe_redact_worker_detail(worker, current_user)
+    return _worker_detail_response(db, worker, current_user)
 
 
 @router.post("", response_model=WorkerOut, status_code=status.HTTP_201_CREATED)
@@ -742,6 +873,15 @@ def update_worker(
             if not employment_status_allowed(db, current_user.organisation_id, v):
                 raise HTTPException(status_code=400, detail="Invalid employment_status for this organisation")
             setattr(worker, "employment_status", v)
+            continue
+        if key == "rtw_verification_checklist":
+            if value is None:
+                worker.rtw_verification_checklist = None
+            else:
+                data = RtwVerificationChecklistData.model_validate(value)
+                _validate_rtw_verification_rules(data)
+                worker.rtw_verification_checklist = data.model_dump()
+                _apply_rtw_followup(worker, data)
             continue
         setattr(worker, key, value)
 

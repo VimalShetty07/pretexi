@@ -246,7 +246,7 @@ export default function VisaExpiryPage() {
                     .toUpperCase();
 
                   return (
-                    <tr key={w.id} className="cursor-pointer" onClick={() => router.push(`/workers/${w.id}?tab=records`)}>
+                    <tr key={w.id} className="cursor-pointer" onClick={() => router.push(`/workers/${w.id}?tab=overview`)}>
                       <td>
                         <div className="flex items-center gap-3">
                           <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-[rgba(0,0,0,0.08)] bg-[rgba(26,79,160,0.08)] text-[11px] font-extrabold text-[#1a4fa0]">
@@ -292,7 +292,7 @@ export default function VisaExpiryPage() {
                       <td onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
-                          onClick={() => router.push(`/workers/${w.id}?tab=records`)}
+                          onClick={() => router.push(`/workers/${w.id}?tab=overview`)}
                           className="inline-flex h-8 items-center gap-1.5 border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]"
                           style={MONO}
                         >

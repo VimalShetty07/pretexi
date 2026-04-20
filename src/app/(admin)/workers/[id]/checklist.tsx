@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Download, Upload, CheckCircle2, XCircle, Loader2, MinusCircle } from "lucide-react";
+import { Download, Upload, CheckCircle2, XCircle, Loader2, MinusCircle, Archive } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
+import { api } from "@/lib/api";
 
 const API_PROXY_URL = "/api";
 const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
@@ -25,12 +26,21 @@ export interface ChecklistItem {
   documents: DocFile[];
 }
 
+/** Uploads kept after a checklist line was removed or the org template changed */
+export interface SupersededDocument {
+  id: string;
+  file_name: string | null;
+  legacy_checklist_description: string | null;
+  legacy_checklist_category: string | null;
+  superseded_at: string | null;
+}
+
 const STATUS_LABEL: Record<ChecklistItem["status"], string> = {
   not_started: "Approval Pending",
   uploaded: "Approval Pending",
   verified: "Verified",
   rejected: "Rejected",
-  not_applicable: "Approval Pending",
+  not_applicable: "Not applicable",
 };
 
 const STATUS_STYLE: Record<ChecklistItem["status"], string> = {
@@ -45,15 +55,18 @@ export default function DocumentChecklist({
   workerId,
   organisationId,
   items,
+  supersededDocuments = [],
   onRefresh,
 }: {
   workerId: string;
   /** Required for platform users; optional for tenant users (still sent when known for consistency). */
   organisationId?: string | null;
   items: ChecklistItem[];
+  /** Retained file uploads from superseded checklist rows (template change / list shrink). */
+  supersededDocuments?: SupersededDocument[];
   onRefresh: () => Promise<void>;
 }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [uploading, setUploading] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -89,6 +102,17 @@ export default function DocumentChecklist({
       map.get(k)!.push(it);
     }
     return order.map((k) => [k, map.get(k)!] as const);
+  }, [items]);
+
+  /** Show 1…n — API item_number is often sort_order (e.g. 100) not a human row index */
+  const displayIndexById = useMemo(() => {
+    const sorted = [...items].sort((a, b) => {
+      const an = Number(a.item_number);
+      const bn = Number(b.item_number);
+      if (Number.isFinite(an) && Number.isFinite(bn) && an !== bn) return an - bn;
+      return String(a.id).localeCompare(String(b.id));
+    });
+    return new Map(sorted.map((it, i) => [it.id, i + 1]));
   }, [items]);
 
   const triggerUpload = (itemId: string) => {
@@ -164,6 +188,42 @@ export default function DocumentChecklist({
     }
   };
 
+  const canDeleteRetained =
+    !!user && user.role !== "employee" && user.role !== "inspector";
+
+  const downloadRetained = async (docId: string, fileName: string) => {
+    const res = await fetch(
+      `${API_PROXY_URL}/workers/${workerId}/checklist/retained-document/${docId}/download${orgQuery}`,
+      { headers: authHeaders }
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.detail || `Download failed (${res.status})`);
+      return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName || "document";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const deleteRetained = async (docId: string) => {
+    if (!token || !canDeleteRetained) return;
+    setActing("retained-delete-" + docId);
+    setError("");
+    try {
+      await api.delete(`/workers/${workerId}/checklist/retained-document/${docId}${orgQuery}`, token);
+      await onRefresh();
+      setSuccess("Archived copy removed.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Delete failed.");
+    } finally {
+      setActing(null);
+    }
+  };
+
   const download = async (itemId: string, docId: string, fileName: string) => {
     const res = await fetch(
       `${API_PROXY_URL}/workers/${workerId}/checklist/${itemId}/download/${docId}${orgQuery}`,
@@ -202,7 +262,7 @@ export default function DocumentChecklist({
           </div>
         )}
 
-        {items.length === 0 && (
+        {items.length === 0 && supersededDocuments.length === 0 && (
           <div className="border border-amber-200 bg-amber-50 px-3 py-3 text-[12px] text-amber-950">
             <p className="font-semibold">No documents configured for this client</p>
             <p className="mt-1 text-amber-900/90">
@@ -225,7 +285,7 @@ export default function DocumentChecklist({
                   <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#EEF3FA] px-4 py-3">
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#94a3b8]" style={MONO}>
-                        #{it.item_number}
+                        #{displayIndexById.get(it.id) ?? it.item_number}
                       </p>
                     <p className="mt-1 text-[15px] font-semibold leading-snug text-[#0f2d5e]">
                         {it.description}
@@ -306,6 +366,67 @@ export default function DocumentChecklist({
             </div>
           ))}
         </div>
+
+        {supersededDocuments.length > 0 ? (
+          <div className="mt-6 border-t border-[#EEF3FA] pt-4">
+            <div className="flex items-center gap-2">
+              <Archive className="h-4 w-4 text-[#64748b]" />
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={MONO}>
+                Archived checklist uploads
+              </p>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-[#94a3b8]" style={MONO}>
+              Files kept when a checklist line was removed or the organisation template changed. Download for audit
+              records. Permanent deletion is for staff only.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {supersededDocuments.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border border-[#E8EEFF] bg-[#f8fafc] px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-semibold text-[#0f2d5e]">{s.file_name ?? "File"}</p>
+                    <p className="truncate text-[11px] text-[#64748b]" style={MONO}>
+                      {(s.legacy_checklist_category ? `${s.legacy_checklist_category} · ` : "") +
+                        (s.legacy_checklist_description ?? "Previous checklist item")}
+                    </p>
+                    {s.superseded_at ? (
+                      <p className="mt-0.5 text-[10px] text-[#94a3b8]" style={MONO}>
+                        Archived {new Date(s.superseded_at).toLocaleString("en-GB")}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex h-8 items-center gap-1 border border-[rgba(0,0,0,0.1)] bg-white px-2.5 text-[9px] font-bold uppercase tracking-[0.06em] text-[#0f2d5e]"
+                      style={MONO}
+                      onClick={() => downloadRetained(s.id, s.file_name ?? "document")}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download
+                    </button>
+                    {canDeleteRetained ? (
+                      <button
+                        type="button"
+                        className="inline-flex h-8 items-center border border-[rgba(220,38,38,0.35)] bg-white px-2.5 text-[9px] font-bold uppercase tracking-[0.06em] text-[#991b1b] disabled:opacity-50"
+                        style={MONO}
+                        disabled={acting?.startsWith("retained-delete-")}
+                        onClick={() => {
+                          if (typeof window !== "undefined" && !window.confirm("Permanently delete this archived file?")) return;
+                          void deleteRetained(s.id);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </div>
   );

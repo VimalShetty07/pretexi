@@ -348,6 +348,31 @@ class WorkerCreate(BaseModel):
     right_to_work_category: str | None = None
 
 
+class RtwVerificationChecklistData(BaseModel):
+    """Structured Right to Work verification record (Home Office–style checklist)."""
+
+    # Step 1 — verification method (drives smart required rules)
+    verification_method: str | None = None  # physical | live_video | home_office_online | ecs
+    identity_original_docs_seen: bool = False
+    identity_in_person_or_live_video: bool = False
+    identity_photo_matches_employee: bool = False
+    identity_name_matches_documents: bool = False
+    authenticity_documents_genuine_unaltered: bool = False
+    authenticity_expiry_dates_checked: bool = False
+    authenticity_work_restrictions_checked: bool = False
+    online_share_code_used: bool = False
+    online_share_code: str | None = None
+    online_profile_matches_employee: bool = False
+    online_screenshot_pdf_saved: bool = False
+    declaration_confirmed: bool = False
+    declaration_checked_by_name: str | None = None
+    declaration_date: str | None = None
+    declaration_signature: str | None = None
+
+    class Config:
+        extra = "ignore"
+
+
 class WorkerUpdate(BaseModel):
     name: str | None = None
     first_name: str | None = None
@@ -415,6 +440,16 @@ class WorkerUpdate(BaseModel):
     salary_pay_type: str | None = None
     hr_onboarding_stage: str | None = None
     right_to_work_category: str | None = None
+    internal_notes: str | None = None
+    last_rtw_check: datetime | None = None
+    next_rtw_check: datetime | None = None
+    rtw_verification_checklist: RtwVerificationChecklistData | None = None
+
+
+class RtwBritishIrishSignIn(BaseModel):
+    """Optional RTW check date when signing; if omitted and worker has no date, today (UTC) is used."""
+
+    last_rtw_check: datetime | None = None
 
 
 class HrCosRtwWorkerRow(BaseModel):
@@ -512,6 +547,9 @@ class WorkerDetailOut(WorkerOut):
     entry_clearance_date: datetime | None = None
     last_rtw_check: datetime | None = None
     next_rtw_check: datetime | None = None
+    rtw_check_signed_at: datetime | None = None
+    rtw_check_signed_by_user_id: str | None = None
+    rtw_check_signed_by_name: str | None = None
     dbs_completed: bool = False
     atas_completed: bool = False
     work_address: str | None = None
@@ -527,6 +565,8 @@ class WorkerDetailOut(WorkerOut):
     dbs_check_date: datetime | None = None
     has_profile_photo: bool = False
     age_years: int | None = None
+    internal_notes: str | None = None
+    rtw_verification_checklist: RtwVerificationChecklistData | None = None
 
 
 class ProfilePhotoPresignOut(BaseModel):
@@ -901,3 +941,31 @@ class DashboardStats(BaseModel):
     cos_allocated: int
     missing_documents: int
     expiring_visas: int
+
+
+# ═══════════════════════════════════════════════════════════
+#  ORG CHECKLIST TEMPLATE
+# ═══════════════════════════════════════════════════════════
+
+
+class ChecklistTemplateItemIn(BaseModel):
+    id: str | None = None
+    description: str
+    category: str | None = None
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class ChecklistTemplatePut(BaseModel):
+    items: list[ChecklistTemplateItemIn]
+
+
+class ChecklistTemplateItemOut(BaseModel):
+    id: str
+    description: str
+    category: str | None
+    sort_order: int
+    is_active: bool = True
+
+    class Config:
+        from_attributes = True

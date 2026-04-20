@@ -484,7 +484,7 @@ export default function NewWorkerPage() {
             <Field label="Job Title" required>
               <input type="text" value={form.job_title} onChange={set("job_title")} placeholder="e.g. Live in Carer" className="wem-new-inp" />
             </Field>
-            <Field label="Status">
+            <Field label="Employment status">
               <select
                 value={form.employment_status}
                 onChange={set("employment_status")}

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import { parseChecklistListPayload } from "@/lib/parse-checklist-response";
 import {
   Upload,
   CheckCircle2,
@@ -41,6 +42,13 @@ interface ChecklistItem {
   documents: DocFile[];
 }
 
+interface SupersededRow {
+  id: string;
+  file_name: string | null;
+  legacy_checklist_description: string | null;
+  superseded_at: string | null;
+}
+
 const API_URL = "/api";
 
 const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
@@ -66,6 +74,7 @@ function itemStatusPill(status: ChecklistItem["status"]) {
 export default function PortalDocumentsPage() {
   const { token, user } = useAuth();
   const [items, setItems] = useState<ChecklistItem[]>([]);
+  const [superseded, setSuperseded] = useState<SupersededRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -80,8 +89,10 @@ export default function PortalDocumentsPage() {
     if (!token) return;
     try {
       setError("");
-      const data = await api.get<ChecklistItem[]>("/portal/checklist", token);
-      setItems(data);
+      const raw = await api.get<unknown>("/portal/checklist", token);
+      const { items, superseded_documents } = parseChecklistListPayload<ChecklistItem, SupersededRow>(raw);
+      setItems(items);
+      setSuperseded(superseded_documents);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load checklist");
     } finally {
@@ -175,6 +186,36 @@ export default function PortalDocumentsPage() {
     setViewing({ name: fileName, url, mime: blob.type || "application/pdf", watermark: wm });
   };
 
+  const handleViewRetained = async (docId: string, fileName: string) => {
+    setError("");
+    const res = await fetch(`${API_URL}/portal/checklist/retained/${docId}/view`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.detail || "Unable to open document");
+      return;
+    }
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const payload = await res.json();
+      if (payload?.mode === "wrapped" && payload?.payload_b64) {
+        const binary = atob(payload.payload_b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: payload.mime || "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const wm = `CONFIDENTIAL | ${user?.email || "employee"} | ${new Date().toLocaleString()}`;
+        setViewing({ name: payload.name || fileName, url, mime: payload.mime || "application/pdf", watermark: wm });
+      }
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const wm = `CONFIDENTIAL | ${user?.email || "employee"} | ${new Date().toLocaleString()}`;
+    setViewing({ name: fileName, url, mime: blob.type || "application/pdf", watermark: wm });
+  };
+
   const todayStr = useMemo(
     () =>
       new Date().toLocaleDateString("en-GB", {
@@ -206,11 +247,13 @@ export default function PortalDocumentsPage() {
     );
   }
 
-  const completed = items.filter((i) => i.status === "verified" || i.status === "not_applicable").length;
+  const hrVerified = items.filter((i) => i.status === "verified").length;
+  const notApplicable = items.filter((i) => i.status === "not_applicable").length;
+  const okClosedCount = hrVerified + notApplicable;
   const uploaded = items.filter((i) => i.status === "uploaded").length;
   const rejected = items.filter((i) => i.status === "rejected").length;
-  const notStarted = items.length - completed - uploaded - rejected;
-  const pct = items.length > 0 ? Math.round((completed / items.length) * 100) : 0;
+  const notStarted = items.filter((i) => i.status === "not_started").length;
+  const pct = items.length > 0 ? Math.round((hrVerified / items.length) * 100) : 0;
 
   const filtered =
     filter === "all"
@@ -346,9 +389,9 @@ export default function PortalDocumentsPage() {
             </div>
             <span className="adm-sc-pill adm-pill-n">OK</span>
           </div>
-          <div className="adm-sc-num">{completed}</div>
+          <div className="adm-sc-num">{okClosedCount}</div>
           <div className="adm-sc-lbl">Verified / N/A</div>
-          <div className="adm-sc-sub">Complete</div>
+          <div className="adm-sc-sub">Closed items</div>
         </button>
       </div>
 
@@ -359,7 +402,7 @@ export default function PortalDocumentsPage() {
             Overall progress
           </span>
           <span className="wem-badge-mono" style={MONO}>
-            {completed}/{items.length} complete
+            {hrVerified}/{items.length} HR verified
           </span>
         </div>
         <div className="border-t border-[rgba(0,0,0,0.07)] bg-white px-4 py-3">
@@ -516,6 +559,46 @@ export default function PortalDocumentsPage() {
           })}
         </div>
       </div>
+
+      {superseded.length > 0 && (
+        <div className="mt-4 wem-surface">
+          <div className="wem-toolbar">
+            <span className="text-[11px] font-extrabold text-[#0a0a0a]">Previous checklist uploads</span>
+            <span className="wem-badge-mono" style={MONO}>
+              Kept when HR changed requirements
+            </span>
+          </div>
+          <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+            <p className="mb-3 text-[11px] leading-relaxed text-[#64748b]" style={MONO}>
+              These files are still yours to view. They are no longer tied to the current checklist lines.
+            </p>
+            <ul className="space-y-2">
+              {superseded.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border border-[#EEF3FA] bg-[#f8fafc] px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-semibold text-[#0f2d5e]">{s.file_name ?? "File"}</p>
+                    <p className="truncate text-[11px] text-[#64748b]" style={MONO}>
+                      {s.legacy_checklist_description ?? "Previous item"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="h-8 shrink-0 border border-[rgba(0,0,0,0.1)] bg-white px-3 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e]"
+                    style={MONO}
+                    onClick={() => void handleViewRetained(s.id, s.file_name ?? "document")}
+                  >
+                    <Eye className="mr-1 inline h-3.5 w-3.5" />
+                    View
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <div className="mt-4 flex flex-col items-center justify-center border border-[rgba(0,0,0,0.08)] bg-white py-14">

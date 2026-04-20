@@ -256,11 +256,11 @@ export default function RiskPage() {
                       tabIndex={0}
                       role="link"
                       aria-label={`Open ${w.name}`}
-                      onClick={() => router.push(`/workers/${w.id}?tab=records`)}
+                      onClick={() => router.push(`/workers/${w.id}?tab=overview`)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          router.push(`/workers/${w.id}?tab=records`);
+                          router.push(`/workers/${w.id}?tab=overview`);
                         }
                       }}
                     >

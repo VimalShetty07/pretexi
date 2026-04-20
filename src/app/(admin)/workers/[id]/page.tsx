@@ -1,19 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, Suspense, type ReactNode } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState, useRef, useCallback, Suspense, type ReactNode } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
 import { getRtwUiProfile } from "@/lib/rtw-profile";
-import DocumentChecklist, { type ChecklistItem } from "./checklist";
+import DocumentChecklist, { type ChecklistItem, type SupersededDocument } from "./checklist";
+import { parseChecklistListPayload } from "@/lib/parse-checklist-response";
+import { RtwVerificationChecklistSection, type RtwVerificationChecklist } from "@/components/rtw-verification-checklist";
 import "../../dashboard/dashboard-marketing.css";
 import "../workers-page.css";
 import {
-  ArrowLeft,
   ChevronRight,
   CheckCircle2,
   XCircle,
+  MinusCircle,
   Clock3,
   FileText,
   FolderOpen,
@@ -27,9 +28,11 @@ import {
   Briefcase,
   Plane,
   ShieldAlert,
-  ArrowRight,
   Camera,
   Trash2,
+  StickyNote,
+  Mail,
+  Phone,
 } from "lucide-react";
 
 interface WorkerDetail {
@@ -65,10 +68,16 @@ interface WorkerDetail {
   uk_residence_country?: string | null;
   last_rtw_check?: string | null;
   next_rtw_check?: string | null;
+  rtw_check_signed_at?: string | null;
+  rtw_check_signed_by_name?: string | null;
   right_to_work_category?: string | null;
-  /** Tenant that owns this worker — used for per-client checklist templates */
+  /** Tenant that owns this worker — used for checklist API scoping (platform users) */
   organisation_id?: string | null;
   has_profile_photo?: boolean;
+  /** HR/compliance notes — per employee; omitted for portal self-view */
+  internal_notes?: string | null;
+  /** Admin RTW verification checklist — omitted for employees on portal */
+  rtw_verification_checklist?: RtwVerificationChecklist | null;
 }
 
 type MainTab = "overview" | "details" | "checklist" | "records" | "bgverify";
@@ -147,6 +156,147 @@ function dateInputToIso(d: string): string | null {
   return `${d}T00:00:00.000Z`;
 }
 
+/** Profile header pill — driven by org employment status (same field as the dropdown), not sponsor `status`. */
+function employmentStatusHeaderBadge(employment: string | null | undefined): { label: string; tone: "active" | "warn" | "muted" } {
+  const label = (employment?.trim() || "Active") || "Active";
+  const low = label.toLowerCase();
+  if (low === "active") return { label, tone: "active" };
+  if (
+    low.includes("inactive") ||
+    low === "finished" ||
+    low.includes("terminated") ||
+    low.includes("former") ||
+    low.endsWith("ended")
+  )
+    return { label, tone: "muted" };
+  if (
+    low.includes("leave") ||
+    low.includes("probation") ||
+    low.includes("sabbatical") ||
+    low.includes("suspension") ||
+    low.includes("notice")
+  )
+    return { label, tone: "warn" };
+  return { label, tone: "muted" };
+}
+
+function formatRtwSignedAt(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function BritishIrishRtwPanel({
+  worker,
+  canEditEmployment,
+  savingEmployment,
+  patchWorker,
+  loadAll,
+  token,
+  workerId,
+}: {
+  worker: WorkerDetail;
+  canEditEmployment: boolean;
+  savingEmployment: boolean;
+  patchWorker: (body: Record<string, unknown>) => Promise<void>;
+  loadAll: () => Promise<void>;
+  token: string | null;
+  workerId: string;
+}) {
+  const [signing, setSigning] = useState(false);
+
+  const signRtw = async () => {
+    if (!token || !workerId) return;
+    setSigning(true);
+    try {
+      await api.post<WorkerDetail>(`/workers/${workerId}/rtw-british-irish-sign`, {}, token);
+      await loadAll();
+    } finally {
+      setSigning(false);
+    }
+  };
+
+  const labelMono = { fontFamily: "var(--dash-mono)" } as const;
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-none border border-[rgba(0,0,0,0.08)] bg-white shadow-[inset_3px_0_0_0_#0d9488]">
+      <div className="border-b border-[rgba(0,0,0,0.06)] bg-[#f8fafc] px-4 py-2.5">
+        <p className="text-[11px] font-semibold leading-tight text-[#0f2d5e]">British / Irish — RTW verification</p>
+      </div>
+
+      <div className="divide-y divide-[rgba(0,0,0,0.06)]">
+        <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <span
+            className="shrink-0 text-[10px] font-bold uppercase tracking-[0.07em] text-[#94a3b8] sm:w-[10.5rem]"
+            style={labelMono}
+          >
+            RTW check date
+          </span>
+          <div className="min-w-0 flex-1 sm:flex sm:justify-end">
+            <input
+              type="date"
+              className="w-full max-w-[11rem] rounded-none border border-[rgba(0,0,0,0.1)] bg-[#fafafa] px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)] focus:bg-white disabled:opacity-60"
+              disabled={!canEditEmployment || savingEmployment}
+              defaultValue={toDateInput(worker.last_rtw_check)}
+              key={`british-rtw-date-${worker.id}-${worker.last_rtw_check ?? ""}`}
+              onBlur={async (e) => {
+                const raw = e.target.value;
+                const next = dateInputToIso(raw);
+                const prev = worker.last_rtw_check ? dateInputToIso(toDateInput(worker.last_rtw_check)) : null;
+                if (next === prev) return;
+                await patchWorker({ last_rtw_check: next });
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <span
+            className="shrink-0 text-[10px] font-bold uppercase tracking-[0.07em] text-[#94a3b8] sm:mt-0.5 sm:w-[10.5rem]"
+            style={labelMono}
+          >
+            Checked by (HR)
+          </span>
+          <p className="min-w-0 flex-1 text-right text-[13px] font-semibold leading-snug text-[#0f2d5e] sm:max-w-[min(100%,20rem)]">
+            {worker.rtw_check_signed_by_name && worker.rtw_check_signed_at
+              ? `${worker.rtw_check_signed_by_name} · ${formatRtwSignedAt(worker.rtw_check_signed_at)}`
+              : <span className="font-medium text-[#cbd5e1]">Not signed yet</span>}
+          </p>
+        </div>
+
+        {canEditEmployment ? (
+          <div className="bg-[#fafaf8] px-4 py-3">
+            <button
+              type="button"
+              disabled={signing || savingEmployment || !!worker.rtw_check_signed_at}
+              onClick={() => void signRtw()}
+              className="inline-flex h-10 w-full items-center justify-center rounded-none border border-[rgba(26,79,160,0.25)] bg-[#0f2d5e] px-4 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#1a4fa0] disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:min-w-[14rem]"
+            >
+              {signing ? "Signing…" : worker.rtw_check_signed_at ? "Signed" : "Sign RTW verification"}
+            </button>
+            {worker.rtw_check_signed_at ? (
+              <p className="mt-2 text-[10px] text-[#94a3b8]" style={labelMono}>
+                This record is locked after sign-off.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function WorkerDetailInner() {
   const { token, user } = useAuth();
   const router = useRouter();
@@ -154,6 +304,7 @@ function WorkerDetailInner() {
   const params = useParams<{ id: string }>();
   const [worker, setWorker] = useState<WorkerDetail | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [supersededDocuments, setSupersededDocuments] = useState<SupersededDocument[]>([]);
   const [mainTab, setMainTab] = useState<MainTab>("overview");
   const [recordsSub, setRecordsSub] = useState<RecordsSub>("documents");
   const [loading, setLoading] = useState(true);
@@ -171,26 +322,48 @@ function WorkerDetailInner() {
   const [onboardingStageOptions, setOnboardingStageOptions] = useState<string[]>(DEFAULT_ONBOARDING_OPTIONS);
   const [rtwCategoryOptions, setRtwCategoryOptions] = useState<string[]>(DEFAULT_RTW_CATEGORY_OPTIONS);
   const [savingEmployment, setSavingEmployment] = useState(false);
+  const [savingInternalNotes, setSavingInternalNotes] = useState(false);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
   const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const firstNameRef = useRef<HTMLInputElement | null>(null);
   const secondNameRef = useRef<HTMLInputElement | null>(null);
   const lastNameRef = useRef<HTMLInputElement | null>(null);
-  const canUploadProfilePhoto = Boolean(user && user.role !== "employee");
+  const canUploadProfilePhoto = Boolean(user && user.role === "employee" && user.worker_id === params?.id);
+  const showStaffNotes = Boolean(user && user.role !== "employee");
+  const [notesDraft, setNotesDraft] = useState("");
 
   const rtwUi = useMemo(() => getRtwUiProfile(worker?.right_to_work_category), [worker?.right_to_work_category]);
 
   const patchWorker = async (body: Record<string, unknown>) => {
     if (!token || !params?.id) return;
-    setSavingEmployment(true);
+    const keys = Object.keys(body);
+    const internalNotesOnly = keys.length === 1 && keys[0] === "internal_notes";
+    if (internalNotesOnly) setSavingInternalNotes(true);
+    else setSavingEmployment(true);
     try {
       await api.patch(`/workers/${params.id}`, body, token);
       const data = await api.get<WorkerDetail>(`/workers/${params.id}`, token);
-      setWorker(data);
+      setWorker((prev) => {
+        if (!prev) return data;
+        const merged = { ...data };
+        if (data.internal_notes === undefined && prev.internal_notes !== undefined) {
+          merged.internal_notes = prev.internal_notes;
+        }
+        return merged;
+      });
     } finally {
-      setSavingEmployment(false);
+      if (internalNotesOnly) setSavingInternalNotes(false);
+      else setSavingEmployment(false);
     }
+  };
+
+  const saveInternalNotesIfChanged = async () => {
+    if (!canEditEmployment || !worker || !token || !params?.id) return;
+    const next = notesDraft;
+    const prev = worker.internal_notes ?? "";
+    if (next === prev) return;
+    await patchWorker({ internal_notes: next.trim() ? next : null });
   };
 
   const syncNameBlur = async () => {
@@ -230,7 +403,8 @@ function WorkerDetailInner() {
         orgForChecklist.length > 0
           ? `/workers/${params.id}/checklist?organisation_id=${encodeURIComponent(orgForChecklist)}`
           : `/workers/${params.id}/checklist`;
-      const items = await api.get<ChecklistItem[]>(checklistPath, token);
+      const rawChecklist = await api.get<unknown>(checklistPath, token);
+      const parsed = parseChecklistListPayload<ChecklistItem, SupersededDocument>(rawChecklist);
       try {
         const s = await api.get<{
           employment_status_options: string[];
@@ -248,7 +422,8 @@ function WorkerDetailInner() {
         /* defaults */
       }
       setWorker(data);
-      setChecklist(items);
+      setChecklist(parsed.items);
+      setSupersededDocuments(parsed.superseded_documents);
       setBgRefs(bg.references || []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load worker");
@@ -257,16 +432,61 @@ function WorkerDetailInner() {
     }
   };
 
+  const reloadChecklist = useCallback(async () => {
+    if (!token || !params?.id) return;
+    const orgForChecklist =
+      worker?.organisation_id?.trim() || user?.organisation_id?.trim() || "";
+    const checklistPath =
+      orgForChecklist.length > 0
+        ? `/workers/${params.id}/checklist?organisation_id=${encodeURIComponent(orgForChecklist)}`
+        : `/workers/${params.id}/checklist`;
+    try {
+      const rawChecklist = await api.get<unknown>(checklistPath, token);
+      const parsed = parseChecklistListPayload<ChecklistItem, SupersededDocument>(rawChecklist);
+      setChecklist(parsed.items);
+      setSupersededDocuments(parsed.superseded_documents);
+    } catch {
+      /* ignore */
+    }
+  }, [token, params?.id, worker?.organisation_id, user?.organisation_id]);
+
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, params?.id, user?.organisation_id]);
 
   useEffect(() => {
-    const t = searchParams.get("tab");
+    if (mainTab === "checklist") reloadChecklist();
+  }, [mainTab, reloadChecklist]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") reloadChecklist();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [reloadChecklist]);
+
+  useEffect(() => {
+    const onTemplateSaved = () => {
+      reloadChecklist();
+    };
+    window.addEventListener("protexi-checklist-template-saved", onTemplateSaved);
+    return () => window.removeEventListener("protexi-checklist-template-saved", onTemplateSaved);
+  }, [reloadChecklist]);
+
+  /** Initialise notes when opening a different employee only — avoids resetting the draft on every PATCH refetch. */
+  useEffect(() => {
+    if (worker) setNotesDraft(worker.internal_notes ?? "");
+  }, [worker?.id]);
+
+  useEffect(() => {
+    const t = searchParams.getAll("tab").at(-1) ?? searchParams.get("tab");
     if (t === "records" || t === "overview" || t === "details" || t === "checklist" || t === "bgverify") {
       setMainTab(t);
+      return;
     }
+    setMainTab("overview");
   }, [searchParams]);
 
   useEffect(() => {
@@ -325,10 +545,15 @@ function WorkerDetailInner() {
     await loadAll();
   };
 
-  const verifiedDocs = checklist.filter((c) => c.status === "verified" || c.status === "not_applicable").length;
-  const checklistPct = checklist.length > 0 ? Math.round((verifiedDocs / checklist.length) * 100) : 0;
-  const rejectedDocs = checklist.filter((c) => c.status === "rejected").length;
-  const inReviewDocs = checklist.filter((c) => c.status === "uploaded" || c.status === "not_started").length;
+  const checklistItems = Array.isArray(checklist) ? checklist : [];
+
+  /** HR-verified uploads only — N/A items do not inflate the headline % */
+  const verifiedHrCount = checklistItems.filter((c) => c.status === "verified").length;
+  const notApplicableCount = checklistItems.filter((c) => c.status === "not_applicable").length;
+  const checklistPct =
+    checklistItems.length > 0 ? Math.round((verifiedHrCount / checklistItems.length) * 100) : 0;
+  const rejectedDocs = checklistItems.filter((c) => c.status === "rejected").length;
+  const inReviewDocs = checklistItems.filter((c) => c.status === "uploaded" || c.status === "not_started").length;
   const visaDays =
     worker?.visa_expiry ? Math.ceil((new Date(worker.visa_expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
 
@@ -387,7 +612,7 @@ function WorkerDetailInner() {
 
   const allFiles = useMemo(() => {
     const out: { name: string; date: string; item: string }[] = [];
-    for (const item of checklist) {
+    for (const item of checklistItems) {
       for (const d of item.documents) {
         out.push({
           name: d.file_name,
@@ -396,13 +621,57 @@ function WorkerDetailInner() {
         });
       }
     }
+    for (const s of supersededDocuments) {
+      out.push({
+        name: s.file_name ?? "File",
+        date: s.superseded_at || "",
+        item: `(archived) ${s.legacy_checklist_description ?? "checklist"}`,
+      });
+    }
     return out.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  }, [checklist]);
+  }, [checklistItems, supersededDocuments]);
+
+  /** 1-based row labels for UI — API `item_number` is often sort_order (e.g. 100) and must not be shown as the item id */
+  const checklistDisplayOrder = useMemo(() => {
+    const sorted = [...checklistItems].sort((a, b) => {
+      const an = Number(a.item_number);
+      const bn = Number(b.item_number);
+      if (Number.isFinite(an) && Number.isFinite(bn) && an !== bn) return an - bn;
+      return String(a.id).localeCompare(String(b.id));
+    });
+    return new Map(sorted.map((it, i) => [it.id, i + 1]));
+  }, [checklistItems]);
 
   if (loading) return <p className="text-sm text-gray-500">Loading employee…</p>;
   if (error || !worker) return <p className="text-sm text-red-600">{error || "Employee not found"}</p>;
 
-  const isActive = worker.status?.toLowerCase() === "active";
+  const empHeader = employmentStatusHeaderBadge(worker.employment_status);
+  const empHeaderStyles =
+    empHeader.tone === "active"
+      ? {
+          wrap: "border-[#bbf7d0] bg-[#f0fdf4] text-[#16a34a]",
+          dot: "bg-[#22c55e]",
+        }
+      : empHeader.tone === "warn"
+        ? {
+            wrap: "border-[#fde68a] bg-[#fffbeb] text-[#a16207]",
+            dot: "bg-[#d97706]",
+          }
+        : {
+            wrap: "border-[rgba(0,0,0,0.12)] bg-[#f5f5f0] text-[#64748b]",
+            dot: "bg-[#94a3b8]",
+          };
+
+  const visaChipTone =
+    visaDays == null
+      ? null
+      : visaDays < 0
+        ? { bg: "#fef2f2", border: "#fecaca", label: "#991b1b", num: "#b91c1c" }
+        : visaDays < 30
+          ? { bg: "#fffbeb", border: "#fde68a", label: "#a16207", num: "#b45309" }
+          : visaDays < 90
+            ? { bg: "#fff7ed", border: "#fed7aa", label: "#c2410c", num: "#9a3412" }
+            : { bg: "#eef4ff", border: "#bfdbfe", label: "#1e40af", num: "#1a4fa0" };
 
   const mainTabs: { id: MainTab; label: string; icon: typeof LayoutDashboard }[] = [
     { id: "overview", label: "Dashboard", icon: LayoutDashboard },
@@ -424,72 +693,259 @@ function WorkerDetailInner() {
           onChange={handleProfilePhotoSelect}
         />
       )}
-      {/* Back link */}
-      <Link
-        href="/workers"
-        className="mb-1 inline-flex w-fit max-w-full items-center gap-1.5 self-start border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-3 py-1.5 font-bold text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]"
-        style={{ fontFamily: "var(--dash-mono)", fontSize: 10, letterSpacing: "0.07em", textTransform: "uppercase" }}
-      >
-        <ArrowLeft className="h-3 w-3" /> Back to Employees
-      </Link>
 
-      {/* ── Marketing page header ───────────────────────── */}
-      <div className="adm-ph relative" style={{ alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
-        <div className="flex w-fit min-w-[320px] max-w-full flex-col items-center px-2 py-0 text-center">
-            {/* Avatar */}
+      {/* ── Header: profile + notes — marketing flat boxes (0 radius) ─ */}
+      <div
+        className={`mb-3 grid w-full min-w-0 grid-cols-1 border border-[rgba(0,0,0,0.08)] bg-[#f5f5f0] ${
+          showStaffNotes ? "gap-2 sm:grid-cols-2 sm:gap-3" : "gap-0 sm:grid-cols-1"
+        }`}
+      >
+        {/* ── Profile card — marketing hero ── */}
+        <div className="min-w-0 border-b border-[rgba(0,0,0,0.08)] bg-[#f0f0eb] sm:border-b-0">
+          <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.07)] bg-white px-3 py-2">
             <div
-              className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#DCE7FF] bg-[#F3F8FF] text-[28px] font-extrabold text-[#1a4fa0]"
-            >
-              {profilePhotoUrl ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={profilePhotoUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-              ) : (
-                <span className="relative z-[1]">{initials}</span>
-              )}
-              {canUploadProfilePhoto && (
-                <button
-                  type="button"
-                  disabled={profilePhotoUploading}
-                  onClick={() => profilePhotoInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 z-[2] flex h-7 w-7 items-center justify-center rounded-md border border-[#0f2d5e] bg-[#0f2d5e] text-white transition hover:bg-[#1a4fa0] disabled:opacity-50"
-                  title="Upload photo"
-                >
-                  <Camera className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-[26px] font-extrabold leading-none tracking-[-0.02em] text-[#0f2d5e]">
-                {worker.name}
-              </h1>
-              <div className="mt-2 flex flex-col gap-0.5 text-[12px] leading-[1.25] text-[#64748b]">
-                <span className="truncate">{worker.email || "—"}</span>
-                {worker.phone ? <span className="truncate">{worker.phone}</span> : null}
-              </div>
-              <div className="mt-2">
-                <span
-                  className={`inline-flex items-center border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] ${isActive ? "border-[rgba(22,163,74,0.3)] bg-[#f0fdf4] text-[#166534]" : "border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] text-[#0f2d5e]"}`}
-                  style={{ fontFamily: "var(--dash-mono)" }}
-                >
-                  {isActive ? "Active" : worker.status || "—"}
-                </span>
-              </div>
-            </div>
-        </div>
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2 md:w-auto">
-          {visaDays != null && (
-            <span
-              className="inline-flex items-center border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#0f2d5e]"
+              className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.13em] text-[#0f2d5e]"
               style={{ fontFamily: "var(--dash-mono)" }}
             >
-              Visa {visaDays}d
+              <User className="h-3.5 w-3.5 text-[#0f2d5e]" aria-hidden />
+              Profile
+            </div>
+            <span
+              className={`inline-flex max-w-[min(100%,14rem)] items-center gap-1.5 border px-2.5 py-1 text-[11px] font-semibold leading-snug ${empHeaderStyles.wrap}`}
+              style={{ fontFamily: "var(--dash-mono)", letterSpacing: "0.04em" }}
+              title={`Sponsor lifecycle (separate from employment status): ${worker.status || "—"}`}
+            >
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${empHeaderStyles.dot}`} />
+              <span className="min-w-0 truncate">{empHeader.label}</span>
             </span>
-          )}
+          </div>
+
+          {/* Band 1: portrait left, identity + contact right */}
+          <div className="border-b border-[rgba(0,0,0,0.07)] bg-white pt-2.5 sm:pt-3">
+            <div className="flex flex-row items-stretch gap-3 px-3 pb-3 pt-0 sm:gap-4 sm:px-4 sm:pb-3.5">
+              <div className="relative shrink-0 self-stretch pb-0.5 pr-0.5">
+                <div className="flex h-full min-h-[3.75rem] border border-[rgba(0,0,0,0.12)] bg-white p-0.5">
+                  <div className="relative flex h-full w-auto min-w-[3rem] max-w-[7.5rem] items-center justify-center overflow-hidden border border-[rgba(15,45,94,0.14)] bg-[#e8f0ff] text-sm font-bold text-[#1a4fa0] sm:max-w-[8.5rem] sm:text-base">
+                    {profilePhotoUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={profilePhotoUrl}
+                        alt={worker.name}
+                        className="max-h-full w-auto object-contain"
+                      />
+                    ) : (
+                      <span className="select-none px-2">{initials}</span>
+                    )}
+                  </div>
+                </div>
+                {canUploadProfilePhoto && (
+                  <button
+                    type="button"
+                    disabled={profilePhotoUploading}
+                    onClick={() => profilePhotoInputRef.current?.click()}
+                    className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center border-2 border-white bg-[#0f2d5e] text-white transition hover:bg-[#1a4fa0] disabled:opacity-50"
+                    title="Upload photo"
+                  >
+                    <Camera className="h-2.5 w-2.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex min-w-0 flex-1 flex-col items-stretch gap-0 text-left">
+                <h1 className="max-w-full text-[1.2rem] font-extrabold leading-tight tracking-[-0.02em] text-[#0a0a0a] sm:text-[1.35rem]">
+                  {worker.name}
+                </h1>
+
+                {(worker.job_title ||
+                  worker.department ||
+                  worker.work_location ||
+                  worker.email ||
+                  worker.phone) && (
+                  <div className="my-4 flex w-full min-w-0 flex-col gap-3">
+                    {(worker.job_title || worker.department || worker.work_location) && (
+                      <div className="border border-[rgba(0,0,0,0.08)] border-l-[3px] border-l-[#1a4fa0] bg-[#f5f5f0] px-3 py-2">
+                        <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] font-semibold leading-snug text-[#475569]">
+                          {worker.job_title && (
+                            <span className="inline-flex items-center gap-1 text-[#0a0a0a]">
+                              <Briefcase className="h-3 w-3 shrink-0 text-[#94a3b8]" aria-hidden />
+                              {worker.job_title}
+                            </span>
+                          )}
+                          {worker.department && (
+                            <>
+                              <span className="text-[rgba(0,0,0,0.18)]">·</span>
+                              <span>{worker.department}</span>
+                            </>
+                          )}
+                          {worker.work_location && (
+                            <>
+                              <span className="text-[rgba(0,0,0,0.18)]">·</span>
+                              <span>{worker.work_location}</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    )}
+
+                    {(worker.email || worker.phone) && (
+                      <div className="w-full max-w-full border border-[rgba(0,0,0,0.1)] bg-white px-2 py-1.5">
+                        <p
+                          className="text-[10px] font-bold uppercase leading-none tracking-[0.1em] text-[#64748b]"
+                          style={{ fontFamily: "var(--dash-mono)" }}
+                        >
+                          Contact
+                        </p>
+                        <div className="mt-1 flex flex-col gap-1">
+                          {worker.email && (
+                            <a
+                              href={`mailto:${worker.email}`}
+                              className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-medium leading-tight text-[#0f2d5e] transition hover:text-[#1a4fa0]"
+                            >
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center border border-[rgba(0,0,0,0.08)] bg-[#f5f5f0] text-[#64748b]">
+                                <Mail className="h-2.5 w-2.5" aria-hidden />
+                              </span>
+                              <span className="min-w-0 break-all underline-offset-2 hover:underline">{worker.email}</span>
+                            </a>
+                          )}
+                          {worker.phone && (
+                            <a
+                              href={`tel:${worker.phone.replace(/\s+/g, "")}`}
+                              className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-medium leading-tight text-[#0f2d5e] transition hover:text-[#1a4fa0]"
+                            >
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center border border-[rgba(0,0,0,0.08)] bg-[#f5f5f0] text-[#64748b]">
+                                <Phone className="h-2.5 w-2.5" aria-hidden />
+                              </span>
+                              <span className="min-w-0 underline-offset-2 hover:underline">{worker.phone}</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(worker.route || (visaDays != null && visaChipTone) || worker.hr_onboarding_stage) && (
+                  <div className="mt-5 flex w-full min-w-0 flex-wrap items-center gap-2 sm:mt-6">
+                    {worker.route && (
+                      <span className="inline-flex items-center gap-1 border border-[#bfdbfe] bg-[#eef4ff] px-2.5 py-1 text-[11px] font-semibold leading-none text-[#1e40af]">
+                        {worker.route} Visa
+                      </span>
+                    )}
+                    {visaDays != null && visaChipTone && (
+                      <span
+                        className="inline-flex items-center gap-1 border px-2.5 py-1 text-[11px] font-semibold leading-none"
+                        style={{
+                          backgroundColor: visaChipTone.bg,
+                          color: visaChipTone.label,
+                          borderColor: visaChipTone.border,
+                        }}
+                      >
+                        <Plane className="h-3 w-3 shrink-0" aria-hidden />
+                        {visaDays < 0 ? "Visa expired" : `${visaDays} days left`}
+                      </span>
+                    )}
+                    {worker.hr_onboarding_stage && (
+                      <span className="inline-flex items-center border border-[rgba(0,0,0,0.1)] bg-[#f5f5f0] px-2.5 py-1 text-[11px] font-semibold leading-none text-[#64748b]">
+                        {worker.hr_onboarding_stage}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {(canEditEmployment || worker.employment_status) && (
+                  <div
+                    className="mt-4 flex w-full min-w-0 flex-wrap items-center gap-3 border-t border-[rgba(0,0,0,0.06)] pt-3 sm:mt-5"
+                    title="Where someone sits in your HR workflow (e.g. Active, On leave). Options are set under Organisation → Employment statuses."
+                  >
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]"
+                      style={{ fontFamily: "var(--dash-mono)" }}
+                    >
+                      Employment status
+                    </span>
+                    {canEditEmployment ? (
+                      <>
+                        <select
+                          className="min-h-[2.5rem] min-w-[11rem] max-w-full rounded-none border border-[rgba(0,0,0,0.1)] bg-[#f5f5f0] px-4 py-2.5 text-[12px] font-semibold leading-normal text-[#0f2d5e] outline-none transition-colors focus:border-[rgba(26,79,160,0.35)] focus:bg-white"
+                          style={{ fontFamily: "var(--dash-mono)" }}
+                          disabled={savingEmployment}
+                          aria-label="Employment status"
+                          value={worker.employment_status || "Active"}
+                          onChange={async (e) => {
+                            await patchWorker({ employment_status: e.target.value });
+                          }}
+                        >
+                          {[...new Set([...employmentOptions, worker.employment_status || "Active"])].map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                        {savingEmployment ? (
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#64748b]"
+                            style={{ fontFamily: "var(--dash-mono)" }}
+                          >
+                            Saving…
+                          </span>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span className="text-[12px] font-semibold text-[#0f2d5e]">{worker.employment_status}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* ── Internal notes ── */}
+        {showStaffNotes && (
+          <div className="flex min-h-[180px] min-w-0 flex-col overflow-hidden bg-[#f0f0eb]">
+            <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.07)] bg-white px-3 py-2">
+              <div
+                className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.13em] text-[#0f2d5e]"
+                style={{ fontFamily: "var(--dash-mono)" }}
+              >
+                <StickyNote className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Internal notes
+              </div>
+              <span
+                className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]"
+                style={{ fontFamily: "var(--dash-mono)" }}
+              >
+                Staff only
+              </span>
+            </div>
+            <div className="flex flex-1 flex-col gap-2 p-2.5">
+              <textarea
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                onBlur={() => void saveInternalNotesIfChanged()}
+                readOnly={!canEditEmployment}
+                disabled={savingInternalNotes && canEditEmployment}
+                placeholder={
+                  canEditEmployment
+                    ? "Visa, RTW, payroll, recruitment, compliance context for this employee…"
+                    : "No edit access"
+                }
+                className="dash-admin-note-textarea min-h-[120px] w-full flex-1 resize-y read-only:cursor-default disabled:opacity-60"
+                style={{ minHeight: 120 }}
+                aria-label="Internal employee notes"
+              />
+              {canEditEmployment && savingInternalNotes ? (
+                <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#16a34a]" style={{ fontFamily: "var(--dash-mono)" }}>
+                  Saving…
+                </span>
+              ) : null}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Main tab nav ────────────────────────────────── */}
-      <div className="wem-surface" style={{ marginBottom: 10 }}>
+      <div className="mt-6 wem-surface">
         <div className="wem-toolbar flex-wrap gap-1">
           {mainTabs.map(({ id, label, icon: Icon }) => (
             <button
@@ -503,16 +959,6 @@ function WorkerDetailInner() {
               {label}
             </button>
           ))}
-          {canUploadProfilePhoto && (
-            <button
-              type="button"
-              onClick={() => setTab("details")}
-              className="ml-auto inline-flex items-center gap-1.5 border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]"
-              style={{ fontFamily: "var(--dash-mono)" }}
-            >
-              <Camera className="h-3 w-3" /> Profile &amp; details
-            </button>
-          )}
         </div>
       </div>
 
@@ -522,286 +968,225 @@ function WorkerDetailInner() {
             <EmployeeDashboard
               worker={worker}
               managerPayrollRestricted={managerPayrollRestricted}
-              checklist={checklist}
               bgRefs={bgRefs}
-              verifiedDocs={verifiedDocs}
+              verifiedHrCount={verifiedHrCount}
+              notApplicableCount={notApplicableCount}
+              checklistTotal={checklistItems.length}
               rejectedDocs={rejectedDocs}
               inReviewDocs={inReviewDocs}
               checklistPct={checklistPct}
               visaDays={visaDays}
               riskTone={riskTone}
-              onGoChecklist={() => setTab("checklist")}
-              onGoBg={() => setTab("bgverify")}
-              onGoDetails={() => setTab("details")}
             />
           )}
 
           {mainTab === "details" && (
             <div className="flex flex-col gap-6">
-              <header className="border-b border-[rgba(0,0,0,0.07)] pb-4">
-                <h2 className="text-[20px] font-extrabold tracking-tight text-[#0a0a0a]">Details</h2>
-                <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-[#94a3b8]">
-                  Full field list grouped by area. Use the tabs above for checklist, files, and references.
-                </p>
-              </header>
-
-              <div className="grid grid-cols-1 gap-6 lg:gap-8 xl:grid-cols-2">
-                <AspectCard title="Profile & contact" subtitle="Identity and how to reach this person" icon={User} barClass="bg-[#2563EB]">
-                  <div className="mb-4 flex flex-col gap-4 border-b border-[#F0F4FF] pb-4 sm:flex-row sm:items-start">
-                    <div className="flex shrink-0 flex-col items-center gap-2 sm:items-start">
-                      <p className="w-full text-center text-[11px] font-bold uppercase tracking-wide text-[#64748B] sm:text-left">
-                        Profile photo
-                      </p>
-                      <div
-                        className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl border border-[#E8EEFF] bg-[#F8FAFF] text-2xl font-bold text-[#94A3B8]"
-                        style={{ boxShadow: "0 4px 14px rgba(37, 99, 235, 0.08)" }}
-                      >
-                        {profilePhotoUrl ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={profilePhotoUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <span className="text-[#2563EB]">{initials}</span>
-                        )}
-                      </div>
-                      {canUploadProfilePhoto && (
-                        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                          <button
-                            type="button"
-                            disabled={profilePhotoUploading}
-                            onClick={() => profilePhotoInputRef.current?.click()}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#BFDBFE] bg-white px-3 py-1.5 text-[11px] font-bold text-[#1d4ed8] shadow-sm hover:bg-[#EFF6FF] disabled:opacity-50"
-                          >
-                            <Camera className="h-3.5 w-3.5" />
-                            {profilePhotoUploading ? "…" : "Upload photo"}
-                          </button>
-                          {worker.has_profile_photo && (
-                            <button
-                              type="button"
-                              disabled={profilePhotoUploading}
-                              onClick={handleRemoveProfilePhoto}
-                              className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-[11px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      <p className="max-w-[200px] text-center text-[10px] leading-snug text-[#94A3B8] sm:text-left">
-                        JPEG, PNG, WebP or GIF · max 5 MB · stored in your configured S3 bucket when{" "}
-                        <code className="rounded bg-slate-100 px-1">STORAGE_PROVIDER=s3</code>
-                      </p>
-                    </div>
-                  </div>
+              <div className="grid grid-cols-1 items-start gap-6 lg:gap-8 xl:grid-cols-2">
+                <AspectCard compact title="Profile & contact" icon={User} barClass="bg-[#2563EB]">
                   {!canEditEmployment ? (
-                    <div className="">
-                      <DashRow label="Full name" value={worker.name} />
-                      <DashRow label="First name" value={worker.first_name || "—"} />
-                      <DashRow label="Second name" value={worker.second_name || "—"} />
-                      <DashRow label="Surname" value={worker.last_name || "—"} />
-                      <DashRow label="Sex" value={worker.sex || "—"} />
-                      <DashRow label="Date of birth" value={formatDetailDate(worker.date_of_birth)} />
-                      <DashRow label="Age" value={worker.age_years != null ? String(worker.age_years) : "—"} />
-                      <DashRow
-                        label="Email"
-                        value={
-                          worker.email ? (
-                            <a href={`mailto:${worker.email}`} className="text-[#2563EB] hover:underline">
-                              {worker.email}
-                            </a>
-                          ) : (
-                            "—"
-                          )
-                        }
-                      />
-                      <DashRow label="Phone" value={worker.phone || "—"} />
-                      <DashRow label="Nationality" value={worker.nationality || "—"} />
-                      <DashRow label="Address line 1" value={worker.address_line_1 || "—"} />
-                      <DashRow label="Address line 2" value={worker.address_line_2 || "—"} />
-                      <DashRow label="Address line 3" value={worker.address_line_3 || "—"} />
-                      <DashRow label="Postcode" value={worker.postal_code || "—"} />
-                      <DashRow label="Country" value={ukCountryLabel(worker.uk_residence_country)} />
+                    <div className="flex flex-col gap-3">
+                      <ProfileFieldGroup title="Identity">
+                        <ProfileKVRow label="Full name" value={worker.name} />
+                        <ProfileKVRow label="First name" value={worker.first_name || "—"} />
+                        <ProfileKVRow label="Second name" value={worker.second_name || "—"} />
+                        <ProfileKVRow label="Surname" value={worker.last_name || "—"} />
+                        <ProfileKVRow label="Sex" value={worker.sex || "—"} />
+                        <ProfileKVRow label="Date of birth" value={formatDetailDate(worker.date_of_birth)} />
+                        <ProfileKVRow label="Age" value={worker.age_years != null ? String(worker.age_years) : "—"} />
+                        <ProfileKVRow label="Nationality" value={worker.nationality || "—"} />
+                      </ProfileFieldGroup>
+                      <ProfileFieldGroup title="Correspondence address">
+                        <ProfileKVRow label="Address line 1" value={worker.address_line_1 || "—"} />
+                        <ProfileKVRow label="Address line 2" value={worker.address_line_2 || "—"} />
+                        <ProfileKVRow label="Address line 3" value={worker.address_line_3 || "—"} />
+                        <ProfileKVRow label="Postcode" value={worker.postal_code || "—"} />
+                        <ProfileKVRow label="Country" value={ukCountryLabel(worker.uk_residence_country)} />
+                      </ProfileFieldGroup>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      <p className="text-[11px] text-[#94A3B8]">
-                        Address and salary changes are logged for reporting. Configure department, location, and onboarding
-                        lists under Organisation.
-                      </p>
-                      <div
-                        key={`nm-${worker.id}-${worker.first_name ?? ""}-${worker.second_name ?? ""}-${worker.last_name ?? ""}`}
-                        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-                      >
-                        <label className="text-[12px] font-semibold text-[#64748B]">
-                          First name
-                          <input
-                            ref={firstNameRef}
-                            defaultValue={worker.first_name ?? ""}
-                            onBlur={syncNameBlur}
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                          />
-                        </label>
-                        <label className="text-[12px] font-semibold text-[#64748B]">
-                          Second name
-                          <input
-                            ref={secondNameRef}
-                            defaultValue={worker.second_name ?? ""}
-                            onBlur={syncNameBlur}
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                          />
-                        </label>
-                        <label className="text-[12px] font-semibold text-[#64748B]">
-                          Surname
-                          <input
-                            ref={lastNameRef}
-                            defaultValue={worker.last_name ?? ""}
-                            onBlur={syncNameBlur}
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                          />
-                        </label>
-                      </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="text-[12px] font-semibold text-[#64748B]">
-                          Sex
-                          <select
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                            disabled={savingEmployment}
-                            value={worker.sex ?? ""}
-                            onChange={async (e) => {
-                              const v = e.target.value;
-                              await patchWorker({ sex: v || null });
-                            }}
+                    <div className="flex flex-col gap-4">
+                      <div className="min-w-0">
+                        <ProfileBlockTitle>Identity</ProfileBlockTitle>
+                        <div className="rounded-none border border-[rgba(0,0,0,0.1)] bg-[#fafbfc] p-3 sm:p-4">
+                          <div
+                            key={`nm-${worker.id}-${worker.first_name ?? ""}-${worker.second_name ?? ""}-${worker.last_name ?? ""}`}
+                            className="grid grid-cols-1 gap-3 sm:grid-cols-3"
                           >
-                            <option value="">—</option>
-                            <option value="Female">Female</option>
-                            <option value="Male">Male</option>
-                            <option value="Non-binary">Non-binary</option>
-                            <option value="Other">Other</option>
-                            <option value="Prefer not to say">Prefer not to say</option>
-                          </select>
-                        </label>
-                        <label className="text-[12px] font-semibold text-[#64748B]">
-                          Date of birth
-                          <input
-                            type="date"
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                            disabled={savingEmployment}
-                            defaultValue={toDateInput(worker.date_of_birth)}
-                            key={`dob-${worker.id}-${toDateInput(worker.date_of_birth)}`}
-                            onBlur={async (e) => {
-                              const raw = e.target.value;
-                              const next = dateInputToIso(raw);
-                              const prev = worker.date_of_birth
-                                ? dateInputToIso(toDateInput(worker.date_of_birth))
-                                : null;
-                              if (next === prev) return;
-                              await patchWorker({ date_of_birth: next });
-                            }}
-                          />
-                        </label>
+                            <label className="flex min-w-0 flex-col gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                                First name
+                              </span>
+                              <input
+                                ref={firstNameRef}
+                                defaultValue={worker.first_name ?? ""}
+                                onBlur={syncNameBlur}
+                                className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                              />
+                            </label>
+                            <label className="flex min-w-0 flex-col gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                                Second name
+                              </span>
+                              <input
+                                ref={secondNameRef}
+                                defaultValue={worker.second_name ?? ""}
+                                onBlur={syncNameBlur}
+                                className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                              />
+                            </label>
+                            <label className="flex min-w-0 flex-col gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                                Surname
+                              </span>
+                              <input
+                                ref={lastNameRef}
+                                defaultValue={worker.last_name ?? ""}
+                                onBlur={syncNameBlur}
+                                className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                              />
+                            </label>
+                          </div>
+                          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <label className="flex min-w-0 flex-col gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                                Sex
+                              </span>
+                              <select
+                                className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                                disabled={savingEmployment}
+                                value={worker.sex ?? ""}
+                                onChange={async (e) => {
+                                  const v = e.target.value;
+                                  await patchWorker({ sex: v || null });
+                                }}
+                              >
+                                <option value="">—</option>
+                                <option value="Female">Female</option>
+                                <option value="Male">Male</option>
+                                <option value="Non-binary">Non-binary</option>
+                                <option value="Other">Other</option>
+                                <option value="Prefer not to say">Prefer not to say</option>
+                              </select>
+                            </label>
+                            <label className="flex min-w-0 flex-col gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                                Date of birth
+                              </span>
+                              <input
+                                type="date"
+                                className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                                disabled={savingEmployment}
+                                defaultValue={toDateInput(worker.date_of_birth)}
+                                key={`dob-${worker.id}-${toDateInput(worker.date_of_birth)}`}
+                                onBlur={async (e) => {
+                                  const raw = e.target.value;
+                                  const next = dateInputToIso(raw);
+                                  const prev = worker.date_of_birth
+                                    ? dateInputToIso(toDateInput(worker.date_of_birth))
+                                    : null;
+                                  if (next === prev) return;
+                                  await patchWorker({ date_of_birth: next });
+                                }}
+                              />
+                            </label>
+                          </div>
+                          <div className="mt-3 flex flex-col gap-2 border-t border-[rgba(0,0,0,0.08)] pt-3">
+                            <ProfileKVRow
+                              dense
+                              label="Age (from DOB)"
+                              value={worker.age_years != null ? String(worker.age_years) : "—"}
+                            />
+                            <ProfileKVRow dense label="Nationality" value={worker.nationality || "—"} />
+                          </div>
+                        </div>
                       </div>
-                      <DashRow label="Age (from DOB)" value={worker.age_years != null ? String(worker.age_years) : "—"} />
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="text-[12px] font-semibold text-[#64748B]">
-                          Phone
-                          <input
-                            defaultValue={worker.phone ?? ""}
-                            key={`ph-${worker.id}-${worker.phone ?? ""}`}
-                            onBlur={async (e) => {
-                              const v = e.target.value.trim();
-                              if (v === (worker.phone ?? "")) return;
-                              await patchWorker({ phone: v || null });
-                            }}
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                          />
-                        </label>
-                        <label className="text-[12px] font-semibold text-[#64748B]">
-                          Email
-                          <input
-                            type="email"
-                            defaultValue={worker.email ?? ""}
-                            key={`em-${worker.id}-${worker.email ?? ""}`}
-                            onBlur={async (e) => {
-                              const v = e.target.value.trim();
-                              if (v === (worker.email ?? "")) return;
-                              await patchWorker({ email: v || null });
-                            }}
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                          />
-                        </label>
-                      </div>
-                      <DashRow label="Nationality" value={worker.nationality || "—"} />
-                      <label className="text-[12px] font-semibold text-[#64748B]">
-                        Address line 1
-                        <input
-                          defaultValue={worker.address_line_1 ?? ""}
-                          key={`a1-${worker.id}-${worker.address_line_1 ?? ""}`}
-                          onBlur={async (e) => {
-                            const v = e.target.value.trim();
-                            if (v === (worker.address_line_1 ?? "")) return;
-                            await patchWorker({ address_line_1: v || null });
-                          }}
-                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                        />
-                      </label>
-                      <label className="text-[12px] font-semibold text-[#64748B]">
-                        Address line 2
-                        <input
-                          defaultValue={worker.address_line_2 ?? ""}
-                          key={`a2-${worker.id}-${worker.address_line_2 ?? ""}`}
-                          onBlur={async (e) => {
-                            const v = e.target.value.trim();
-                            if (v === (worker.address_line_2 ?? "")) return;
-                            await patchWorker({ address_line_2: v || null });
-                          }}
-                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                        />
-                      </label>
-                      <label className="text-[12px] font-semibold text-[#64748B]">
-                        Address line 3
-                        <input
-                          defaultValue={worker.address_line_3 ?? ""}
-                          key={`a3-${worker.id}-${worker.address_line_3 ?? ""}`}
-                          onBlur={async (e) => {
-                            const v = e.target.value.trim();
-                            if (v === (worker.address_line_3 ?? "")) return;
-                            await patchWorker({ address_line_3: v || null });
-                          }}
-                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                        />
-                      </label>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="text-[12px] font-semibold text-[#64748B]">
-                          Postcode
-                          <input
-                            defaultValue={worker.postal_code ?? ""}
-                            key={`pc-${worker.id}-${worker.postal_code ?? ""}`}
-                            onBlur={async (e) => {
-                              const v = e.target.value.trim();
-                              if (v === (worker.postal_code ?? "")) return;
-                              await patchWorker({ postal_code: v || null });
-                            }}
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                          />
-                        </label>
-                        <label className="text-[12px] font-semibold text-[#64748B]">
-                          Country
-                          <select
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                            disabled={savingEmployment}
-                            value={worker.uk_residence_country ?? ""}
-                            onChange={async (e) => {
-                              const v = e.target.value;
-                              await patchWorker({ uk_residence_country: v || null });
-                            }}
-                          >
-                            {UK_RESIDENCE_OPTIONS.map((o) => (
-                              <option key={o.value || "unset"} value={o.value}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                      <div className="min-w-0">
+                        <ProfileBlockTitle>Correspondence address</ProfileBlockTitle>
+                        <div className="space-y-3 rounded-none border border-[rgba(0,0,0,0.1)] bg-[#fafbfc] p-3 sm:p-4">
+                          <label className="flex min-w-0 flex-col gap-1">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                              Address line 1
+                            </span>
+                            <input
+                              defaultValue={worker.address_line_1 ?? ""}
+                              key={`a1-${worker.id}-${worker.address_line_1 ?? ""}`}
+                              onBlur={async (e) => {
+                                const v = e.target.value.trim();
+                                if (v === (worker.address_line_1 ?? "")) return;
+                                await patchWorker({ address_line_1: v || null });
+                              }}
+                              className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                            />
+                          </label>
+                          <label className="flex min-w-0 flex-col gap-1">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                              Address line 2
+                            </span>
+                            <input
+                              defaultValue={worker.address_line_2 ?? ""}
+                              key={`a2-${worker.id}-${worker.address_line_2 ?? ""}`}
+                              onBlur={async (e) => {
+                                const v = e.target.value.trim();
+                                if (v === (worker.address_line_2 ?? "")) return;
+                                await patchWorker({ address_line_2: v || null });
+                              }}
+                              className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                            />
+                          </label>
+                          <label className="flex min-w-0 flex-col gap-1">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                              Address line 3
+                            </span>
+                            <input
+                              defaultValue={worker.address_line_3 ?? ""}
+                              key={`a3-${worker.id}-${worker.address_line_3 ?? ""}`}
+                              onBlur={async (e) => {
+                                const v = e.target.value.trim();
+                                if (v === (worker.address_line_3 ?? "")) return;
+                                await patchWorker({ address_line_3: v || null });
+                              }}
+                              className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                            />
+                          </label>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <label className="flex min-w-0 flex-col gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                                Postcode
+                              </span>
+                              <input
+                                defaultValue={worker.postal_code ?? ""}
+                                key={`pc-${worker.id}-${worker.postal_code ?? ""}`}
+                                onBlur={async (e) => {
+                                  const v = e.target.value.trim();
+                                  if (v === (worker.postal_code ?? "")) return;
+                                  await patchWorker({ postal_code: v || null });
+                                }}
+                                className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                              />
+                            </label>
+                            <label className="flex min-w-0 flex-col gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                                Country
+                              </span>
+                              <select
+                                className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                                disabled={savingEmployment}
+                                value={worker.uk_residence_country ?? ""}
+                                onChange={async (e) => {
+                                  const v = e.target.value;
+                                  await patchWorker({ uk_residence_country: v || null });
+                                }}
+                              >
+                                {UK_RESIDENCE_OPTIONS.map((o) => (
+                                  <option key={o.value || "unset"} value={o.value}>
+                                    {o.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -821,7 +1206,7 @@ function WorkerDetailInner() {
                       <DashRow label="Onboarding (HR label)" value={worker.hr_onboarding_stage || worker.stage || "—"} />
                       <DashRow label="Workflow stage" value={worker.stage || "—"} />
                       <DashRow label="Lifecycle status" value={worker.status || "—"} />
-                      <DashRow label="Status" value={worker.employment_status || "—"} />
+                      <DashRow label="Employment status" value={worker.employment_status || "—"} />
                       <DashRow label="Start date" value={formatDetailDate(worker.start_date)} />
                       <DashRow label="End date" value={formatDetailDate(worker.termination_date)} />
                       <DashRow
@@ -846,14 +1231,14 @@ function WorkerDetailInner() {
                             if (!v) return;
                             await patchWorker({ job_title: v });
                           }}
-                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          className="mt-1 w-full rounded-none border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
                         />
                       </label>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="text-[12px] font-semibold text-[#64748B]">
                           Department
                           <select
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            className="mt-1 w-full rounded-none border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
                             disabled={savingEmployment}
                             value={worker.department ?? ""}
                             onChange={async (e) => {
@@ -872,7 +1257,7 @@ function WorkerDetailInner() {
                         <label className="text-[12px] font-semibold text-[#64748B]">
                           Work location
                           <select
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            className="mt-1 w-full rounded-none border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
                             disabled={savingEmployment}
                             value={worker.work_location ?? ""}
                             onChange={async (e) => {
@@ -892,7 +1277,7 @@ function WorkerDetailInner() {
                       <label className="text-[12px] font-semibold text-[#64748B]">
                         Onboarding stage
                         <select
-                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                          className="mt-1 w-full rounded-none border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
                           disabled={savingEmployment}
                           value={worker.hr_onboarding_stage ?? ""}
                           onChange={async (e) => {
@@ -910,33 +1295,17 @@ function WorkerDetailInner() {
                           )}
                         </select>
                       </label>
-                      <div className="grid grid-cols-1 gap-2 rounded-xl border border-[#F0F4FF] bg-[#FAFCFF] p-3 sm:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-2 rounded-none border border-[#F0F4FF] bg-[#FAFCFF] p-3 sm:grid-cols-2">
                         <DashRow label="Workflow stage" value={worker.stage || "—"} />
                         <DashRow label="Lifecycle status" value={worker.status || "—"} />
                       </div>
-                      <label className="text-[12px] font-semibold text-[#64748B]">
-                        Status
-                        <select
-                          className="mt-1 w-full max-w-md rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                          disabled={savingEmployment}
-                          value={worker.employment_status || "Active"}
-                          onChange={async (e) => {
-                            await patchWorker({ employment_status: e.target.value });
-                          }}
-                        >
-                          {[...new Set([...employmentOptions, worker.employment_status || "Active"])].map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <DashRow label="Employment status" value={worker.employment_status || "—"} />
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="text-[12px] font-semibold text-[#64748B]">
                           Start date
                           <input
                             type="date"
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            className="mt-1 w-full rounded-none border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
                             disabled={savingEmployment}
                             defaultValue={toDateInput(worker.start_date)}
                             key={`sd-${worker.id}-${toDateInput(worker.start_date)}`}
@@ -953,7 +1322,7 @@ function WorkerDetailInner() {
                           End date
                           <input
                             type="date"
-                            className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                            className="mt-1 w-full rounded-none border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
                             disabled={savingEmployment}
                             defaultValue={toDateInput(worker.termination_date)}
                             key={`ed-${worker.id}-${toDateInput(worker.termination_date)}`}
@@ -986,13 +1355,13 @@ function WorkerDetailInner() {
                                 if (num === worker.salary || (num == null && worker.salary == null)) return;
                                 await patchWorker({ salary: num ?? 0 });
                               }}
-                              className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                              className="mt-1 w-full rounded-none border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
                             />
                           </label>
                           <label className="text-[12px] font-semibold text-[#64748B]">
                             Salary basis
                             <select
-                              className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
+                              className="mt-1 w-full rounded-none border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
                               disabled={savingEmployment}
                               value={worker.salary_pay_type || "annual"}
                               onChange={async (e) => {
@@ -1025,27 +1394,34 @@ function WorkerDetailInner() {
                 >
                   <div className="space-y-3">
                     {canEditEmployment ? (
-                      <label className="block text-[12px] font-semibold text-[#64748B]">
-                        Right to work category
-                        <select
-                          className="mt-1 w-full rounded-xl border border-[#E8EEFF] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a]"
-                          disabled={savingEmployment}
-                          value={worker.right_to_work_category ?? ""}
-                          onChange={async (e) => {
-                            const v = e.target.value;
-                            await patchWorker({ right_to_work_category: v || null });
-                          }}
+                      <div className="flex flex-col gap-2 border-b border-[rgba(0,0,0,0.06)] pb-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <span
+                          className="shrink-0 text-[10px] font-bold uppercase tracking-[0.07em] text-[#94a3b8] sm:w-[10.5rem]"
+                          style={{ fontFamily: "var(--dash-mono)" }}
                         >
-                          <option value="">—</option>
-                          {[...new Set([...rtwCategoryOptions, worker.right_to_work_category || ""])]
-                            .filter(Boolean)
-                            .map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
+                          Right to work category
+                        </span>
+                        <div className="min-w-0 flex-1 sm:flex sm:justify-end">
+                          <select
+                            className="w-full max-w-md rounded-none border border-[rgba(0,0,0,0.1)] bg-white px-3 py-2 text-[13px] font-semibold text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.4)] disabled:opacity-60 sm:max-w-[min(100%,22rem)]"
+                            disabled={savingEmployment}
+                            value={worker.right_to_work_category ?? ""}
+                            onChange={async (e) => {
+                              const v = e.target.value;
+                              await patchWorker({ right_to_work_category: v || null });
+                            }}
+                          >
+                            <option value="">—</option>
+                            {[...new Set([...rtwCategoryOptions, worker.right_to_work_category || ""])]
+                              .filter(Boolean)
+                              .map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      </div>
                     ) : null}
                     <div className="">
                       {!canEditEmployment ? (
@@ -1073,15 +1449,39 @@ function WorkerDetailInner() {
                           />
                         </>
                       ) : null}
-                      <DashRow label="Last RTW check" value={formatDetailDate(worker.last_rtw_check)} />
-                      <DashRow label="Next RTW check" value={formatDetailDate(worker.next_rtw_check)} />
+                      {rtwUi.kind === "british_irish" ? (
+                        <BritishIrishRtwPanel
+                          worker={worker}
+                          canEditEmployment={canEditEmployment}
+                          savingEmployment={savingEmployment}
+                          patchWorker={patchWorker}
+                          loadAll={loadAll}
+                          token={token}
+                          workerId={params.id ?? ""}
+                        />
+                      ) : (
+                        <>
+                          <DashRow label="Last RTW check" value={formatDetailDate(worker.last_rtw_check)} />
+                          <DashRow label="Next RTW check" value={formatDetailDate(worker.next_rtw_check)} />
+                        </>
+                      )}
                     </div>
+                    {showStaffNotes ? (
+                      <RtwVerificationChecklistSection
+                        checklist={worker.rtw_verification_checklist}
+                        canEditEmployment={canEditEmployment}
+                        savingEmployment={savingEmployment}
+                        onSave={async (next) => {
+                          await patchWorker({ rtw_verification_checklist: next });
+                        }}
+                      />
+                    ) : null}
                   </div>
                 </AspectCard>
 
                 <AspectCard title="Risk & monitoring" subtitle="Compliance posture for this worker" icon={ShieldAlert} barClass="bg-[#DC2626]">
                   <div
-                    className="rounded-xl border p-4"
+                    className="rounded-none border p-4"
                     style={{ background: riskTone.bg, borderColor: riskTone.border }}
                   >
                     <p className="text-[11px] font-bold uppercase tracking-wide text-[#64748B]">Risk level</p>
@@ -1101,7 +1501,8 @@ function WorkerDetailInner() {
             <DocumentChecklist
               workerId={params.id}
               organisationId={worker.organisation_id?.trim() || user?.organisation_id || null}
-              items={checklist}
+              items={checklistItems}
+              supersededDocuments={supersededDocuments}
               onRefresh={loadAll}
             />
           )}
@@ -1124,20 +1525,29 @@ function WorkerDetailInner() {
                   </button>
                 </div>
 
-                <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <div className="min-h-[82px] rounded-xl border border-[#E8EEFF] bg-white px-3 py-2.5">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>Checklist items</p>
-                    <p className="mt-1 text-xl font-extrabold text-[#0F172A]">{checklist.length}</p>
+                <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                  <div className="min-h-[82px] rounded-none border border-[#E8EEFF] bg-white px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>Required types</p>
+                    <p className="mt-1 text-xl font-extrabold text-[#0F172A]">{checklistItems.length}</p>
+                    <p className="mt-0.5 text-[9px] leading-tight text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>Template or default 3</p>
                   </div>
-                  <div className="min-h-[82px] rounded-xl border border-[#E8EEFF] bg-white px-3 py-2.5">
+                  <div className="min-h-[82px] rounded-none border border-[#E8EEFF] bg-white px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>HR verified</p>
+                    <p className="mt-1 text-xl font-extrabold text-[#0F172A]">
+                      {verifiedHrCount}/{checklistItems.length || "—"}
+                    </p>
+                    <p className="mt-0.5 text-[9px] leading-tight text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>Vs Dashboard %</p>
+                  </div>
+                  <div className="min-h-[82px] rounded-none border border-[#E8EEFF] bg-white px-3 py-2.5">
                     <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>Uploaded files</p>
                     <p className="mt-1 text-xl font-extrabold text-[#0F172A]">{allFiles.length}</p>
+                    <p className="mt-0.5 text-[9px] leading-tight text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>Total attachments</p>
                   </div>
-                  <div className="min-h-[82px] rounded-xl border border-[#E8EEFF] bg-white px-3 py-2.5">
+                  <div className="min-h-[82px] rounded-none border border-[#E8EEFF] bg-white px-3 py-2.5">
                     <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>RTW category</p>
                     <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#0F2D5E]">{worker.right_to_work_category || "—"}</p>
                   </div>
-                  <div className="min-h-[82px] rounded-xl border border-[#E8EEFF] bg-white px-3 py-2.5">
+                  <div className="min-h-[82px] rounded-none border border-[#E8EEFF] bg-white px-3 py-2.5">
                     <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-[#94A3B8]" style={{ fontFamily: "var(--dash-mono)" }}>Visa expiry</p>
                     <p className="mt-1 text-sm font-semibold text-[#0F2D5E]">
                       {rtwUi.showVisaImmigration ? formatDetailDate(worker.visa_expiry) : "—"}
@@ -1145,7 +1555,7 @@ function WorkerDetailInner() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#E8EEFF] bg-[#f8fafc] p-2">
+                <div className="flex flex-wrap items-center gap-2 rounded-none border border-[#E8EEFF] bg-[#f8fafc] p-2">
                   {(
                     [
                       { id: "documents" as const, label: "Documents", icon: FileText },
@@ -1174,14 +1584,15 @@ function WorkerDetailInner() {
 
               {recordsSub === "documents" && (
                 <div className="overflow-hidden rounded-2xl border border-[#E5EAF4] bg-white shadow-sm">
-                  {checklist.length === 0 ? (
+                  {checklistItems.length === 0 ? (
                     <p className="px-4 py-10 text-center text-sm text-[#94a3b8]">No compliance items yet.</p>
                   ) : (
-                    checklist.map((item, i) => (
+                    checklistItems.map((item, i) => (
                       <DocumentRow
                         key={item.id}
                         item={item}
-                        isLast={i === checklist.length - 1}
+                        displayOrder={checklistDisplayOrder.get(item.id) ?? i + 1}
+                        isLast={i === checklistItems.length - 1}
                         hovered={hoverRow === item.id}
                         onHover={(v) => setHoverRow(v ? item.id : null)}
                         onOpen={() => setTab("checklist")}
@@ -1202,8 +1613,8 @@ function WorkerDetailInner() {
                         className={`flex items-center justify-between gap-4 px-5 py-3.5 ${i < allFiles.length - 1 ? "border-b border-[#EEF3FA]" : ""}`}
                       >
                         <div className="flex min-w-0 items-center gap-3">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-[#f0fdf4] text-[#16a34a]">
-                            <CheckCircle2 className="h-4 w-4" />
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-[rgba(0,0,0,0.08)] bg-[#f8fafc] text-[#64748b]">
+                            <FileText className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
                             <p className="truncate text-[13px] font-semibold text-[#0f2d5e]">{f.name}</p>
@@ -1248,8 +1659,35 @@ function WorkerDetailInner() {
                     {rtwUi.showVisaImmigration ? (
                       <DashRow label="Visa expiry" value={formatDetailDate(worker.visa_expiry)} />
                     ) : null}
-                    <DashRow label="Last RTW check" value={formatDetailDate(worker.last_rtw_check)} />
-                    <DashRow label="Next RTW check" value={formatDetailDate(worker.next_rtw_check)} />
+                    {rtwUi.kind === "british_irish" ? (
+                      <div className="px-5 py-4">
+                        <BritishIrishRtwPanel
+                          worker={worker}
+                          canEditEmployment={canEditEmployment}
+                          savingEmployment={savingEmployment}
+                          patchWorker={patchWorker}
+                          loadAll={loadAll}
+                          token={token}
+                          workerId={params.id ?? ""}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <DashRow label="Last RTW check" value={formatDetailDate(worker.last_rtw_check)} />
+                        <DashRow label="Next RTW check" value={formatDetailDate(worker.next_rtw_check)} />
+                      </>
+                    )}
+                    {showStaffNotes ? (
+                      <RtwVerificationChecklistSection
+                        checklist={worker.rtw_verification_checklist}
+                        canEditEmployment={canEditEmployment}
+                        savingEmployment={savingEmployment}
+                        padded
+                        onSave={async (next) => {
+                          await patchWorker({ rtw_verification_checklist: next });
+                        }}
+                      />
+                    ) : null}
                   </div>
                 </div>
               )}
@@ -1323,31 +1761,27 @@ type RiskTone = { bg: string; border: string; text: string };
 function EmployeeDashboard({
   worker,
   managerPayrollRestricted,
-  checklist,
   bgRefs,
-  verifiedDocs,
+  verifiedHrCount,
+  notApplicableCount,
+  checklistTotal,
   rejectedDocs,
   inReviewDocs,
   checklistPct,
   visaDays,
   riskTone,
-  onGoChecklist,
-  onGoBg,
-  onGoDetails,
 }: {
   worker: WorkerDetail;
   managerPayrollRestricted: boolean;
-  checklist: ChecklistItem[];
   bgRefs: Array<{ id: string; referee_name: string; referee_email: string; status: string }>;
-  verifiedDocs: number;
+  verifiedHrCount: number;
+  notApplicableCount: number;
+  checklistTotal: number;
   rejectedDocs: number;
   inReviewDocs: number;
   checklistPct: number;
   visaDays: number | null;
   riskTone: RiskTone;
-  onGoChecklist: () => void;
-  onGoBg: () => void;
-  onGoDetails: () => void;
 }) {
   const rtwUi = useMemo(() => getRtwUiProfile(worker.right_to_work_category), [worker.right_to_work_category]);
 
@@ -1366,13 +1800,20 @@ function EmployeeDashboard({
     ? "Not visible (managers cannot view payroll-related data)"
     : salaryStr;
 
-  const topChecklist = [...checklist].slice(0, 5);
-
   return (
     <div className="flex flex-col gap-4">
       {/* KPI strip — multiple lenses */}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
-        <DashboardKpi label="Compliance" value={`${checklistPct}%`} sub={`${verifiedDocs}/${checklist.length} done`} tone="blue" />
+        <DashboardKpi
+          label="Compliance"
+          value={`${checklistPct}%`}
+          sub={
+            notApplicableCount > 0
+              ? `${verifiedHrCount}/${checklistTotal} HR-verified · ${notApplicableCount} N/A`
+              : `${verifiedHrCount}/${checklistTotal} HR-verified`
+          }
+          tone="blue"
+        />
         <DashboardKpi label="In review" value={String(inReviewDocs)} sub="Awaiting verification" tone="amber" />
         <DashboardKpi label="Rejected" value={String(rejectedDocs)} sub="Need re-upload" tone="rose" />
         <DashboardKpi label="Risk" value={worker.risk_level} sub="Posture" tone="slate" accentColor={riskTone.text} />
@@ -1387,32 +1828,12 @@ function EmployeeDashboard({
 
       {/* Perspective grid */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <AspectCard
-          title="Profile & contact"
-          subtitle="Who to reach and how"
-          icon={User}
-          barClass="bg-[#2563EB]"
-          action={
-            <button type="button" onClick={onGoDetails} className="inline-flex items-center gap-1 border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]" style={{ fontFamily: "var(--dash-mono)" }}>
-              All fields →
-            </button>
-          }
-        >
-          <div className="">
-            <DashRow label="Full name" value={worker.name} />
-            <DashRow label="Email" value={worker.email ? <a href={`mailto:${worker.email}`} className="text-[#2563EB] hover:underline">{worker.email}</a> : "—"} />
-            <DashRow label="Phone" value={worker.phone || "—"} />
-            <DashRow label="Age" value={worker.age_years != null ? String(worker.age_years) : "—"} />
-            <DashRow label="Nationality" value={worker.nationality || "—"} />
-          </div>
-        </AspectCard>
-
         <AspectCard title="Employment" subtitle="Role, location & contract context" icon={Briefcase} barClass="bg-[#7C3AED]">
           <div className="">
             <DashRow label="Job title" value={worker.job_title || "—"} />
             <DashRow label="Department" value={worker.department || "—"} />
             <DashRow label="Work location" value={worker.work_location || "—"} />
-            <DashRow label="Status" value={worker.employment_status || "—"} />
+            <DashRow label="Employment status" value={worker.employment_status || "—"} />
             <DashRow label="Onboarding stage" value={worker.hr_onboarding_stage || worker.stage || "—"} />
             <DashRow label="Start date" value={fmtDate(worker.start_date)} />
             <DashRow label="Salary (reported)" value={salaryReportedDisplay} />
@@ -1436,102 +1857,6 @@ function EmployeeDashboard({
             ) : null}
           </div>
         </AspectCard>
-
-        <AspectCard
-          title="Compliance & documents"
-          subtitle="Checklist progress and latest items"
-          icon={ClipboardList}
-          barClass="bg-[#1D4ED8]"
-          action={
-            <button type="button" onClick={onGoChecklist} className="inline-flex items-center gap-1 border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]" style={{ fontFamily: "var(--dash-mono)" }}>
-              Open checklist <ArrowRight className="h-3 w-3" />
-            </button>
-          }
-        >
-          <div className="mb-4">
-            <div className="mb-1.5 flex justify-between text-[10px] font-bold uppercase tracking-[0.07em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>
-              <span>Overall completion</span>
-              <span className="text-[#0f2d5e]">{checklistPct}%</span>
-            </div>
-            <div className="h-1.5 overflow-hidden bg-[#f0f0eb]">
-              <div
-                className="h-full bg-[#1a4fa0] transition-all duration-500"
-                style={{ width: `${checklistPct}%` }}
-              />
-            </div>
-            <p className="mt-2 text-[10px] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>
-              {verifiedDocs} complete · {inReviewDocs} in review · {rejectedDocs} rejected
-            </p>
-          </div>
-          {topChecklist.length === 0 ? (
-            <p className="text-[12px] text-[#94a3b8]">No checklist items yet.</p>
-          ) : (
-            <ul className="space-y-0">
-              {topChecklist.map((it) => (
-                <li
-                  key={it.id}
-                  className="flex items-center justify-between gap-2 border-b border-[rgba(0,0,0,0.06)] px-0 py-2.5 last:border-b-0"
-                >
-                  <span className="min-w-0 truncate text-[12px] font-semibold text-[#0f2d5e]">{it.description}</span>
-                  <span
-                    className={`shrink-0 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.07em] ${
-                      it.status === "verified" || it.status === "not_applicable"
-                        ? "bg-[#f0fdf4] text-[#166534]"
-                        : it.status === "rejected"
-                          ? "bg-[#fef2f2] text-[#dc2626]"
-                          : "bg-[#fffbeb] text-[#d97706]"
-                    }`}
-                    style={{ fontFamily: "var(--dash-mono)" }}
-                  >
-                    {it.status.replace("_", " ")}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </AspectCard>
-
-        <AspectCard title="Risk & monitoring" subtitle="Sponsor risk posture" icon={ShieldAlert} barClass="bg-[#DC2626]">
-          <div className="border border-[rgba(0,0,0,0.07)] px-5 py-4" style={{ background: riskTone.bg }}>
-            <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>Current risk level</p>
-            <p className="mt-1 text-[24px] font-extrabold capitalize tracking-tight" style={{ color: riskTone.text }}>
-              {worker.risk_level}
-            </p>
-            <p className="mt-2 text-[11px] leading-relaxed text-[#94a3b8]">
-              Use checklist, visa dates, and right-to-work evidence to keep this worker audit-ready.
-            </p>
-          </div>
-        </AspectCard>
-
-        <AspectCard
-          title="Background verification"
-          subtitle="References and referee status"
-          icon={ShieldCheck}
-          barClass="bg-[#4F46E5]"
-          action={
-            <button type="button" onClick={onGoBg} className="inline-flex items-center gap-1 border border-[rgba(0,0,0,0.1)] bg-[#f0f0eb] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[rgba(26,79,160,0.08)]" style={{ fontFamily: "var(--dash-mono)" }}>
-              Manage refs <ArrowRight className="h-3 w-3" />
-            </button>
-          }
-        >
-          {bgRefs.length === 0 ? (
-            <p className="text-[12px] text-[#94a3b8]">No references added yet. Add referees from the BG verify tab.</p>
-          ) : (
-            <ul className="space-y-0">
-              {bgRefs.slice(0, 4).map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-2 border-b border-[rgba(0,0,0,0.06)] py-2.5 last:border-b-0">
-                  <div className="min-w-0">
-                    <p className="truncate text-[12px] font-semibold text-[#0f2d5e]">{r.referee_name}</p>
-                    <p className="truncate text-[10px] text-[#94a3b8]">{r.referee_email}</p>
-                  </div>
-                  <span className="shrink-0 bg-[rgba(26,79,160,0.08)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.07em] text-[#1a4fa0]" style={{ fontFamily: "var(--dash-mono)" }}>
-                    {r.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </AspectCard>
       </div>
     </div>
   );
@@ -1553,12 +1878,62 @@ function DashboardKpi({
   // tone kept for API compat — not used visually
   void tone;
   return (
-    <div className="border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3">
+    <div className="rounded-none border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3">
       <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>{label}</p>
       <p className="mt-1 truncate text-[22px] font-extrabold tracking-tight text-[#0f2d5e]" style={accentColor ? { color: accentColor } : undefined}>
         {value}
       </p>
       <p className="mt-0.5 text-[10px] font-medium leading-tight text-[#94a3b8]">{sub}</p>
+    </div>
+  );
+}
+
+function ProfileBlockTitle({ children }: { children: ReactNode }) {
+  return (
+    <h3
+      className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#0f2d5e]"
+      style={{ fontFamily: "var(--dash-mono)" }}
+    >
+      {children}
+    </h3>
+  );
+}
+
+function ProfileFieldGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0 w-full">
+      <ProfileBlockTitle>{title}</ProfileBlockTitle>
+      <div className="w-full min-w-0 divide-y divide-[rgba(0,0,0,0.07)] rounded-none border border-[rgba(0,0,0,0.1)] bg-white">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ProfileKVRow({
+  label,
+  value,
+  dense,
+}: {
+  label: string;
+  value: ReactNode;
+  dense?: boolean;
+}) {
+  return (
+    <div
+      className={`flex min-w-0 w-full flex-col gap-1 sm:flex-row sm:items-start sm:gap-x-4 ${
+        dense ? "px-3 py-1.5 sm:px-3" : "px-3 py-2.5 sm:px-3"
+      }`}
+    >
+      <span
+        className="shrink-0 text-[10px] font-bold uppercase tracking-[0.07em] text-[#94a3b8] sm:w-[10.5rem] sm:pt-0.5"
+        style={{ fontFamily: "var(--dash-mono)" }}
+      >
+        {label}
+      </span>
+      <span className="min-w-0 flex-1 break-words text-[13px] font-semibold leading-snug text-[#0f2d5e]">
+        {value}
+      </span>
     </div>
   );
 }
@@ -1570,52 +1945,67 @@ function AspectCard({
   barClass,
   children,
   action,
+  compact,
 }: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   icon: React.ComponentType<{ className?: string }>;
   barClass: string;
   children: ReactNode;
   action?: ReactNode;
+  compact?: boolean;
 }) {
   // barClass kept for API compatibility but not rendered visually
   void barClass;
   return (
-    <section className="overflow-hidden border border-[rgba(0,0,0,0.08)] bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(0,0,0,0.07)] px-5 py-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center bg-[rgba(26,79,160,0.08)] text-[#1a4fa0]">
-            <Icon className="h-4 w-4" />
+    <section className="min-w-0 rounded-none border border-[rgba(0,0,0,0.08)] bg-white">
+      <div
+        className={`flex flex-wrap items-center justify-between border-b border-[rgba(0,0,0,0.07)] ${
+          compact ? "gap-2 px-4 py-2.5" : "gap-3 px-5 py-4"
+        }`}
+      >
+        <div className={`flex min-w-0 items-center ${compact ? "gap-2" : "gap-3"}`}>
+          <div
+            className={`flex shrink-0 items-center justify-center bg-[rgba(26,79,160,0.08)] text-[#1a4fa0] ${
+              compact ? "h-7 w-7" : "h-8 w-8"
+            }`}
+          >
+            <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </div>
           <div className="min-w-0">
-            <h2 className="text-[13px] font-bold text-[#0a0a0a]">{title}</h2>
-            <p className="text-[11px] text-[#94a3b8]">{subtitle}</p>
+            <h2 className={`font-bold text-[#0a0a0a] ${compact ? "text-[12px] leading-tight" : "text-[13px]"}`}>{title}</h2>
+            {subtitle ? (
+              <p className={`text-[#94a3b8] ${compact ? "mt-0.5 text-[10px] leading-snug" : "text-[11px]"}`}>{subtitle}</p>
+            ) : null}
           </div>
         </div>
         {action}
       </div>
-      <div className="p-5">{children}</div>
+      <div className={compact ? "min-w-0 p-3 sm:p-4" : "min-w-0 p-5"}>{children}</div>
     </section>
   );
 }
 
 function DashRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-[rgba(0,0,0,0.06)] px-5 py-3 last:border-b-0">
-      <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.07em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)", minWidth: 140 }}>{label}</span>
-      <span className="min-w-0 text-[13px] font-semibold leading-snug text-[#0f2d5e] text-right">{value}</span>
+    <div className="flex items-start justify-between gap-4 border-b border-[rgba(0,0,0,0.06)] py-3 last:border-b-0">
+      <span className="w-[10.5rem] shrink-0 text-[10px] font-bold uppercase tracking-[0.07em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>{label}</span>
+      <span className="min-w-0 flex-1 text-[13px] font-semibold leading-snug text-[#0f2d5e] text-right">{value}</span>
     </div>
   );
 }
 
 function DocumentRow({
   item,
+  displayOrder,
   isLast,
   hovered,
   onHover,
   onOpen,
 }: {
   item: ChecklistItem;
+  /** 1…n in template order — not raw API item_number (may be 100+) */
+  displayOrder: number;
   isLast: boolean;
   hovered: boolean;
   onHover: (v: boolean) => void;
@@ -1628,7 +2018,8 @@ function DocumentRow({
     return new Date(latest).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
   }, [item.documents]);
 
-  const ok = item.status === "verified" || item.status === "not_applicable";
+  const verified = item.status === "verified";
+  const notApp = item.status === "not_applicable";
   const bad = item.status === "rejected";
 
   return (
@@ -1642,9 +2033,13 @@ function DocumentRow({
       } ${hovered ? "bg-[#f8f8f5]" : "bg-white"}`}
     >
       <span className="flex shrink-0 items-center justify-center">
-        {ok ? (
+        {verified ? (
           <span className="flex h-7 w-7 items-center justify-center bg-[#f0fdf4] text-[#16a34a]">
             <CheckCircle2 className="h-4 w-4" />
+          </span>
+        ) : notApp ? (
+          <span className="flex h-7 w-7 items-center justify-center bg-[#f1f5f9] text-[#64748b]" title="Marked not applicable">
+            <MinusCircle className="h-4 w-4" />
           </span>
         ) : bad ? (
           <span className="flex h-7 w-7 items-center justify-center bg-[#fef2f2] text-[#dc2626]">
@@ -1658,7 +2053,7 @@ function DocumentRow({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-semibold leading-snug text-[#0f2d5e]">{item.description}</p>
-        <p className="mt-0.5 text-[10px] uppercase tracking-[0.07em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>Item {item.item_number}</p>
+        <p className="mt-0.5 text-[10px] uppercase tracking-[0.07em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>Item {displayOrder}</p>
       </div>
       <div className="hidden shrink-0 flex-col items-end text-right sm:flex">
         <span className="text-[9px] font-bold uppercase tracking-[0.07em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>Updated</span>

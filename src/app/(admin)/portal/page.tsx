@@ -5,6 +5,7 @@ import Link from "next/link";
 import { UserCircle, ShieldCheck, FileText, AlertTriangle, ArrowRight, Clock3, ListChecks } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
+import { parseChecklistListPayload } from "@/lib/parse-checklist-response";
 import "../dashboard/dashboard-marketing.css";
 import "../workers/workers-page.css";
 
@@ -37,12 +38,12 @@ export default function PortalPage() {
       try {
         setLoading(true);
         setError("");
-        const [p, c] = await Promise.all([
+        const [p, rawChecklist] = await Promise.all([
           api.get<WorkerProfile>("/portal/me", token),
-          api.get<ChecklistItem[]>("/portal/checklist", token),
+          api.get<unknown>("/portal/checklist", token),
         ]);
         setProfile(p);
-        setChecklist(c);
+        setChecklist(parseChecklistListPayload<ChecklistItem>(rawChecklist).items);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load portal");
       } finally {
@@ -54,14 +55,15 @@ export default function PortalPage() {
 
   const stats = useMemo(() => {
     const total = checklist.length;
-    const verified = checklist.filter((x) => x.status === "verified" || x.status === "not_applicable").length;
+    const hrVerified = checklist.filter((x) => x.status === "verified").length;
+    const notApplicable = checklist.filter((x) => x.status === "not_applicable").length;
     const uploaded = checklist.filter((x) => x.status === "uploaded").length;
     const rejected = checklist.filter((x) => x.status === "rejected").length;
-    return { total, verified, uploaded, rejected };
+    return { total, hrVerified, notApplicable, uploaded, rejected };
   }, [checklist]);
 
-  const progressPct = stats.total > 0 ? Math.round((stats.verified / stats.total) * 100) : 0;
-  const pending = Math.max(stats.total - stats.verified, 0);
+  const progressPct = stats.total > 0 ? Math.round((stats.hrVerified / stats.total) * 100) : 0;
+  const pending = Math.max(stats.total - stats.hrVerified - stats.notApplicable, 0);
   const visaDate = profile?.visa_expiry ? new Date(profile.visa_expiry) : null;
   const visaDaysLeft = visaDate ? Math.ceil((visaDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
 
@@ -189,10 +191,12 @@ export default function PortalPage() {
             <span className="adm-sc-pill adm-pill-n">Docs</span>
           </div>
           <div className="adm-sc-num">
-            {stats.verified}/{stats.total}
+            {stats.hrVerified}/{stats.total}
           </div>
-          <div className="adm-sc-lbl">Verified</div>
-          <div className="adm-sc-sub">Checklist items</div>
+          <div className="adm-sc-lbl">HR verified</div>
+          <div className="adm-sc-sub">
+            {stats.notApplicable > 0 ? `${stats.notApplicable} marked N/A` : "Checklist items"}
+          </div>
         </div>
         <div className="adm-sc adm-sc-a bg-white px-4 py-4 text-left">
           <div className="adm-sc-top">
@@ -224,9 +228,10 @@ export default function PortalPage() {
               style={{ width: `${progressPct}%` }}
             />
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
             <MiniStat label="Total" value={String(stats.total)} />
-            <MiniStat label="Verified" value={String(stats.verified)} />
+            <MiniStat label="HR verified" value={String(stats.hrVerified)} />
+            <MiniStat label="N/A" value={String(stats.notApplicable)} />
             <MiniStat label="Uploaded" value={String(stats.uploaded)} />
             <MiniStat label="Rejected" value={String(stats.rejected)} />
           </div>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Download, PanelsTopLeft, Plus, Upload } from "lucide-react";
+import { ArrowLeft, Download, PanelsTopLeft, Plus, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
 import { DASHBOARD_FEATURE_PREF_ROLES } from "@/lib/dashboard-features";
@@ -122,6 +122,28 @@ export function AdminSubnav() {
       <Suspense fallback={<div className="adm-subnav min-h-[36px]" />}>
         <WorkersSubnavInner />
       </Suspense>
+    );
+  }
+
+  /* Employee profile, add form, etc. — same strip as list context, navigates back to directory */
+  const workersBackToList =
+    pathname.startsWith("/workers/") && !pathname.startsWith("/workers/visa-expiry");
+  if (workersBackToList) {
+    return (
+      <div className="adm-subnav">
+        <Link
+          href="/workers"
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-sm border border-transparent px-2 py-1 text-[13px] font-bold tracking-tight text-[#0f2d5e] no-underline outline-none transition-colors",
+            "hover:border-[rgba(0,0,0,0.08)] hover:bg-[rgba(0,0,0,0.03)] hover:text-[#0a1628]",
+            "focus-visible:border-[rgba(26,79,160,0.35)] focus-visible:ring-2 focus-visible:ring-[rgba(26,79,160,0.25)]"
+          )}
+          aria-label="Back to employees list"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          Employees
+        </Link>
+      </div>
     );
   }
 

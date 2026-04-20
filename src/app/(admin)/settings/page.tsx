@@ -189,7 +189,7 @@ export default function SettingsPage() {
                 {" "}
                 To configure which <strong className="text-[#475569]">Status</strong> labels apply to every employee
                 (Active, Inactive, Finished, and custom values), open{" "}
-                <Link href="/organisation" className="font-semibold text-[#1a4fa0] underline-offset-2 hover:underline">
+                <Link href="/organisation#employment-statuses" className="font-semibold text-[#1a4fa0] underline-offset-2 hover:underline">
                   Organisation
                 </Link>
                 → Employment statuses.

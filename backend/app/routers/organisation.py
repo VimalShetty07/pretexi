@@ -78,6 +78,7 @@ DEFAULT_WORKER_COLUMNS = ["name", "job_title", "employment", "status", "email", 
 DASHBOARD_FEATURE_KEYS = frozenset(
     {
         "admin_chat",
+        "admin_notes",
         "stats",
         "cos",
         "charts",
@@ -86,14 +87,12 @@ DASHBOARD_FEATURE_KEYS = frozenset(
         "activity",
     }
 )
+# Default view is deliberately minimal (stats + HR notes box only).
+# Other sections (CoS, charts, visa alerts, quick actions, activity, admin chat)
+# can be re-enabled per org from Settings → Dashboard layout.
 DEFAULT_DASHBOARD_FEATURES = [
-    "admin_chat",
     "stats",
-    "cos",
-    "charts",
-    "visa_alerts",
-    "quick_actions",
-    "activity",
+    "admin_notes",
 ]
 
 

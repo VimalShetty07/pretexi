@@ -220,6 +220,8 @@ class Organisation(Base):
     worker_table_columns_by_role: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Org-wide dashboard section visibility, e.g. ["stats","charts",...]; null = all sections
     dashboard_features: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Bumps when checklist template is saved — workers resync when this != worker.checklist_sync_revision
+    checklist_template_revision: Mapped[int] = mapped_column(Integer, default=0)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -234,6 +236,26 @@ class Organisation(Base):
     dashboard_messages: Mapped[list["DashboardAdminMessage"]] = relationship(
         back_populates="organisation", cascade="all, delete-orphan"
     )
+    checklist_template_items: Mapped[list["OrganisationChecklistTemplateItem"]] = relationship(
+        back_populates="organisation",
+        cascade="all, delete-orphan",
+        order_by="OrganisationChecklistTemplateItem.sort_order",
+    )
+
+
+class OrganisationChecklistTemplateItem(Base):
+    """Per-organisation checklist template (drives worker document_checklist rows when saved)."""
+
+    __tablename__ = "organisation_checklist_template_items"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id", ondelete="CASCADE"))
+    description: Mapped[str] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    organisation: Mapped["Organisation"] = relationship(back_populates="checklist_template_items")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -470,15 +492,25 @@ class Worker(Base):
     brp_expiry: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_rtw_check: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_rtw_check: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # HR sign-off for British/Irish RTW (online verification record)
+    rtw_check_signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rtw_check_signed_by_user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     right_to_work_category: Mapped[str | None] = mapped_column(String(150), nullable=True)
     entry_clearance_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     dbs_check_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Admin RTW verification checklist (JSON) — not exposed to employees on portal
+    rtw_verification_checklist: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # ── Lifecycle & compliance ─────────────────────────
     status: Mapped[WorkerStatus] = mapped_column(SAEnum(WorkerStatus), default=WorkerStatus.ACTIVE)
     stage: Mapped[WorkerStage] = mapped_column(SAEnum(WorkerStage), default=WorkerStage.RECRUITMENT)
     hr_onboarding_stage: Mapped[str | None] = mapped_column(String(100), nullable=True)
     risk_level: Mapped[RiskLevel] = mapped_column(SAEnum(RiskLevel), default=RiskLevel.LOW)
+
+    # HR / compliance free-text — unique per worker; not shown to employees on portal
+    internal_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Matched against organisation.checklist_template_revision — mismatch triggers checklist rebuild
+    checklist_sync_revision: Mapped[int] = mapped_column(Integer, default=0)
 
     # ── DBS / ATAS flags ──────────────────────────────
     dbs_required: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -616,6 +648,12 @@ class Document(Base):
     file_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     file_mime: Mapped[str | None] = mapped_column(String(100), nullable=True)
     checklist_item_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("document_checklist.id"), nullable=True)
+    # When checklist rows are replaced (template change / prune), files are retained with metadata — not hard-deleted
+    legacy_org_template_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    legacy_checklist_item_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    legacy_checklist_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    legacy_checklist_category: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Metadata
     expiry_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -636,7 +674,7 @@ class Document(Base):
 
 
 # ═══════════════════════════════════════════════════════════
-#  DOCUMENT CHECKLIST (66 items per worker)
+#  DOCUMENT CHECKLIST (per worker — org template or three-row default)
 # ═══════════════════════════════════════════════════════════
 
 class ChecklistStatus(str, enum.Enum):
@@ -649,11 +687,22 @@ class ChecklistStatus(str, enum.Enum):
 
 class DocumentChecklist(Base):
     __tablename__ = "document_checklist"
+    __table_args__ = (
+        UniqueConstraint(
+            "worker_id",
+            "item_number",
+            name="uq_document_checklist_worker_item",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     worker_id: Mapped[str] = mapped_column(String(36), ForeignKey("workers.id"))
+    template_item_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("organisation_checklist_template_items.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     item_number: Mapped[int] = mapped_column(Integer)
     description: Mapped[str] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(String(200), nullable=True)
     status: Mapped[ChecklistStatus] = mapped_column(
         SAEnum(ChecklistStatus), default=ChecklistStatus.NOT_STARTED
     )

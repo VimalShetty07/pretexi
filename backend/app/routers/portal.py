@@ -29,7 +29,7 @@ from app.core.profile_photo_storage import (
     store_worker_profile_photo,
     delete_stored_object,
 )
-from app.routers.documents import create_checklist_for_worker
+from app.routers.documents import create_checklist_for_worker, _serialize_superseded_documents
 import boto3
 
 router = APIRouter(prefix="/portal", tags=["employee-portal"])
@@ -127,7 +127,12 @@ def _worker_detail_out(worker: Worker) -> WorkerDetailOut:
     out = WorkerDetailOut.model_validate(worker)
     has_photo = bool(worker.profile_photo_s3_key or worker.profile_photo_data)
     return out.model_copy(
-        update={"has_profile_photo": has_photo, "age_years": _age_years_from_dob(worker.date_of_birth)}
+        update={
+            "has_profile_photo": has_photo,
+            "age_years": _age_years_from_dob(worker.date_of_birth),
+            "internal_notes": None,
+            "rtw_verification_checklist": None,
+        }
     )
 
 
@@ -363,14 +368,8 @@ def mark_notification_read(
 def get_my_checklist(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     worker = _get_employee_worker(current_user, db)
 
-    items = (
-        db.query(DocumentChecklist)
-        .filter(DocumentChecklist.worker_id == worker.id)
-        .order_by(DocumentChecklist.item_number)
-        .all()
-    )
-    if not items:
-        items = create_checklist_for_worker(db, worker.id)
+    items = create_checklist_for_worker(db, worker.id)
+    if list(db.new) or list(db.dirty):
         db.commit()
 
     result = []
@@ -386,6 +385,7 @@ def get_my_checklist(db: Session = Depends(get_db), current_user: User = Depends
             "id": item.id,
             "item_number": item.item_number,
             "description": item.description,
+            "category": item.category,
             "status": item.status.value,
             "notes": item.notes,
             "verified_by": item.verified_by,
@@ -406,7 +406,10 @@ def get_my_checklist(db: Session = Depends(get_db), current_user: User = Depends
             ],
         })
 
-    return result
+    return {
+        "items": result,
+        "superseded_documents": _serialize_superseded_documents(db, worker.id),
+    }
 
 
 @router.post("/checklist/{item_id}/upload")
@@ -481,6 +484,46 @@ async def portal_upload_document(
     return {"id": doc.id, "file_name": doc.file_name, "status": checklist_item.status.value, "version": doc.version}
 
 
+@router.get("/checklist/retained/{doc_id}/view")
+def portal_view_retained_document(
+    doc_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """View a checklist upload kept after the org template changed (superseded row)."""
+    worker = _get_employee_worker(current_user, db)
+    doc = db.query(Document).filter(
+        Document.id == doc_id,
+        Document.worker_id == worker.id,
+        Document.superseded_at.isnot(None),
+    ).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    raw_bytes = _load_file_for_doc(doc)
+    if settings.PORTAL_VIEW_MODE == "wrapped":
+        payload = base64.b64encode(raw_bytes).decode("utf-8")
+        return {
+            "mode": "wrapped",
+            "mime": doc.file_mime or "application/octet-stream",
+            "name": doc.file_name or "document",
+            "payload_b64": payload,
+            "watermark": f"{current_user.email} | {datetime.now(timezone.utc).isoformat()}",
+        }
+
+    return Response(
+        content=raw_bytes,
+        media_type=doc.file_mime or "application/pdf",
+        headers={
+            "Content-Disposition": "inline",
+            "Cache-Control": "no-store, private",
+            "Pragma": "no-cache",
+            "X-Frame-Options": "SAMEORIGIN",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.get("/checklist/{item_id}/view/{doc_id}")
 def portal_view_document(
     item_id: str,
@@ -542,3 +585,15 @@ def portal_download_document(
         _get_employee_worker(current_user, db)  # keep same auth check and audit path
         raise HTTPException(status_code=403, detail="Download is disabled for employee portal documents")
     return portal_view_document(item_id=item_id, doc_id=doc_id, db=db, current_user=current_user)
+
+
+@router.get("/checklist/retained/{doc_id}/download")
+def portal_download_retained_document(
+    doc_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if settings.PORTAL_DISABLE_DOWNLOAD:
+        _get_employee_worker(current_user, db)
+        raise HTTPException(status_code=403, detail="Download is disabled for employee portal documents")
+    return portal_view_retained_document(doc_id=doc_id, db=db, current_user=current_user)

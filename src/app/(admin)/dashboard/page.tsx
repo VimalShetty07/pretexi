@@ -19,6 +19,8 @@ import {
   CreditCard,
   CalendarRange,
   FileUp,
+  StickyNote,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
@@ -97,6 +99,13 @@ const DASH_HEADER_LEAD_ROLES = new Set([
   "hr_officer",
 ]);
 
+const HR_NOTE_EDIT_ROLES = new Set([
+  "super_admin",
+  "tenant_admin",
+  "compliance_manager",
+  "hr_officer",
+]);
+
 export default function DashboardPage() {
   const { token, user } = useAuth();
   const router = useRouter();
@@ -107,9 +116,15 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dashFeatures, setDashFeatures] = useState<DashboardFeatureKey[]>(DEFAULT_DASHBOARD_FEATURES);
+  const [hrNote, setHrNote] = useState<string>("");
+  const [hrNoteDraft, setHrNoteDraft] = useState<string>("");
+  const [hrNoteSaving, setHrNoteSaving] = useState(false);
+  const [hrNoteError, setHrNoteError] = useState<string>("");
+  const [hrNoteSavedAt, setHrNoteSavedAt] = useState<number | null>(null);
   const canPostAdminChat = ["super_admin", "tenant_admin", "compliance_manager", "hr_officer"].includes(
     user?.role ?? ""
   );
+  const canEditHrNote = user ? HR_NOTE_EDIT_ROLES.has(user.role) : false;
   const chatListRef = useRef<HTMLDivElement>(null);
   const chatDidInitialScroll = useRef(false);
 
@@ -142,16 +157,22 @@ export default function DashboardPage() {
       if (!token) return;
       try {
         setLoading(true);
-        const [overview, chat, featResp] = await Promise.all([
+        const [overview, chat, featResp, settings] = await Promise.all([
           api.get<DashboardOverview>("/dashboard/overview", token),
-          api.get<DashboardAdminMessage[]>("/organisation/dashboard-chat", token),
+          api.get<DashboardAdminMessage[]>("/organisation/dashboard-chat", token).catch(() => []),
           api.get<{ features: string[] }>("/organisation/dashboard-features", token).catch(() => ({
             features: DEFAULT_DASHBOARD_FEATURES,
           })),
+          api
+            .get<{ dashboard_admin_note: string | null }>("/organisation/settings", token)
+            .catch(() => ({ dashboard_admin_note: null })),
         ]);
         setData(overview);
         setChatMessages(chat);
         setDashFeatures(orderDashboardFeatures(featResp.features));
+        const note = settings.dashboard_admin_note ?? "";
+        setHrNote(note);
+        setHrNoteDraft(note);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load dashboard");
       } finally {
@@ -160,6 +181,29 @@ export default function DashboardPage() {
     };
     load();
   }, [token]);
+
+  const saveHrNote = async () => {
+    if (!token || !canEditHrNote) return;
+    const next = hrNoteDraft.trim().slice(0, 2000);
+    if (next === (hrNote ?? "")) return;
+    setHrNoteSaving(true);
+    setHrNoteError("");
+    try {
+      const resp = await api.patch<{ dashboard_admin_note: string | null }>(
+        "/organisation/settings",
+        { dashboard_admin_note: next },
+        token
+      );
+      const saved = resp.dashboard_admin_note ?? "";
+      setHrNote(saved);
+      setHrNoteDraft(saved);
+      setHrNoteSavedAt(Date.now());
+    } catch (e) {
+      setHrNoteError(e instanceof Error ? e.message : "Could not save note");
+    } finally {
+      setHrNoteSaving(false);
+    }
+  };
 
   const sendChatMessage = async () => {
     if (!token || !canPostAdminChat) return;
@@ -453,6 +497,66 @@ export default function DashboardPage() {
       </div>
       ) : null}
 
+      {/* HR / Manager notes */}
+      {showFeat("admin_notes") ? (
+        <div className="mb-4 rounded-2xl border border-[#E5EAF4] bg-white p-4 shadow-sm md:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="flex items-start gap-2">
+              <div className="flex h-8 w-8 items-center justify-center bg-[rgba(26,79,160,0.08)] text-[#1a4fa0]">
+                <StickyNote className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-[13px] font-bold text-[#0a0a0a]">HR / Manager notes</p>
+                <p className="text-[11px] text-[#94a3b8]">
+                  Quick note for the admin team on this dashboard. Not visible to employees.
+                </p>
+              </div>
+            </div>
+            {canEditHrNote ? (
+              <Link
+                href="/dashboard/customize"
+                className="inline-flex h-8 items-center gap-1.5 border border-[rgba(0,0,0,0.1)] bg-white px-3 text-[10px] font-bold uppercase tracking-[0.07em] text-[#0f2d5e] hover:bg-[#f8fafc]"
+                style={{ fontFamily: "var(--dash-mono)" }}
+                title="Customize dashboard sections"
+              >
+                <SettingsIcon className="h-3 w-3" />
+                Customize
+              </Link>
+            ) : null}
+          </div>
+
+          {canEditHrNote ? (
+            <div className="mt-3">
+              <textarea
+                className="min-h-[88px] w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] leading-relaxed text-[#0f1f3a] placeholder:text-[#94a3b8] focus:border-[rgba(26,79,160,0.4)] focus:outline-none disabled:opacity-60"
+                value={hrNoteDraft}
+                onChange={(e) => setHrNoteDraft(e.target.value.slice(0, 2000))}
+                onBlur={() => { void saveHrNote(); }}
+                maxLength={2000}
+                disabled={hrNoteSaving}
+                placeholder="Any message for the HR / Manager team (auto-saves on blur)…"
+              />
+              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#94a3b8]">
+                <span>{hrNoteDraft.length}/2000</span>
+                {hrNoteError ? (
+                  <span className="text-[#dc2626]" role="alert">{hrNoteError}</span>
+                ) : hrNoteSaving ? (
+                  <span>Saving…</span>
+                ) : hrNoteSavedAt ? (
+                  <span className="text-[#047857]">Saved</span>
+                ) : hrNoteDraft.trim() !== (hrNote ?? "").trim() ? (
+                  <span>Unsaved changes — tab away to save</span>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 whitespace-pre-wrap rounded-none border border-[rgba(0,0,0,0.06)] bg-[#fafafa] px-3 py-2.5 text-[13px] leading-relaxed text-[#0f1f3a]">
+              {hrNote.trim() ? hrNote : <span className="text-[#94a3b8]">No notes from the admin team yet.</span>}
+            </div>
+          )}
+        </div>
+      ) : null}
+
       {/* CoS row */}
       {showFeat("cos") && canViewCos && (
         <div className="dash-cos-row mb-0">
@@ -568,7 +672,7 @@ export default function DashboardPage() {
                   <button
                     key={w.id}
                     type="button"
-                    onClick={() => router.push(`/workers/${w.id}?tab=records`)}
+                    onClick={() => router.push(`/workers/${w.id}?tab=overview`)}
                     className="flex w-full items-center justify-between border-b border-[#F8FAFF] py-2.5 text-left last:border-0"
                   >
                     <div>
@@ -687,27 +791,29 @@ export default function DashboardPage() {
       </div>
       ) : null}
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-800">Onboarding checklist</h3>
-          <span className="text-xs text-slate-500">{onboardingDone}/{onboardingSteps.length} complete</span>
+      {showFeat("activity") ? (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-800">Onboarding checklist</h3>
+            <span className="text-xs text-slate-500">{onboardingDone}/{onboardingSteps.length} complete</span>
+          </div>
+          <div className="space-y-2">
+            {onboardingSteps.map((step) => (
+              <button
+                key={step.key}
+                type="button"
+                onClick={() => router.push(step.href)}
+                className="flex w-full items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-left hover:bg-slate-50"
+              >
+                <span className="text-sm text-slate-700">{step.label}</span>
+                <span className={`text-xs font-semibold ${step.done ? "text-emerald-600" : "text-amber-600"}`}>
+                  {step.done ? "Done" : "Pending"}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="space-y-2">
-          {onboardingSteps.map((step) => (
-            <button
-              key={step.key}
-              type="button"
-              onClick={() => router.push(step.href)}
-              className="flex w-full items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-left hover:bg-slate-50"
-            >
-              <span className="text-sm text-slate-700">{step.label}</span>
-              <span className={`text-xs font-semibold ${step.done ? "text-emerald-600" : "text-amber-600"}`}>
-                {step.done ? "Done" : "Pending"}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      ) : null}
     </div>
   );
 }

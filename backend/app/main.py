@@ -14,6 +14,7 @@ from app.routers import (
     dashboard,
     documents,
     leave,
+    org_checklist,
     organisation,
     payroll,
     platform,
@@ -47,6 +48,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(workers.router, prefix="/api")
 app.include_router(organisation.router, prefix="/api")
+app.include_router(org_checklist.router, prefix="/api")
 app.include_router(payroll.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")

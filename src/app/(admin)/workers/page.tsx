@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo, Suspense } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback, Suspense } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
@@ -43,7 +44,7 @@ interface Worker {
   route: string;
   work_location: string | null;
   status: string;
-  /** HR status (org-configurable): Active, Inactive, Finished, … */
+  /** Employment status (org-configurable): Active, On leave, … */
   employment_status?: string;
   stage: string;
   risk_level: string;
@@ -85,7 +86,7 @@ const DEFAULT_WORKER_COLUMNS: WorkerTableColumnKey[] = ["name", "job_title", "em
 const WORKER_COLUMN_OPTIONS: Array<{ key: WorkerTableColumnKey; label: string }> = [
   { key: "name", label: "Name" },
   { key: "job_title", label: "Role" },
-  { key: "employment", label: "Status" },
+  { key: "employment", label: "Employment status" },
   { key: "status", label: "Sponsor" },
   { key: "email", label: "Email" },
   { key: "docs", label: "Docs" },
@@ -142,7 +143,6 @@ function WorkersPageInner() {
   const [starred, setStarred] = useState<Record<string, boolean>>({});
 
   const [compliance, setCompliance] = useState<Record<string, { total: number; verified: number; uploaded: number; rejected: number }>>({});
-  const [employmentStatusOptions, setEmploymentStatusOptions] = useState<string[]>(["Active", "Inactive", "Finished"]);
 
   const canManage = user ? STAFF_ROLES.includes(user.role) : false;
   const canEditTableColumns = user ? COLUMN_PREF_ROLES.includes(user.role) : false;
@@ -181,16 +181,6 @@ function WorkersPageInner() {
     }
   }, [searchParams, router]);
 
-  const fetchEmploymentStatusOptions = async () => {
-    if (!token) return;
-    try {
-      const s = await api.get<{ employment_status_options: string[] }>("/organisation/settings", token);
-      if (s.employment_status_options?.length) setEmploymentStatusOptions(s.employment_status_options);
-    } catch {
-      /* defaults */
-    }
-  };
-
   const fetchWorkerTableColumns = async () => {
     if (!token) return;
     try {
@@ -223,13 +213,6 @@ function WorkersPageInner() {
     const next = has ? visibleColumns.filter((c) => c !== key) : [...visibleColumns, key];
     setVisibleColumns(next);
     void saveWorkerTableColumns(next);
-  };
-
-  const patchEmploymentStatus = async (workerId: string, value: string) => {
-    if (!token) return;
-    await api.patch(`/workers/${workerId}`, { employment_status: value }, token);
-    setWorkers((prev) => prev.map((w) => (w.id === workerId ? { ...w, employment_status: value } : w)));
-    setStatsWorkers((prev) => prev.map((w) => (w.id === workerId ? { ...w, employment_status: value } : w)));
   };
 
   const fetchWorkers = async () => {
@@ -281,17 +264,18 @@ function WorkersPageInner() {
     }
   };
 
-  const fetchCompliance = async () => {
+  const fetchCompliance = useCallback(async () => {
+    if (!token) return;
     try {
       const data = await api.get<Record<string, { total: number; verified: number; uploaded: number; rejected: number }>>(
         "/workers/compliance-summary",
-        token ?? undefined
+        token
       );
       setCompliance(data);
     } catch {
       /* ignore */
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchWorkers();
@@ -302,16 +286,33 @@ function WorkersPageInner() {
     if (token) {
       fetchStatsWorkers();
       fetchOnLeave();
-      fetchEmploymentStatusOptions();
       fetchWorkerTableColumns();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   useEffect(() => {
-    if (canManage && token) fetchCompliance();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, canManage]);
+    if (!canManage || !token) return;
+    fetchCompliance();
+  }, [canManage, token, fetchCompliance]);
+
+  useEffect(() => {
+    if (!canManage || !token) return;
+    const onVis = () => {
+      if (document.visibilityState === "visible") fetchCompliance();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [canManage, token, fetchCompliance]);
+
+  useEffect(() => {
+    if (!canManage || !token) return;
+    const onTemplateSaved = () => {
+      fetchCompliance();
+    };
+    window.addEventListener("protexi-checklist-template-saved", onTemplateSaved);
+    return () => window.removeEventListener("protexi-checklist-template-saved", onTemplateSaved);
+  }, [canManage, token, fetchCompliance]);
 
   useEffect(() => {
     setPage(1);
@@ -426,16 +427,15 @@ function WorkersPageInner() {
 
   const openProfile = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    router.push(`/workers/${id}?tab=records`);
+    router.push(`/workers/${id}?tab=overview`);
   };
 
-  const moreOptions = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
-
-  const today = new Date().toLocaleDateString("en-GB", {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
-  });
+  const now = new Date();
+  const today = `${now.toLocaleDateString("en-GB", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London",
+  })} ${now.toLocaleTimeString("en-GB", {
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/London",
+  })} (UK)`;
 
   return (
     <div className="protexi-dash-marketing flex flex-col gap-0">
@@ -594,15 +594,11 @@ function WorkersPageInner() {
                 <EmployeeHtmlCard
                   key={w.id}
                   worker={w}
-                  employmentOptions={[...new Set([...employmentStatusOptions, w.employment_status || "Active"])]}
-                  canEditEmployment={canManage}
-                  onEmploymentChange={(value) => patchEmploymentStatus(w.id, value)}
                   compliance={compliance[w.id]}
                   starred={!!starred[w.id]}
                   onToggleStar={(e) => toggleStar(w.id, e)}
-                  onOpen={() => router.push(`/workers/${w.id}?tab=records`)}
+                  onOpen={() => router.push(`/workers/${w.id}?tab=overview`)}
                   onProfile={(e) => openProfile(w.id, e)}
-                  onMore={moreOptions}
                   token={token ?? ""}
                 />
               ))}
@@ -629,7 +625,7 @@ function WorkersPageInner() {
                   <tr>
                     {visibleColumns.includes("name") && <th>Name</th>}
                     {visibleColumns.includes("job_title") && <th>Role</th>}
-                    {visibleColumns.includes("employment") && <th>Status</th>}
+                    {visibleColumns.includes("employment") && <th>Employment status</th>}
                     {visibleColumns.includes("status") && <th>Sponsor</th>}
                     {visibleColumns.includes("email") && <th>Email</th>}
                     {visibleColumns.includes("docs") && <th>Docs</th>}
@@ -640,23 +636,15 @@ function WorkersPageInner() {
                     const c = compliance[w.id];
                     const pct = c && c.total > 0 ? Math.round((c.verified / c.total) * 100) : null;
                     const st = STATUS_CONFIG[w.status] ?? STATUS_CONFIG.active;
-                    const empOpts = [...new Set([...employmentStatusOptions, w.employment_status || "Active"])];
                     return (
-                      <tr key={w.id} className="cursor-pointer" onClick={() => router.push(`/workers/${w.id}?tab=records`)}>
+                      <tr key={w.id} className="cursor-pointer" onClick={() => router.push(`/workers/${w.id}?tab=overview`)}>
                         {visibleColumns.includes("name") && <td className="font-semibold">{w.name}</td>}
                         {visibleColumns.includes("job_title") && <td>{w.job_title || "—"}</td>}
-                        {visibleColumns.includes("employment") && <td onClick={(e) => e.stopPropagation()}>
-                          {canManage ? (
-                            <select className="cursor-pointer border border-[rgba(0,0,0,0.1)] bg-[#f5f5f0] px-2 py-1 text-[11px] font-bold text-[#0f2d5e]"
-                              style={{ fontFamily: "var(--dash-mono)" }}
-                              value={w.employment_status || "Active"}
-                              onChange={(e) => { e.stopPropagation(); patchEmploymentStatus(w.id, e.target.value); }}>
-                              {empOpts.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
-                          ) : (
+                        {visibleColumns.includes("employment") && (
+                          <td>
                             <span className="text-[12px] font-semibold text-[#0f2d5e]">{w.employment_status || "—"}</span>
-                          )}
-                        </td>}
+                          </td>
+                        )}
                         {visibleColumns.includes("status") && <td>
                           <span className={`inline-flex items-center border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.06em] ${w.status === "active" ? "border-[rgba(22,163,74,0.3)] bg-[#f0fdf4] text-[#166534]" : w.status === "suspended" ? "border-[rgba(0,0,0,0.08)] bg-[#f0f0eb] text-[#0f2d5e]" : "border-[rgba(220,38,38,0.3)] bg-[rgba(254,242,242,0.6)] text-[#991b1b]"}`}
                             style={{ fontFamily: "var(--dash-mono)" }}>
@@ -784,9 +772,6 @@ function AuthImage({ src, token, alt, className }: { src: string; token: string;
 
 function EmployeeHtmlCard({
   worker: w,
-  employmentOptions,
-  canEditEmployment,
-  onEmploymentChange,
   compliance: c,
   starred,
   onToggleStar,
@@ -795,15 +780,11 @@ function EmployeeHtmlCard({
   token,
 }: {
   worker: Worker;
-  employmentOptions: string[];
-  canEditEmployment: boolean;
-  onEmploymentChange: (value: string) => void;
   compliance?: { total: number; verified: number; uploaded: number; rejected: number };
   starred: boolean;
   onToggleStar: (e: React.MouseEvent) => void;
   onOpen: () => void;
   onProfile: (e: React.MouseEvent) => void;
-  onMore: (e: React.MouseEvent) => void;
   token: string;
 }) {
   const st = STATUS_CONFIG[w.status] ?? STATUS_CONFIG.active;
@@ -867,18 +848,12 @@ function EmployeeHtmlCard({
 
       {/* Footer */}
       <div className="wem-footer">
-        <span className="wem-added">{w.nationality || "—"} · {relativeShort(w.created_at)}</span>
+        <span className="wem-added">
+          {w.nationality || "—"} · {relativeShort(w.created_at)}
+          <span className="mx-1.5 text-[rgba(0,0,0,0.12)]">·</span>
+          <span className="text-[#64748b]">Employment</span> {emp}
+        </span>
         <div className="flex items-center gap-1.5">
-          {canEditEmployment && (
-            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-              <span className="text-[9px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]" style={{ fontFamily: "var(--dash-mono)" }}>
-                Status
-              </span>
-              <select className="wem-emp-select" value={emp} onChange={(e) => onEmploymentChange(e.target.value)}>
-                {employmentOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-          )}
           <button type="button" className="wem-action-btn" title="Star" onClick={onToggleStar}>
             <Star className={`h-[12px] w-[12px] ${starred ? "fill-amber-400 text-amber-500" : ""}`} />
           </button>

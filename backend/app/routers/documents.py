@@ -1,104 +1,359 @@
 import hashlib
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.routers.deps import get_current_user, require_staff
 from app.models.models import (
-    User, Worker, UserRole, Document, DocumentStatus,
-    DocumentChecklist, ChecklistStatus,
+    User,
+    Worker,
+    UserRole,
+    Organisation,
+    OrganisationChecklistTemplateItem,
+    Document,
+    DocumentStatus,
+    DocumentChecklist,
+    ChecklistStatus,
 )
 
 router = APIRouter(prefix="/workers/{worker_id}/checklist", tags=["documents"])
 
 # ──────────────────────────────────────────────────────────
-# The 50 required compliance checklist items
+# Default checklist when org has not saved a custom template (3 rows — same as Organisation UI defaults)
 # ──────────────────────────────────────────────────────────
 
-CHECKLIST_ITEMS: list[dict] = [
-    {"n": 1, "desc": "A screenshot of the job advert, or the link to the job advert"},
-    {"n": 2, "desc": "Confirmation that SOC Occupation code matches the job profile"},
-    {"n": 3, "desc": "Confirmation of the genuineness of the job - the job role is genuine and is required based on the business's needs or for growth"},
-    {"n": 4, "desc": "Details of the advertised job"},
-    {"n": 5, "desc": "Details of the number of applicants who applied for the job, and shortlisted candidates uploaded"},
-    {"n": 6, "desc": "A copy or summary of the interview notes for the successful candidate uploaded"},
-    {"n": 7, "desc": "A list of common interview questions used for all candidates as part of your selection process"},
-    {"n": 8, "desc": "Selection criteria for the successful candidate uploaded"},
-    {"n": 9, "desc": "Scoring criteria to identify the successful candidate uploaded"},
-    {"n": 10, "desc": "Sponsored Employee's CV reviewed and uploaded"},
-    {"n": 11, "desc": "Completed Job Application Form reviewed and uploaded"},
-    {"n": 12, "desc": "Right to Work check recorded on IRS HR"},
-    {"n": 13, "desc": "Right to Work check PDF uploaded in the documents folder"},
-    {"n": 14, "desc": "Proof of 3-month experience with the sponsoring company (only for international students, dependents and Post Study Work Visa holders in the UK) uploaded"},
-    {"n": 15, "desc": "Employment Experience Letter reviewed and uploaded"},
-    {"n": 16, "desc": "Recent practice in English reviewed and uploaded, if applicable"},
-    {"n": 17, "desc": "A degree or qualification/training certificate reviewed and uploaded"},
-    {"n": 18, "desc": "Sponsored Employee meets RQF Level 6 reviewed and requirement"},
-    {"n": 19, "desc": "Reference from a previous employer reviewed and uploaded"},
-    {"n": 20, "desc": "Other evidence of experience reviewed and uploaded"},
-    {"n": 21, "desc": "Professional accreditation documents reviewed and uploaded, if applicable"},
-    {"n": 22, "desc": "Passport reviewed and uploaded"},
-    {"n": 23, "desc": "National Identity reviewed and uploaded, if applicable"},
-    {"n": 24, "desc": "National insurance number recorded on IRS HR"},
-    {"n": 25, "desc": "IELTS UKVI or OET Test Pass Certificate reviewed and uploaded"},
-    {"n": 26, "desc": "Police Certificate reviewed and uploaded"},
-    {"n": 27, "desc": "Signed Offer Letter reviewed and uploaded"},
-    {"n": 28, "desc": "Signed Employment Contract reviewed and uploaded"},
-    {"n": 29, "desc": "A detailed and specific job description uploaded"},
-    {"n": 30, "desc": "Previous E-visa reviewed and uploaded in the documents folder if applicable"},
-    {"n": 31, "desc": "Confirm that CoS was assigned after the interview was conducted and the Offer letter was issued"},
-    {"n": 32, "desc": "New E-visa reviewed and uploaded in the documents folder"},
-    {"n": 33, "desc": "Pension Joining letter of the employee reviewed and uploaded"},
-    {"n": 34, "desc": "Pension leaving letter of the employee reviewed and uploaded, if applicable"},
-    {"n": 35, "desc": "Employee induction completed"},
-    {"n": 36, "desc": "Employee has received the Employee handbook"},
-    {"n": 37, "desc": "Record of employee starting the sponsored employment on the start date listed on the CoS uploaded"},
-    {"n": 38, "desc": "Monthly record of salary payslips uploaded in the documents folder"},
-    {"n": 39, "desc": "Emergency Contact details recorded on IRS HR"},
-    {"n": 40, "desc": "Next of kin details recorded on IRS HR"},
-    {"n": 41, "desc": "Medical test certificate uploaded"},
-    {"n": 42, "desc": "Evidence of current address (two required) reviewed and uploaded"},
-    {"n": 43, "desc": "Confirm that the employee is being paid the annual salary listed in their CoS"},
-    {"n": 44, "desc": "Confirm that the employee is being paid the annual salary more than the national living wage"},
-    {"n": 45, "desc": "Supervision report uploaded"},
-    {"n": 46, "desc": "Spot Check records uploaded"},
-    {"n": 47, "desc": "Annual review uploaded"},
-    {"n": 48, "desc": "Appraisal records uploaded"},
-    {"n": 49, "desc": "Promotion letter issued and uploaded"},
-    {"n": 50, "desc": "Evidence uploaded confirming sponsored employee performing duties listed in the CoS"},
+DEFAULT_FALLBACK_CHECKLIST: list[dict] = [
+    {
+        "n": 1,
+        "desc": "Right to work evidence (share code, acceptable online check, or eligible visa)",
+        "cat": "Right to work",
+    },
+    {
+        "n": 2,
+        "desc": "Passport or national ID — photo page",
+        "cat": "Identity",
+    },
+    {
+        "n": 3,
+        "desc": "Current visa or BRP (if applicable)",
+        "cat": "Immigration",
+    },
 ]
 
 
-def create_checklist_for_worker(db: Session, worker_id: str) -> list[DocumentChecklist]:
-    """Auto-create the 50 required checklist items for a newly created worker."""
-    items = []
-    for ci in CHECKLIST_ITEMS:
-        item = DocumentChecklist(
-            worker_id=worker_id,
-            item_number=ci["n"],
-            description=ci["desc"],
-        )
-        db.add(item)
-        items.append(item)
+def _detach_documents_for_checklist_row(
+    db: Session,
+    chk: DocumentChecklist,
+    legacy_org_template_revision: int,
+) -> None:
+    """Keep file blobs; unlink from checklist row and snapshot line metadata for audit / discovery."""
+    now = datetime.now(timezone.utc)
+    for d in db.query(Document).filter(Document.checklist_item_id == chk.id).all():
+        d.checklist_item_id = None
+        d.legacy_org_template_revision = legacy_org_template_revision
+        d.legacy_checklist_item_number = chk.item_number
+        d.legacy_checklist_description = chk.description
+        d.legacy_checklist_category = chk.category
+        d.superseded_at = now
+
+
+def _prune_worker_checklist_to_allowed(
+    db: Session,
+    worker_id: str,
+    allowed_nums: set[int],
+    legacy_org_template_revision: int,
+) -> None:
+    """Remove checklist rows not in the active definition; retain uploads as superseded documents."""
+    rows = (
+        db.query(DocumentChecklist)
+        .filter(DocumentChecklist.worker_id == worker_id)
+        .all()
+    )
+    for row in rows:
+        if row.item_number not in allowed_nums:
+            _detach_documents_for_checklist_row(db, row, legacy_org_template_revision)
+            db.delete(row)
     db.flush()
-    return items
+
+
+def _next_worker_checklist_item_number(db: Session, worker_id: str) -> int:
+    n = (
+        db.query(func.max(DocumentChecklist.item_number))
+        .filter(DocumentChecklist.worker_id == worker_id)
+        .scalar()
+    )
+    return int(n or 0) + 1
+
+
+def _purge_stale_fallback_rows_if_template_exists(db: Session, organisation_id: str) -> None:
+    """Remove unused default (no template_item_id) rows once an org template exists — only when still empty."""
+    has_template = (
+        db.query(OrganisationChecklistTemplateItem.id)
+        .filter(OrganisationChecklistTemplateItem.organisation_id == organisation_id)
+        .first()
+    )
+    if not has_template:
+        return
+    worker_ids = [w.id for w in db.query(Worker).filter(Worker.organisation_id == organisation_id).all()]
+    for wid in worker_ids:
+        for row in (
+            db.query(DocumentChecklist)
+            .filter(
+                DocumentChecklist.worker_id == wid,
+                DocumentChecklist.template_item_id.is_(None),
+            )
+            .all()
+        ):
+            if row.status != ChecklistStatus.NOT_STARTED:
+                continue
+            has_doc = (
+                db.query(Document.id)
+                .filter(Document.checklist_item_id == row.id)
+                .first()
+            )
+            if has_doc:
+                continue
+            db.delete(row)
+    db.flush()
+
+
+def provision_missing_worker_checklist_rows(db: Session, organisation_id: str) -> None:
+    """Append new checklist rows for active template lines; never resets existing worker progress."""
+    _purge_stale_fallback_rows_if_template_exists(db, organisation_id)
+    active_templates = (
+        db.query(OrganisationChecklistTemplateItem)
+        .filter(
+            OrganisationChecklistTemplateItem.organisation_id == organisation_id,
+            OrganisationChecklistTemplateItem.is_active.is_(True),
+        )
+        .order_by(
+            OrganisationChecklistTemplateItem.sort_order.asc(),
+            OrganisationChecklistTemplateItem.id.asc(),
+        )
+        .all()
+    )
+    if not active_templates:
+        return
+    workers = db.query(Worker).filter(Worker.organisation_id == organisation_id).all()
+    for w in workers:
+        # Allocate item_numbers in memory: MAX() does not see unflushed rows, so calling
+        # _next_worker_checklist_item_number in a tight loop would reuse the same number → 500 (unique violation).
+        next_num = _next_worker_checklist_item_number(db, w.id)
+        for tmpl in active_templates:
+            exists = (
+                db.query(DocumentChecklist)
+                .filter(
+                    DocumentChecklist.worker_id == w.id,
+                    DocumentChecklist.template_item_id == tmpl.id,
+                )
+                .first()
+            )
+            if exists:
+                continue
+            db.add(
+                DocumentChecklist(
+                    worker_id=w.id,
+                    template_item_id=tmpl.id,
+                    item_number=next_num,
+                    description=tmpl.description,
+                    category=tmpl.category,
+                    status=ChecklistStatus.NOT_STARTED,
+                )
+            )
+            next_num += 1
+    db.flush()
+
+
+def _visible_checklist_rows(db: Session, worker_id: str, organisation_id: str) -> list[DocumentChecklist]:
+    """Rows shown on the worker Checklist tab."""
+    template_count = (
+        db.query(OrganisationChecklistTemplateItem)
+        .filter(OrganisationChecklistTemplateItem.organisation_id == organisation_id)
+        .count()
+    )
+    rows = (
+        db.query(DocumentChecklist)
+        .filter(DocumentChecklist.worker_id == worker_id)
+        .order_by(DocumentChecklist.item_number.asc(), DocumentChecklist.id.asc())
+        .all()
+    )
+    if template_count == 0:
+        return [r for r in rows if r.template_item_id is None]
+
+    active_ids = {
+        t.id
+        for t in db.query(OrganisationChecklistTemplateItem)
+        .filter(
+            OrganisationChecklistTemplateItem.organisation_id == organisation_id,
+            OrganisationChecklistTemplateItem.is_active.is_(True),
+        )
+        .all()
+    }
+    visible = [r for r in rows if r.template_item_id and r.template_item_id in active_ids]
+    tmpl_sort = {
+        t.id: (t.sort_order, t.id)
+        for t in db.query(OrganisationChecklistTemplateItem)
+        .filter(OrganisationChecklistTemplateItem.organisation_id == organisation_id)
+        .all()
+    }
+
+    def sort_key(r: DocumentChecklist) -> tuple:
+        if r.template_item_id and r.template_item_id in tmpl_sort:
+            return (tmpl_sort[r.template_item_id][0], tmpl_sort[r.template_item_id][1])
+        return (10**9, r.id)
+
+    visible.sort(key=sort_key)
+    return visible
+
+
+def create_checklist_for_worker(db: Session, worker_id: str) -> list[DocumentChecklist]:
+    """Default 3 rows when no org template; with a saved template, append rows per active template item (no wipe)."""
+    worker = db.query(Worker).filter(Worker.id == worker_id).first()
+    if not worker:
+        raise ValueError("Worker not found")
+    org = db.query(Organisation).filter(Organisation.id == worker.organisation_id).first()
+    if not org:
+        raise ValueError("Organisation not found")
+
+    template_rows = (
+        db.query(OrganisationChecklistTemplateItem)
+        .filter(OrganisationChecklistTemplateItem.organisation_id == org.id)
+        .order_by(
+            OrganisationChecklistTemplateItem.sort_order.asc(),
+            OrganisationChecklistTemplateItem.id.asc(),
+        )
+        .all()
+    )
+
+    wr = int(worker.checklist_sync_revision or 0)
+    orv = int(org.checklist_template_revision or 0)
+    if wr != orv:
+        worker.checklist_sync_revision = orv
+        db.flush()
+
+    if not template_rows:
+        definitions = [(ci["n"], ci["desc"], ci.get("cat"), None) for ci in DEFAULT_FALLBACK_CHECKLIST]
+        allowed_nums = {d[0] for d in definitions}
+        _prune_worker_checklist_to_allowed(db, worker_id, allowed_nums, legacy_org_template_revision=orv)
+        existing = {
+            row.item_number: row
+            for row in db.query(DocumentChecklist).filter(DocumentChecklist.worker_id == worker_id).all()
+        }
+        for item_number, desc, cat, _tmpl_id in definitions:
+            if item_number not in existing:
+                db.add(
+                    DocumentChecklist(
+                        worker_id=worker_id,
+                        item_number=item_number,
+                        description=desc,
+                        category=cat,
+                        template_item_id=None,
+                    )
+                )
+            else:
+                row = existing[item_number]
+                if row.description != desc or row.category != cat:
+                    row.description = desc
+                    row.category = cat
+        db.flush()
+        return _visible_checklist_rows(db, worker_id, org.id)
+
+    active_templates = [t for t in template_rows if t.is_active]
+    next_num = _next_worker_checklist_item_number(db, worker_id)
+    for tmpl in active_templates:
+        existing_row = (
+            db.query(DocumentChecklist)
+            .filter(
+                DocumentChecklist.worker_id == worker_id,
+                DocumentChecklist.template_item_id == tmpl.id,
+            )
+            .first()
+        )
+        if existing_row:
+            continue
+        db.add(
+            DocumentChecklist(
+                worker_id=worker_id,
+                template_item_id=tmpl.id,
+                item_number=next_num,
+                description=tmpl.description,
+                category=tmpl.category,
+                status=ChecklistStatus.NOT_STARTED,
+            )
+        )
+        next_num += 1
+    db.flush()
+    return _visible_checklist_rows(db, worker_id, org.id)
 
 
 # ──────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────
 
-def _get_worker(worker_id: str, db: Session, user: User) -> Worker:
-    worker = db.query(Worker).filter(
-        Worker.id == worker_id,
-        Worker.organisation_id == user.organisation_id,
-    ).first()
+def resolve_worker_for_checklist(
+    worker_id: str,
+    db: Session,
+    user: User,
+    organisation_id: str | None,
+) -> Worker:
+    worker = db.query(Worker).filter(Worker.id == worker_id).first()
     if not worker:
         raise HTTPException(status_code=404, detail="Worker not found")
-    if user.role == UserRole.EMPLOYEE and user.worker_id != worker_id:
-        raise HTTPException(status_code=403, detail="You can only access your own records")
+
+    if user.role == UserRole.EMPLOYEE:
+        if user.worker_id != worker_id:
+            raise HTTPException(status_code=403, detail="You can only access your own records")
+        return worker
+
+    if user.role == UserRole.PLATFORM_OWNER:
+        if not organisation_id or organisation_id != worker.organisation_id:
+            raise HTTPException(
+                status_code=400,
+                detail="organisation_id query parameter must match this worker's organisation",
+            )
+        return worker
+
+    if user.organisation_id != worker.organisation_id:
+        raise HTTPException(status_code=404, detail="Worker not found")
+
+    if organisation_id and organisation_id != worker.organisation_id:
+        raise HTTPException(status_code=400, detail="organisation_id does not match this worker")
+
     return worker
+
+
+def _serialize_superseded_documents(db: Session, worker_id: str) -> list[dict]:
+    rows = (
+        db.query(Document)
+        .filter(
+            Document.worker_id == worker_id,
+            Document.superseded_at.isnot(None),
+        )
+        .order_by(Document.superseded_at.desc())
+        .all()
+    )
+    out: list[dict] = []
+    for d in rows:
+        out.append(
+            {
+                "id": d.id,
+                "file_name": d.file_name,
+                "file_mime": d.file_mime,
+                "status": d.status.value,
+                "upload_date": d.upload_date.isoformat() if d.upload_date else None,
+                "uploaded_by": d.uploaded_by,
+                "verified_by": d.verified_by,
+                "verified_date": d.verified_date.isoformat() if d.verified_date else None,
+                "legacy_org_template_revision": d.legacy_org_template_revision,
+                "legacy_checklist_item_number": d.legacy_checklist_item_number,
+                "legacy_checklist_description": d.legacy_checklist_description,
+                "legacy_checklist_category": d.legacy_checklist_category,
+                "superseded_at": d.superseded_at.isoformat() if d.superseded_at else None,
+            }
+        )
+    return out
 
 
 # ──────────────────────────────────────────────────────────
@@ -108,20 +363,14 @@ def _get_worker(worker_id: str, db: Session, user: User) -> Worker:
 @router.get("")
 def list_checklist(
     worker_id: str,
+    organisation_id: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _get_worker(worker_id, db, current_user)
+    resolve_worker_for_checklist(worker_id, db, current_user, organisation_id)
 
-    items = (
-        db.query(DocumentChecklist)
-        .filter(DocumentChecklist.worker_id == worker_id)
-        .order_by(DocumentChecklist.item_number)
-        .all()
-    )
-
-    if not items:
-        items = create_checklist_for_worker(db, worker_id)
+    items = create_checklist_for_worker(db, worker_id)
+    if list(db.new) or list(db.dirty):
         db.commit()
 
     result = []
@@ -136,6 +385,7 @@ def list_checklist(
             "id": item.id,
             "item_number": item.item_number,
             "description": item.description,
+            "category": item.category,
             "status": item.status.value,
             "notes": item.notes,
             "verified_by": item.verified_by,
@@ -159,7 +409,64 @@ def list_checklist(
             ],
         })
 
-    return result
+    return {
+        "items": result,
+        "superseded_documents": _serialize_superseded_documents(db, worker_id),
+    }
+
+
+# ──────────────────────────────────────────────────────────
+# GET /workers/{worker_id}/checklist/retained-document/{doc_id}/download
+# ──────────────────────────────────────────────────────────
+
+
+@router.get("/retained-document/{doc_id}/download")
+def download_retained_document(
+    worker_id: str,
+    doc_id: str,
+    organisation_id: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    resolve_worker_for_checklist(worker_id, db, current_user, organisation_id)
+    doc = db.query(Document).filter(
+        Document.id == doc_id,
+        Document.worker_id == worker_id,
+        Document.superseded_at.isnot(None),
+    ).first()
+    if not doc or not doc.file_data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return Response(
+        content=doc.file_data,
+        media_type=doc.file_mime or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{doc.file_name}"'},
+    )
+
+
+# ──────────────────────────────────────────────────────────
+# DELETE /workers/{worker_id}/checklist/retained-document/{doc_id}
+# ──────────────────────────────────────────────────────────
+
+
+@router.delete("/retained-document/{doc_id}")
+def delete_retained_document(
+    worker_id: str,
+    doc_id: str,
+    organisation_id: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    resolve_worker_for_checklist(worker_id, db, current_user, organisation_id)
+    doc = db.query(Document).filter(
+        Document.id == doc_id,
+        Document.worker_id == worker_id,
+        Document.superseded_at.isnot(None),
+    ).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    db.delete(doc)
+    db.commit()
+    return {"status": "deleted", "id": doc_id}
 
 
 # ──────────────────────────────────────────────────────────
@@ -172,10 +479,11 @@ async def upload_document(
     item_id: str,
     file: UploadFile = File(...),
     notes: str = Form(None),
+    organisation_id: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _get_worker(worker_id, db, current_user)
+    resolve_worker_for_checklist(worker_id, db, current_user, organisation_id)
 
     checklist_item = db.query(DocumentChecklist).filter(
         DocumentChecklist.id == item_id,
@@ -227,10 +535,11 @@ def download_document(
     worker_id: str,
     item_id: str,
     doc_id: str,
+    organisation_id: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _get_worker(worker_id, db, current_user)
+    resolve_worker_for_checklist(worker_id, db, current_user, organisation_id)
 
     doc = db.query(Document).filter(
         Document.id == doc_id,
@@ -255,10 +564,11 @@ def download_document(
 def verify_checklist_item(
     worker_id: str,
     item_id: str,
+    organisation_id: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    _get_worker(worker_id, db, current_user)
+    resolve_worker_for_checklist(worker_id, db, current_user, organisation_id)
 
     checklist_item = db.query(DocumentChecklist).filter(
         DocumentChecklist.id == item_id,
@@ -292,10 +602,11 @@ def reject_checklist_item(
     worker_id: str,
     item_id: str,
     reason: str = Form(""),
+    organisation_id: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    _get_worker(worker_id, db, current_user)
+    resolve_worker_for_checklist(worker_id, db, current_user, organisation_id)
 
     checklist_item = db.query(DocumentChecklist).filter(
         DocumentChecklist.id == item_id,
@@ -327,10 +638,11 @@ def reject_checklist_item(
 def mark_not_applicable(
     worker_id: str,
     item_id: str,
+    organisation_id: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    _get_worker(worker_id, db, current_user)
+    resolve_worker_for_checklist(worker_id, db, current_user, organisation_id)
 
     checklist_item = db.query(DocumentChecklist).filter(
         DocumentChecklist.id == item_id,
@@ -354,10 +666,11 @@ def update_notes(
     worker_id: str,
     item_id: str,
     notes: str = Form(""),
+    organisation_id: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _get_worker(worker_id, db, current_user)
+    resolve_worker_for_checklist(worker_id, db, current_user, organisation_id)
 
     checklist_item = db.query(DocumentChecklist).filter(
         DocumentChecklist.id == item_id,
