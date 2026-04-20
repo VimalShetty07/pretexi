@@ -2,12 +2,18 @@
 Idempotent seed: one tenant org, tenant admin + HR, and 20 varied dummy employees with portal users.
 
 Run on the server from the backend app root (with DATABASE_URL in env), e.g.:
-  docker compose exec api python seed_production_vimal_demo.py
-  # Full reset of this demo org only, then 20 employees + vimal@vimal.com (admin) + vimalhr@vimal.com (HR):
+  docker compose exec pretexi_api python seed_production_vimal_demo.py
+  # Full reset of this org only, then 20 employees (see env vars below)
   SEED_ALLOW_CLEAN=1 python seed_production_vimal_demo.py --clean
 
 Uses MOCK_SEED_PASSWORD from settings for all seeded user passwords (set in .env).
-Licence: PROD-VIMAL-001. Other tenants in the same database are not affected by --clean.
+
+Environment (optional; defaults = Admin Org + admin@protexi.local):
+  SEED_ORG_NAME, SEED_ORG_LICENCE, SEED_ORG_SLUG
+  SEED_ADMIN_EMAIL, SEED_ADMIN_NAME, SEED_HR_EMAIL, SEED_HR_NAME
+  SEED_EMPLOYEE_EMAIL_DOMAIN  (e.g. protexi.local → emp01@protexi.local)
+  SEED_EMP_ID_PREFIX          (e.g. EMP-ADMIN → employee id EMP-ADMIN-001)
+--clean wipes only the org matching SEED_ORG_LICENCE. Other tenants are not affected.
 """
 from __future__ import annotations
 
@@ -43,14 +49,23 @@ from app.models.models import (
 
 settings = get_settings()
 
-ORG_NAME = "Vimal Demo Ltd"
-ORG_LICENCE = "PROD-VIMAL-001"
-ORG_SLUG = "vimal-demo"
 
-ADMIN_EMAIL = "vimal@vimal.com"
-ADMIN_NAME = "Vimal Admin"
-HR_EMAIL = "vimalhr@vimal.com"
-HR_NAME = "Vimal HR"
+def _env(key: str, default: str) -> str:
+    v = os.environ.get(key, "")
+    v = v.strip() if isinstance(v, str) else ""
+    return v if v else default
+
+
+# Defaults: admin@protexi.local, org slug adminorg, 20 × emp{nn}@protexi.local
+ORG_NAME = _env("SEED_ORG_NAME", "Admin Org")
+ORG_LICENCE = _env("SEED_ORG_LICENCE", "PROD-ADMINORG-001")
+ORG_SLUG = _env("SEED_ORG_SLUG", "adminorg")
+ADMIN_EMAIL = _env("SEED_ADMIN_EMAIL", "admin@protexi.local")
+ADMIN_NAME = _env("SEED_ADMIN_NAME", "Protexi Admin")
+HR_EMAIL = _env("SEED_HR_EMAIL", "hr@protexi.local")
+HR_NAME = _env("SEED_HR_NAME", "Protexi HR")
+EMPLOYEE_EMAIL_DOMAIN = _env("SEED_EMPLOYEE_EMAIL_DOMAIN", "protexi.local")
+EMP_ID_PREFIX = _env("SEED_EMP_ID_PREFIX", "EMP-ADMIN")
 
 PASSWORD = settings.MOCK_SEED_PASSWORD
 
@@ -554,7 +569,7 @@ def main() -> None:
         today = now.date()
         for i in range(20):
             idx = i + 1
-            email = f"emp{idx:02d}@vimal.com"
+            email = f"emp{idx:02d}@{EMPLOYEE_EMAIL_DOMAIN}"
             fn = FIRST_NAMES[i]
             ln = LAST_NAMES[i]
             name = f"{fn} {ln}"
@@ -607,7 +622,7 @@ def main() -> None:
                 w.passport_expiry = passport_exp
                 w.brp_expiry = visa_exp
                 w.phone = f"+44 7700 {100000 + idx}"
-                w.employee_id = f"EMP-VIMAL-{idx:03d}"
+                w.employee_id = f"{EMP_ID_PREFIX}-{idx:03d}"
                 if w.status == WorkerStatus.TERMINATED:
                     w.termination_date = datetime(today.year, 1, 15, tzinfo=timezone.utc)
                 else:
@@ -640,7 +655,7 @@ def main() -> None:
                     risk_level=RISKS[i],
                     employment_status=EMPLOYMENT_STATUSES[i],
                     right_to_work_category=RTW_CATEGORIES[i],
-                    employee_id=f"EMP-VIMAL-{idx:03d}",
+                    employee_id=f"{EMP_ID_PREFIX}-{idx:03d}",
                     employee_type="migrant",
                     date_of_birth=datetime(1988 + (idx % 10), ((idx + 3) % 12) + 1, min(idx, 28), tzinfo=timezone.utc).date(),
                     address_line_1=f"{10 + idx} Demo Street",
