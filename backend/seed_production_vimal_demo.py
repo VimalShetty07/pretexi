@@ -3,11 +3,16 @@ Idempotent seed: one tenant org, tenant admin + HR, and 20 varied dummy employee
 
 Run on the server from the backend app root (with DATABASE_URL in env), e.g.:
   docker compose exec api python seed_production_vimal_demo.py
+  # Full reset of this demo org only, then 20 employees + vimal@vimal.com (admin) + vimalhr@vimal.com (HR):
+  SEED_ALLOW_CLEAN=1 python seed_production_vimal_demo.py --clean
 
 Uses MOCK_SEED_PASSWORD from settings for all seeded user passwords (set in .env).
+Licence: PROD-VIMAL-001. Other tenants in the same database are not affected by --clean.
 """
 from __future__ import annotations
 
+import argparse
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -21,8 +26,11 @@ from app.models.models import (
     BgVerification,
     BgVerificationReference,
     BgVerificationStatus,
+    DashboardAdminMessage,
     Document,
     DocumentStatus,
+    InspectionPack,
+    LeaveRequest,
     Organisation,
     ReferenceStatus,
     RiskLevel,
@@ -210,6 +218,44 @@ RTW_CATEGORIES = (
     "Skilled Worker",
     "Skilled Worker",
 )
+
+
+def _wipe_organisation_for_reseed(db, org: Organisation) -> None:
+    """Remove users, workers, and linked rows for the demo org so it can be re-seeded from scratch.
+
+    Not a full DB reset — other tenants are untouched. Requires SEED_ALLOW_CLEAN=1 in env when
+    used with the CLI --clean flag.
+    """
+    org_id = org.id
+    print(f"  Cleaning org {org.name!r} (licence {org.licence_number})…")
+
+    db.query(User).filter(User.organisation_id == org_id, User.worker_id.isnot(None)).update(
+        {User.worker_id: None},
+        synchronize_session=False,
+    )
+
+    for v in db.query(BgVerification).filter(BgVerification.organisation_id == org_id).all():
+        db.delete(v)
+
+    db.query(LeaveRequest).filter(LeaveRequest.organisation_id == org_id).delete(synchronize_session=False)
+    n_insp = (
+        db.query(InspectionPack).filter(InspectionPack.organisation_id == org_id).delete(
+            synchronize_session=False
+        )
+    )
+    if n_insp:
+        print(f"    Removed {n_insp} inspection pack(s)")
+
+    for w in db.query(Worker).filter(Worker.organisation_id == org_id).all():
+        db.delete(w)
+    n_users = db.query(User).filter(User.organisation_id == org_id).all()
+    for u in n_users:
+        db.delete(u)
+    db.query(DashboardAdminMessage).filter(DashboardAdminMessage.organisation_id == org_id).delete(
+        synchronize_session=False
+    )
+    print("    Wipe step complete (workers, org users, linked rows).")
+    db.flush()
 
 
 def _ensure_org(db) -> Organisation:
@@ -458,8 +504,32 @@ def _seed_bg_verification_for_worker(db, *, worker: Worker, idx: int, now: datet
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Seed or refresh the Vimal production demo org (idempotent; safe to re-run)."
+    )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Delete all data for the demo org (licence %s) before re-seeding. Set SEED_ALLOW_CLEAN=1." % (ORG_LICENCE,),
+    )
+    args = parser.parse_args()
+
+    if args.clean:
+        if os.environ.get("SEED_ALLOW_CLEAN", "").strip().lower() not in ("1", "true", "yes"):
+            print(
+                "Refusing --clean: set SEED_ALLOW_CLEAN=1 in the environment to confirm a destructive wipe of the demo org.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     db = SessionLocal()
     try:
+        if args.clean:
+            org_existing = (
+                db.query(Organisation).filter(Organisation.licence_number == ORG_LICENCE).first()
+            )
+            if org_existing:
+                _wipe_organisation_for_reseed(db, org_existing)
         org = _ensure_org(db)
         db.flush()
 
