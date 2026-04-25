@@ -108,8 +108,7 @@ const DEFAULT_DEPT_OPTIONS = ["Operations", "People", "Finance", "Engineering", 
 const DEFAULT_LOC_OPTIONS = ["London HQ", "Manchester Office", "Remote", "Hybrid — UK"];
 const DEFAULT_ONBOARDING_OPTIONS = ["Recruitment", "CoS assignment", "Pre-start", "Active sponsorship"];
 const DEFAULT_RTW_CATEGORY_OPTIONS = [
-  "British Citizen",
-  "Irish Citizen",
+  "British/Irish Citizen",
   "ILR / Settled Status",
   "Pre-settled Status",
   "Visa – Sponsored Worker",
@@ -320,7 +319,6 @@ function WorkerDetailInner() {
   const [departmentOptions, setDepartmentOptions] = useState<string[]>(DEFAULT_DEPT_OPTIONS);
   const [workLocationOptions, setWorkLocationOptions] = useState<string[]>(DEFAULT_LOC_OPTIONS);
   const [onboardingStageOptions, setOnboardingStageOptions] = useState<string[]>(DEFAULT_ONBOARDING_OPTIONS);
-  const [rtwCategoryOptions, setRtwCategoryOptions] = useState<string[]>(DEFAULT_RTW_CATEGORY_OPTIONS);
   const [savingEmployment, setSavingEmployment] = useState(false);
   const [savingInternalNotes, setSavingInternalNotes] = useState(false);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
@@ -334,6 +332,14 @@ function WorkerDetailInner() {
   const [notesDraft, setNotesDraft] = useState("");
 
   const rtwUi = useMemo(() => getRtwUiProfile(worker?.right_to_work_category), [worker?.right_to_work_category]);
+  const ensureFixedRtwCategories = useCallback(async () => {
+    if (!token) return;
+    await api.patch(
+      "/organisation/settings",
+      { rtw_category_options: DEFAULT_RTW_CATEGORY_OPTIONS },
+      token
+    );
+  }, [token]);
 
   const patchWorker = async (body: Record<string, unknown>) => {
     if (!token || !params?.id) return;
@@ -342,7 +348,23 @@ function WorkerDetailInner() {
     if (internalNotesOnly) setSavingInternalNotes(true);
     else setSavingEmployment(true);
     try {
+      setError("");
       await api.patch(`/workers/${params.id}`, body, token);
+    } catch (err: unknown) {
+      const isRtwPatch = keys.includes("right_to_work_category");
+      if (!isRtwPatch) {
+        setError(err instanceof Error ? err.message : "Failed to update employee");
+        return;
+      }
+      try {
+        await ensureFixedRtwCategories();
+        await api.patch(`/workers/${params.id}`, body, token);
+      } catch (retryErr: unknown) {
+        setError(retryErr instanceof Error ? retryErr.message : "Failed to update right to work category");
+        return;
+      }
+    }
+    try {
       const data = await api.get<WorkerDetail>(`/workers/${params.id}`, token);
       setWorker((prev) => {
         if (!prev) return data;
@@ -352,6 +374,8 @@ function WorkerDetailInner() {
         }
         return merged;
       });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Updated, but failed to refresh employee details");
     } finally {
       if (internalNotesOnly) setSavingInternalNotes(false);
       else setSavingEmployment(false);
@@ -411,13 +435,11 @@ function WorkerDetailInner() {
           department_options: string[];
           work_location_options: string[];
           onboarding_stage_options: string[];
-          rtw_category_options: string[];
         }>("/organisation/settings", token);
         if (s.employment_status_options?.length) setEmploymentOptions(s.employment_status_options);
         if (s.department_options?.length) setDepartmentOptions(s.department_options);
         if (s.work_location_options?.length) setWorkLocationOptions(s.work_location_options);
         if (s.onboarding_stage_options?.length) setOnboardingStageOptions(s.onboarding_stage_options);
-        if (s.rtw_category_options?.length) setRtwCategoryOptions(s.rtw_category_options);
       } catch {
         /* defaults */
       }
@@ -996,6 +1018,10 @@ function WorkerDetailInner() {
                         <ProfileKVRow label="Age" value={worker.age_years != null ? String(worker.age_years) : "—"} />
                         <ProfileKVRow label="Nationality" value={worker.nationality || "—"} />
                       </ProfileFieldGroup>
+                      <ProfileFieldGroup title="Contact">
+                        <ProfileKVRow label="Phone number" value={worker.phone || "—"} />
+                        <ProfileKVRow label="Email address" value={worker.email || "—"} />
+                      </ProfileFieldGroup>
                       <ProfileFieldGroup title="Correspondence address">
                         <ProfileKVRow label="Address line 1" value={worker.address_line_1 || "—"} />
                         <ProfileKVRow label="Address line 2" value={worker.address_line_2 || "—"} />
@@ -1099,6 +1125,42 @@ function WorkerDetailInner() {
                             />
                             <ProfileKVRow dense label="Nationality" value={worker.nationality || "—"} />
                           </div>
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <ProfileBlockTitle>Contact</ProfileBlockTitle>
+                        <div className="space-y-3 rounded-none border border-[rgba(0,0,0,0.1)] bg-[#fafbfc] p-3 sm:p-4">
+                          <label className="flex min-w-0 flex-col gap-1">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                              Phone number
+                            </span>
+                            <input
+                              defaultValue={worker.phone ?? ""}
+                              key={`ph-${worker.id}-${worker.phone ?? ""}`}
+                              onBlur={async (e) => {
+                                const v = e.target.value.trim();
+                                if (v === (worker.phone ?? "")) return;
+                                await patchWorker({ phone: v || null });
+                              }}
+                              className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                            />
+                          </label>
+                          <label className="flex min-w-0 flex-col gap-1">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b]" style={{ fontFamily: "var(--dash-mono)" }}>
+                              Email address
+                            </span>
+                            <input
+                              type="email"
+                              defaultValue={worker.email ?? ""}
+                              key={`em-${worker.id}-${worker.email ?? ""}`}
+                              onBlur={async (e) => {
+                                const v = e.target.value.trim();
+                                if (v === (worker.email ?? "")) return;
+                                await patchWorker({ email: v || null });
+                              }}
+                              className="w-full rounded-none border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-[13px] font-medium text-[#0f1f3a] outline-none transition-colors focus:border-[rgba(26,79,160,0.45)]"
+                            />
+                          </label>
                         </div>
                       </div>
                       <div className="min-w-0">
@@ -1388,7 +1450,7 @@ function WorkerDetailInner() {
 
                 <AspectCard
                   title="Immigration / Right to work"
-                  subtitle="Right to work category, sponsor route, visa dates, and RTW checks"
+                  subtitle="Right to work sign-off details"
                   icon={Plane}
                   barClass="bg-[#0D9488]"
                 >
@@ -1412,70 +1474,35 @@ function WorkerDetailInner() {
                             }}
                           >
                             <option value="">—</option>
-                            {[...new Set([...rtwCategoryOptions, worker.right_to_work_category || ""])]
-                              .filter(Boolean)
-                              .map((opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              ))}
+                            {DEFAULT_RTW_CATEGORY_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
                           </select>
                         </div>
                       </div>
                     ) : null}
                     <div className="">
-                      {!canEditEmployment ? (
-                        <DashRow label="Right to work category" value={worker.right_to_work_category || "—"} />
-                      ) : null}
-                      {(rtwUi.showVisaImmigration || rtwUi.showSponsorshipCos) && (
-                        <DashRow label="Immigration route" value={worker.route || "—"} />
-                      )}
-                      {rtwUi.showVisaImmigration ? (
-                        <>
-                          <DashRow label="Visa expiry" value={formatDetailDate(worker.visa_expiry)} />
-                          <DashRow
-                            label="Days to expiry"
-                            value={
-                              worker.visa_expiry
-                                ? (() => {
-                                    const d = Math.ceil(
-                                      (new Date(worker.visa_expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-                                    );
-                                    if (d < 0) return `${Math.abs(d)} days overdue`;
-                                    return `${d} days`;
-                                  })()
-                                : "—"
-                            }
-                          />
-                        </>
-                      ) : null}
-                      {rtwUi.kind === "british_irish" ? (
-                        <BritishIrishRtwPanel
-                          worker={worker}
-                          canEditEmployment={canEditEmployment}
-                          savingEmployment={savingEmployment}
-                          patchWorker={patchWorker}
-                          loadAll={loadAll}
-                          token={token}
-                          workerId={params.id ?? ""}
-                        />
-                      ) : (
-                        <>
-                          <DashRow label="Last RTW check" value={formatDetailDate(worker.last_rtw_check)} />
-                          <DashRow label="Next RTW check" value={formatDetailDate(worker.next_rtw_check)} />
-                        </>
-                      )}
-                    </div>
-                    {showStaffNotes ? (
-                      <RtwVerificationChecklistSection
-                        checklist={worker.rtw_verification_checklist}
-                        canEditEmployment={canEditEmployment}
-                        savingEmployment={savingEmployment}
-                        onSave={async (next) => {
-                          await patchWorker({ rtw_verification_checklist: next });
-                        }}
+                      <DashRow
+                        label="Approved by"
+                        value={
+                          worker.rtw_verification_checklist?.declaration_checked_by_name ||
+                          worker.rtw_check_signed_by_name ||
+                          "—"
+                        }
                       />
-                    ) : null}
+                      <DashRow
+                        label="Signed on"
+                        value={
+                          worker.rtw_verification_checklist?.declaration_date
+                            ? formatDetailDate(worker.rtw_verification_checklist.declaration_date)
+                            : worker.rtw_check_signed_at
+                              ? formatRtwSignedAt(worker.rtw_check_signed_at)
+                              : "—"
+                        }
+                      />
+                    </div>
                   </div>
                 </AspectCard>
 
@@ -1498,13 +1525,34 @@ function WorkerDetailInner() {
           )}
 
           {mainTab === "checklist" && (
-            <DocumentChecklist
-              workerId={params.id}
-              organisationId={worker.organisation_id?.trim() || user?.organisation_id || null}
-              items={checklistItems}
-              supersededDocuments={supersededDocuments}
-              onRefresh={loadAll}
-            />
+            <div className="space-y-4">
+              <div className="wem-surface">
+                <div className="wem-toolbar">
+                  <h3 className="text-[11px] font-extrabold text-[#0a0a0a]">RTW questions</h3>
+                </div>
+                <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">
+                  {showStaffNotes ? (
+                    <RtwVerificationChecklistSection
+                      checklist={worker.rtw_verification_checklist}
+                      canEditEmployment={canEditEmployment}
+                      savingEmployment={savingEmployment}
+                      onSave={async (next) => {
+                        await patchWorker({ rtw_verification_checklist: next });
+                      }}
+                    />
+                  ) : (
+                    <p className="text-[12px] text-[#94a3b8]">RTW questions are visible to staff only.</p>
+                  )}
+                </div>
+              </div>
+              <DocumentChecklist
+                workerId={params.id}
+                organisationId={worker.organisation_id?.trim() || user?.organisation_id || null}
+                items={checklistItems}
+                supersededDocuments={supersededDocuments}
+                onRefresh={loadAll}
+              />
+            </div>
           )}
 
           {mainTab === "records" && (

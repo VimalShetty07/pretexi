@@ -15,7 +15,6 @@ import {
   BriefcaseBusiness,
   Building2,
   Mail,
-  ShieldCheck,
   Users,
   UserCheck,
   ListChecks,
@@ -65,21 +64,11 @@ const DEFAULT_EMPLOYMENT_STATUSES = ["Active", "Inactive", "Finished"];
 const DEFAULT_DEPARTMENTS = ["Operations", "People", "Finance", "Engineering", "Care"];
 const DEFAULT_WORK_LOCATIONS = ["London HQ", "Manchester Office", "Remote", "Hybrid — UK"];
 const DEFAULT_ONBOARDING_STAGES = ["Recruitment", "CoS assignment", "Pre-start", "Active sponsorship"];
-const DEFAULT_RTW_CATEGORIES = [
-  "British Citizen",
-  "Irish Citizen",
-  "ILR / Settled Status",
-  "Pre-settled Status",
-  "Visa – Sponsored Worker",
-  "Visa – Non-Sponsored Worker",
-];
-
 interface OrgSettingsResponse {
   employment_status_options: string[];
   department_options: string[];
   work_location_options: string[];
   onboarding_stage_options: string[];
-  rtw_category_options: string[];
 }
 
 const MONO: React.CSSProperties = { fontFamily: "var(--dash-mono)" };
@@ -123,8 +112,7 @@ function SettingsSection({
     | "employment_status_options"
     | "department_options"
     | "work_location_options"
-    | "onboarding_stage_options"
-    | "rtw_category_options";
+    | "onboarding_stage_options";
   token: string | null;
   saveLabel?: string;
   addLabel?: string;
@@ -287,7 +275,6 @@ export default function OrganisationPage() {
   const [departmentOptions, setDepartmentOptions] = useState<string[]>(DEFAULT_DEPARTMENTS);
   const [workLocationOptions, setWorkLocationOptions] = useState<string[]>(DEFAULT_WORK_LOCATIONS);
   const [onboardingStageOptions, setOnboardingStageOptions] = useState<string[]>(DEFAULT_ONBOARDING_STAGES);
-  const [rtwCategoryOptions, setRtwCategoryOptions] = useState<string[]>(DEFAULT_RTW_CATEGORIES);
 
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
@@ -297,8 +284,6 @@ export default function OrganisationPage() {
   const [locMsg, setLocMsg] = useState("");
   const [stageSaving, setStageSaving] = useState(false);
   const [stageMsg, setStageMsg] = useState("");
-  const [rtwSaving, setRtwSaving] = useState(false);
-  const [rtwMsg, setRtwMsg] = useState("");
 
   const loadOrgSettings = useCallback(async () => {
     if (!token) return;
@@ -308,7 +293,6 @@ export default function OrganisationPage() {
       if (s.department_options?.length) setDepartmentOptions(s.department_options);
       if (s.work_location_options?.length) setWorkLocationOptions(s.work_location_options);
       if (s.onboarding_stage_options?.length) setOnboardingStageOptions(s.onboarding_stage_options);
-      if (s.rtw_category_options?.length) setRtwCategoryOptions(s.rtw_category_options);
     } catch { /* keep defaults */ }
   }, [token]);
 
@@ -597,24 +581,6 @@ export default function OrganisationPage() {
           token={token}
         />
       </div>
-
-      <SettingsSection
-        title="Right to work categories"
-        description="Canonical list for the Right to work category field on every employee — align with your HR / compliance policy."
-        icon={ShieldCheck}
-        count={rtwCategoryOptions.length}
-        options={rtwCategoryOptions}
-        setOptions={setRtwCategoryOptions}
-        canEdit={canEdit}
-        saving={rtwSaving}
-        setSaving={setRtwSaving}
-        msg={rtwMsg}
-        setMsg={setRtwMsg}
-        onReload={loadOrgSettings}
-        resetDefaults={DEFAULT_RTW_CATEGORIES}
-        patchKey="rtw_category_options"
-        token={token}
-      />
 
       {/* ── Admin context bar ─────────────────────────────────── */}
       <div className="border border-[rgba(0,0,0,0.08)] bg-white">

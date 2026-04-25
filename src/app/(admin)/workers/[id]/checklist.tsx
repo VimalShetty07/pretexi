@@ -247,7 +247,7 @@ export default function DocumentChecklist({
       <input ref={fileInputRef} type="file" className="hidden" onChange={onFileChange} />
 
       <div className="wem-toolbar">
-        <h3 className="text-[11px] font-extrabold text-[#0a0a0a]">Document Checklist</h3>
+        <h3 className="text-[11px] font-extrabold text-[#0a0a0a]">RTW documents</h3>
       </div>
 
       <div className="border-t border-[rgba(0,0,0,0.07)] bg-white p-4">

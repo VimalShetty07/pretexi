@@ -143,6 +143,13 @@ const DEFAULT_ONBOARDING_STAGE_OPTIONS = [
   "Pre-start",
   "Active sponsorship",
 ];
+const FIXED_RTW_CATEGORY_OPTIONS = [
+  "British/Irish Citizen",
+  "ILR / Settled Status",
+  "Pre-settled Status",
+  "Visa – Sponsored Worker",
+  "Visa – Non-Sponsored Worker",
+];
 
 const SALARY_PAY_OPTIONS: { value: string; label: string }[] = [
   { value: "hourly", label: "Hourly rate" },
@@ -181,19 +188,18 @@ export default function NewWorkerPage() {
   const [departmentOptions, setDepartmentOptions] = useState<string[]>(DEFAULT_DEPARTMENT_OPTIONS);
   const [workLocationOptions, setWorkLocationOptions] = useState<string[]>(DEFAULT_WORK_LOCATION_OPTIONS);
   const [onboardingStageOptions, setOnboardingStageOptions] = useState<string[]>(DEFAULT_ONBOARDING_STAGE_OPTIONS);
-  const RTW_CATEGORY_OPTIONS_FALLBACK = [
-    "British Citizen",
-    "Irish Citizen",
-    "ILR / Settled Status",
-    "Pre-settled Status",
-    "Visa – Sponsored Worker",
-    "Visa – Non-Sponsored Worker",
-  ];
-  const [rtwCategoryOptions, setRtwCategoryOptions] = useState<string[]>(RTW_CATEGORY_OPTIONS_FALLBACK);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const rtwUi = useMemo(() => getRtwUiProfile(form.right_to_work_category || null), [form.right_to_work_category]);
+  const ensureFixedRtwCategories = async () => {
+    if (!token) return;
+    await api.patch(
+      "/organisation/settings",
+      { rtw_category_options: FIXED_RTW_CATEGORY_OPTIONS },
+      token
+    );
+  };
 
   const todayLabel = useMemo(
     () =>
@@ -212,13 +218,11 @@ export default function NewWorkerPage() {
       try {
         const s = await api.get<{
           employment_status_options: string[];
-          rtw_category_options: string[];
           department_options: string[];
           work_location_options: string[];
           onboarding_stage_options: string[];
         }>("/organisation/settings", token);
         if (s.employment_status_options?.length) setEmploymentOptions(s.employment_status_options);
-        if (s.rtw_category_options?.length) setRtwCategoryOptions(s.rtw_category_options);
         if (s.department_options?.length) setDepartmentOptions(s.department_options);
         if (s.work_location_options?.length) setWorkLocationOptions(s.work_location_options);
         if (s.onboarding_stage_options?.length) setOnboardingStageOptions(s.onboarding_stage_options);
@@ -252,6 +256,7 @@ export default function NewWorkerPage() {
     setError("");
     setSaving(true);
     try {
+      await ensureFixedRtwCategories();
       const fullName =
         form.name.trim() ||
         [form.first_name.trim(), form.second_name.trim(), form.last_name.trim()].filter(Boolean).join(" ").trim();
@@ -574,7 +579,7 @@ export default function NewWorkerPage() {
                 className="wem-new-inp cursor-pointer"
               >
                 <option value="">Select...</option>
-                {rtwCategoryOptions.map((o) => (
+                {FIXED_RTW_CATEGORY_OPTIONS.map((o) => (
                   <option key={o} value={o}>
                     {o}
                   </option>

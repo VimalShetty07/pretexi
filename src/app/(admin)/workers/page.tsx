@@ -104,6 +104,57 @@ function isSponsoredRoute(route: string | null | undefined): boolean {
   return true;
 }
 
+/** Auth user row from `/auth/users` (HR, managers, etc. may exist here without a worker record). */
+interface TenantDirectoryUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  worker_id?: string | null;
+}
+
+const DIRECTORY_ACCOUNT_ID_PREFIX = "acct:";
+
+function isDirectoryAccountRow(w: Worker): boolean {
+  return w.id.startsWith(DIRECTORY_ACCOUNT_ID_PREFIX);
+}
+
+function formatDirectoryRoleLabel(role: string): string {
+  return role
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function accountToDirectoryWorker(u: TenantDirectoryUser): Worker {
+  return {
+    id: `${DIRECTORY_ACCOUNT_ID_PREFIX}${u.id}`,
+    name: u.full_name,
+    job_title: formatDirectoryRoleLabel(u.role),
+    email: u.email,
+    phone: null,
+    nationality: null,
+    department: "Internal",
+    salary: null,
+    route: "",
+    work_location: null,
+    status: u.is_active ? "active" : "suspended",
+    employment_status: "Organisation account",
+    stage: "—",
+    risk_level: "low",
+    visa_expiry: null,
+    start_date: null,
+    created_at: "1970-01-01T00:00:00.000Z",
+    has_profile_photo: false,
+  };
+}
+
+function directoryRowMatchesSearch(w: Worker, searchLower: string): boolean {
+  if (!searchLower) return true;
+  const hay = `${w.name} ${w.job_title || ""} ${w.email || ""} ${w.department || ""}`.toLowerCase();
+  return hay.includes(searchLower);
+}
+
 export default function WorkersPage() {
   return (
     <Suspense
@@ -124,6 +175,7 @@ function WorkersPageInner() {
   const { token, user } = useAuth();
   const { showToast } = useToast();
   const [workers, setWorkers] = useState<Worker[]>([]);
+  const [tenantDirectoryUsers, setTenantDirectoryUsers] = useState<TenantDirectoryUser[]>([]);
   const [statsWorkers, setStatsWorkers] = useState<Worker[]>([]);
   const [onLeaveIds, setOnLeaveIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -146,6 +198,7 @@ function WorkersPageInner() {
 
   const canManage = user ? STAFF_ROLES.includes(user.role) : false;
   const canEditTableColumns = user ? COLUMN_PREF_ROLES.includes(user.role) : false;
+  const canOpenSettingsForAccounts = user?.role === "tenant_admin" || user?.role === "super_admin";
 
   useEffect(() => {
     try {
@@ -241,6 +294,19 @@ function WorkersPageInner() {
     }
   };
 
+  const fetchTenantDirectoryUsers = async () => {
+    if (!token) {
+      setTenantDirectoryUsers([]);
+      return;
+    }
+    try {
+      const data = await api.get<TenantDirectoryUser[]>("/auth/users", token);
+      setTenantDirectoryUsers(Array.isArray(data) ? data : []);
+    } catch {
+      setTenantDirectoryUsers([]);
+    }
+  };
+
   const fetchOnLeave = async () => {
     if (!token) return;
     try {
@@ -285,6 +351,7 @@ function WorkersPageInner() {
   useEffect(() => {
     if (token) {
       fetchStatsWorkers();
+      fetchTenantDirectoryUsers();
       fetchOnLeave();
       fetchWorkerTableColumns();
     }
@@ -318,8 +385,24 @@ function WorkersPageInner() {
     setPage(1);
   }, [search, tab]);
 
+  const mergedWorkers = useMemo(() => {
+    const workerIds = new Set(workers.map((w) => w.id));
+    const searchLo = search.trim().toLowerCase();
+    const extras = tenantDirectoryUsers
+      .filter((u) => {
+        if (u.worker_id && workerIds.has(u.worker_id)) return false;
+        return true;
+      })
+      .map(accountToDirectoryWorker)
+      .filter((row) => directoryRowMatchesSearch(row, searchLo));
+    return [...workers, ...extras];
+  }, [workers, tenantDirectoryUsers, search]);
+
   const filteredWorkers = useMemo(() => {
-    let list = workers;
+    let list = mergedWorkers;
+    if (tab === "active") {
+      list = list.filter((w) => w.status === "active");
+    }
     if (tab === "sponsored") {
       list = list.filter((w) => isSponsoredRoute(w.route));
     }
@@ -327,7 +410,7 @@ function WorkersPageInner() {
       list = list.filter((w) => onLeaveIds.has(w.id));
     }
     return list;
-  }, [workers, tab, onLeaveIds]);
+  }, [mergedWorkers, tab, onLeaveIds]);
 
   const totalPages = Math.max(1, Math.ceil(filteredWorkers.length / PAGE_SIZE));
   const paginatedWorkers = useMemo(() => {
@@ -341,7 +424,11 @@ function WorkersPageInner() {
 
   const miniStats = useMemo(() => {
     const sw = statsWorkers;
-    const active = sw.filter((w) => w.status === "active").length;
+    const statsIds = new Set(sw.map((w) => w.id));
+    const supplementalActive = tenantDirectoryUsers.filter(
+      (u) => u.is_active && (!u.worker_id || !statsIds.has(u.worker_id))
+    ).length;
+    const active = sw.filter((w) => w.status === "active").length + supplementalActive;
     const sponsored = sw.filter((w) => isSponsoredRoute(w.route)).length;
     const onLeave = onLeaveIds.size;
     const docsPending = sw.filter((w) => {
@@ -351,7 +438,13 @@ function WorkersPageInner() {
       return c.verified < c.total;
     }).length;
     return { active, sponsored, onLeave, docsPending };
-  }, [statsWorkers, onLeaveIds, compliance]);
+  }, [statsWorkers, tenantDirectoryUsers, onLeaveIds, compliance]);
+
+  const totalPeopleOnRecord = useMemo(() => {
+    const ids = new Set(statsWorkers.map((w) => w.id));
+    const extra = tenantDirectoryUsers.filter((u) => !u.worker_id || !ids.has(u.worker_id)).length;
+    return statsWorkers.length + extra;
+  }, [statsWorkers, tenantDirectoryUsers]);
 
   const handleDownloadTemplate = async () => {
     const headers: Record<string, string> = {};
@@ -395,6 +488,7 @@ function WorkersPageInner() {
         showToast(`Added ${data.created} employee${data.created === 1 ? "" : "s"}.`, "success");
         fetchWorkers();
         fetchStatsWorkers();
+        fetchTenantDirectoryUsers();
         if (canManage) fetchCompliance();
       }
     } catch (err: unknown) {
@@ -425,9 +519,22 @@ function WorkersPageInner() {
     });
   };
 
-  const openProfile = (id: string, e: React.MouseEvent) => {
+  const openDirectoryEntry = (w: Worker, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (isDirectoryAccountRow(w)) {
+      if (canOpenSettingsForAccounts) {
+        router.push("/settings");
+      } else {
+        showToast("Organisation account (HR / admin). Open Settings if you have access to manage users.", "info");
+      }
+      return;
+    }
+    router.push(`/workers/${w.id}?tab=overview`);
+  };
+
+  const openProfile = (w: Worker, e: React.MouseEvent) => {
     e.stopPropagation();
-    router.push(`/workers/${id}?tab=overview`);
+    openDirectoryEntry(w, e);
   };
 
   const now = new Date();
@@ -460,7 +567,7 @@ function WorkersPageInner() {
           </div>
           <div className="adm-sc-num">{miniStats.active}</div>
           <div className="adm-sc-lbl">Active Employees</div>
-          <div className="adm-sc-sub">{workers.length} total on record</div>
+          <div className="adm-sc-sub">{totalPeopleOnRecord} total on record</div>
         </button>
         <button type="button" className="adm-sc adm-sc-p" onClick={() => router.push("/workers?tab=sponsored")}>
           <div className="adm-sc-top">
@@ -597,8 +704,8 @@ function WorkersPageInner() {
                   compliance={compliance[w.id]}
                   starred={!!starred[w.id]}
                   onToggleStar={(e) => toggleStar(w.id, e)}
-                  onOpen={() => router.push(`/workers/${w.id}?tab=overview`)}
-                  onProfile={(e) => openProfile(w.id, e)}
+                  onOpen={() => openDirectoryEntry(w)}
+                  onProfile={(e) => openProfile(w, e)}
                   token={token ?? ""}
                 />
               ))}
@@ -637,7 +744,7 @@ function WorkersPageInner() {
                     const pct = c && c.total > 0 ? Math.round((c.verified / c.total) * 100) : null;
                     const st = STATUS_CONFIG[w.status] ?? STATUS_CONFIG.active;
                     return (
-                      <tr key={w.id} className="cursor-pointer" onClick={() => router.push(`/workers/${w.id}?tab=overview`)}>
+                      <tr key={w.id} className="cursor-pointer" onClick={() => openDirectoryEntry(w)}>
                         {visibleColumns.includes("name") && <td className="font-semibold">{w.name}</td>}
                         {visibleColumns.includes("job_title") && <td>{w.job_title || "—"}</td>}
                         {visibleColumns.includes("employment") && (
@@ -787,6 +894,7 @@ function EmployeeHtmlCard({
   onProfile: (e: React.MouseEvent) => void;
   token: string;
 }) {
+  const isAccountRow = isDirectoryAccountRow(w);
   const st = STATUS_CONFIG[w.status] ?? STATUS_CONFIG.active;
   const emp = w.employment_status || "Active";
   const initials = w.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -849,9 +957,17 @@ function EmployeeHtmlCard({
       {/* Footer */}
       <div className="wem-footer">
         <span className="wem-added">
-          {w.nationality || "—"} · {relativeShort(w.created_at)}
-          <span className="mx-1.5 text-[rgba(0,0,0,0.12)]">·</span>
-          <span className="text-[#64748b]">Employment</span> {emp}
+          {isAccountRow ? (
+            <>
+              <span className="text-[#64748b]">Access</span> · {emp}
+            </>
+          ) : (
+            <>
+              {w.nationality || "—"} · {relativeShort(w.created_at)}
+              <span className="mx-1.5 text-[rgba(0,0,0,0.12)]">·</span>
+              <span className="text-[#64748b]">Employment</span> {emp}
+            </>
+          )}
         </span>
         <div className="flex items-center gap-1.5">
           <button type="button" className="wem-action-btn" title="Star" onClick={onToggleStar}>
